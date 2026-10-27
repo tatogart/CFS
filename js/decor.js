@@ -2,8 +2,8 @@
 // Окна, двери, ставни, карнизы, фонари, навесы, кондиционеры, трубы, провода с бельём,
 // деревья, крыши с баками и антеннами, город и горы на горизонте, пятна на полу.
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793131785';
-import { rng, shade } from './art.js?v=1793131785';
+import { CELL } from './maps.js?v=1793131993';
+import { rng, shade } from './art.js?v=1793131993';
 
 // стиль оформления по карте
 const STYLE_BY_MAP = { dust2: 'dust', mirage: 'dust', inferno: 'inferno', nuke: 'industrial', overpass: 'park', ancient: 'jungle', anubis: 'egypt', vertigo: 'construction', train: 'industrial', aim: 'indoor', shortdust: 'dust', lake: 'lake', canals: 'inferno', baggage: 'indoor', shoots: 'dust', poolday: 'lake' };
@@ -278,6 +278,32 @@ export function decorate(world, group, quality) {
     const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: decalTex(k), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), list.length);
     list.forEach(([i, j], n) => { const s = k === 'drain' ? 0.9 : 1.4 + R() * 2.2; m.setMatrixAt(n, mat4((i + 0.5 + (R() - 0.5) * 0.4) * CELL, world.fl(i, j) + 0.012, (j + 0.5 + (R() - 0.5) * 0.4) * CELL, s, 1, s, R() * 6.28)); });
     m.renderOrder = 1; group.add(m);
+  }
+
+  // ---------- ящики, контейнеры и вагоны: рамы, рёбра, колёса ----------
+  {
+    const crate = th.crate || '#8a6a44', cd = shade(crate, -0.35), cm = shade(crate, -0.2);
+    for (let j = 0; j < Hh; j++) for (let i = 0; i < W; i++) {
+      const ch = cells[j][i], x = (i + 0.5) * CELL, z = (j + 0.5) * CELL, fl = world.fl(i, j);
+      if (ch === 'c') {
+        const h = 1.0, w = CELL * 0.92, e = w / 2 - 0.04;
+        for (const [dx, dz] of [[-e, -e], [e, -e], [-e, e], [e, e]]) solid.add(GEO.box, mat4(x + dx, fl + h / 2, z + dz, 0.1, h + 0.01, 0.1), cd);
+        for (const [dx, dz, sx, sz] of [[0, -e, w, 0.1], [0, e, w, 0.1], [-e, 0, 0.1, w], [e, 0, 0.1, w]]) { solid.add(GEO.box, mat4(x + dx, fl + h - 0.04, z + dz, sx, 0.09, sz), cd); solid.add(GEO.box, mat4(x + dx, fl + 0.05, z + dz, sx, 0.09, sz), cd); }
+      } else if (ch === 'C') {
+        const h = 2.0, w = CELL * 0.98;
+        for (let k = 1; k < 4; k++) for (const [dx, dz, sx, sz] of [[0, -w / 2, w, 0.06], [0, w / 2, w, 0.06], [-w / 2, 0, 0.06, w], [w / 2, 0, 0.06, w]]) solid.add(GEO.box, mat4(x + dx, fl + h * k / 4, z + dz, sx + 0.02, 0.07, sz + 0.02), cm);
+        solid.add(GEO.box, mat4(x, fl + h + 0.02, z, w * 0.9, 0.04, w * 0.9), cm);
+      } else if (ch === 'R') {
+        const h = 3.4, dw = CELL * 0.9;
+        const horiz = (cells[j][i - 1] === 'R' || cells[j][i + 1] === 'R');
+        const [sx, sz] = horiz ? [CELL + 0.01, dw + 0.06] : [dw + 0.06, CELL + 0.01];
+        solid.add(GEO.box, mat4(x, fl + 0.3, z, sx, 0.6, sz), '#1f2226');
+        solid.add(GEO.box, mat4(x, fl + h - 0.12, z, sx, 0.2, sz), shade('#7a2f25', -0.3));
+        solid.add(GEO.box, mat4(x, fl + 1.9, z, sx * (horiz ? 1 : 1.01), 0.5, sz * (horiz ? 1.01 : 1)), '#2a3238');
+        const along = horiz ? [1, 0] : [0, 1], side = horiz ? [0, 1] : [1, 0];
+        for (const sd of [-1, 1]) solid.add(GEO.cyl, mat4(x + side[0] * sd * (dw / 2 - 0.05), fl + 0.42, z + side[1] * sd * (dw / 2 - 0.05), 0.42, 0.18, 0.42, horiz ? 0 : Math.PI / 2, Math.PI / 2), '#141618');
+      }
+    }
   }
 
   // ---------- буквы точек на стенах (как в CS) ----------

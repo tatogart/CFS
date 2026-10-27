@@ -1,6 +1,6 @@
 // Music kit: встроенные киты синтезируются на лету (секвенсор WebAudio),
 // свой кит — треки игрока из файлов (хранятся в IndexedDB на устройстве).
-import { audioCtx, initAudio } from './sfx.js?v=1793131785';
+import { audioCtx, initAudio } from './sfx.js?v=1793131993';
 
 // ступени ладов (полутоны)
 const MINOR = [0, 2, 3, 5, 7, 8, 10], PHRYG = [0, 1, 3, 5, 7, 8, 10], DORIAN = [0, 2, 3, 5, 7, 9, 10];

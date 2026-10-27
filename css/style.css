@@ -103,13 +103,13 @@ select { background: var(--card); color: var(--txt); border: 1px solid var(--lin
 
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.9); }
-#cross { position: absolute; left: 50%; top: 50%; --g: 5px; --c: #4dff6a; }
-#cross i { position: absolute; background: var(--c); box-shadow: 0 0 1px #000; }
-#cross i:nth-child(1) { width: 2px; height: 8px; left: -1px; bottom: var(--g); }
-#cross i:nth-child(2) { width: 2px; height: 8px; left: -1px; top: var(--g); }
-#cross i:nth-child(3) { height: 2px; width: 8px; top: -1px; right: var(--g); }
-#cross i:nth-child(4) { height: 2px; width: 8px; top: -1px; left: var(--g); }
-#cross b { position: absolute; width: 2px; height: 2px; left: -1px; top: -1px; background: var(--c); }
+#cross { position: absolute; left: 50%; top: 50%; --g: 5px; --c: #4dff6a; --len: 8px; --th: 2px; --o: 0 0 0 1px rgba(0,0,0,.7); }
+#cross i { position: absolute; background: var(--c); box-shadow: var(--o); }
+#cross i:nth-child(1) { width: var(--th); height: var(--len); left: calc(var(--th) / -2); bottom: var(--g); }
+#cross i:nth-child(2) { width: var(--th); height: var(--len); left: calc(var(--th) / -2); top: var(--g); }
+#cross i:nth-child(3) { height: var(--th); width: var(--len); top: calc(var(--th) / -2); right: var(--g); }
+#cross i:nth-child(4) { height: var(--th); width: var(--len); top: calc(var(--th) / -2); left: var(--g); }
+#cross b { position: absolute; width: var(--th); height: var(--th); left: calc(var(--th) / -2); top: calc(var(--th) / -2); background: var(--c); box-shadow: var(--o); }
 #scope { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 0, transparent 34vmin, #000 34.3vmin); }
 #scope::before, #scope::after { content: ""; position: absolute; background: #000; }
 #scope::before { left: 0; right: 0; top: 50%; height: 1px; } #scope::after { top: 0; bottom: 0; left: 50%; width: 1px; }
@@ -309,17 +309,33 @@ body.touch .bitem { padding: 4px; font-size: 11px; }
 body.touch #banner { top: 14%; padding: 8px 12px; } body.touch #banner b { font-size: 28px; } body.touch #banner .bIcon svg { width: 42px; height: 42px; }
 #vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.38)); pointer-events: none; }
 
-/* мультиплеер */
-.mpJoin { display: flex; gap: 8px; max-width: 420px; margin: 0 auto; }
-.mpJoin input { flex: 1; min-width: 0; font: 800 24px/1 "Barlow Condensed", system-ui; text-align: center; letter-spacing: 6px; text-transform: uppercase; border-radius: 10px; border: 1px solid var(--line); background: #0b0f15; color: #fff; padding: 10px; }
-.mpJoin .big { margin: 0; width: auto; }
-.mpCodeBox { text-align: center; font-size: 18px; margin: 10px 0; }
-.mpCodeBox b { font: 800 40px/1 "Barlow Condensed", system-ui; letter-spacing: 8px; color: var(--acc2); margin: 0 10px; vertical-align: middle; }
-.mpCodeBox button { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
-.mpTeams { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.mpTeams h3 { margin-top: 0; }
-.mpList { min-height: 80px; background: rgba(0,0,0,.25); border-radius: 8px; padding: 6px; }
-.mpP { padding: 6px 8px; border-radius: 6px; background: var(--card); margin-bottom: 4px; font-weight: 700; }
-.mpP.me { border: 1px solid var(--acc2); } .mpP.empty { background: none; color: var(--dim); font-weight: 400; }
-.mpTeams .big { margin: 8px 0 0; max-width: none; }
-#mpName { flex: 1; max-width: 260px; background: #0b0f15; color: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; }
+
+.chPrev { height: 90px; border-radius: 10px; background: linear-gradient(135deg, #6d6355, #a3967f 50%, #4a5a6a); position: relative; }
+.chPrev .cx { position: absolute; left: 50%; top: 50%; }
+.chPrev .cx i { position: absolute; background: var(--c); box-shadow: var(--o); }
+.chPrev .cx i:nth-child(1) { width: var(--th); height: var(--len); left: calc(var(--th) / -2); bottom: var(--g); }
+.chPrev .cx i:nth-child(2) { width: var(--th); height: var(--len); left: calc(var(--th) / -2); top: var(--g); }
+.chPrev .cx i:nth-child(3) { height: var(--th); width: var(--len); top: calc(var(--th) / -2); right: var(--g); }
+.chPrev .cx i:nth-child(4) { height: var(--th); width: var(--len); top: calc(var(--th) / -2); left: var(--g); }
+.chPrev .cx b { position: absolute; width: var(--th); height: var(--th); left: calc(var(--th) / -2); top: calc(var(--th) / -2); background: var(--c); box-shadow: var(--o); }
+.set h3 { margin: 10px 0 0; }
+
+/* music kit */
+.kits { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.kit { background: var(--card); border: 2px solid var(--line); border-radius: 8px; padding: 8px; }
+.kit.on { border-color: #fff; }
+.kit.custom { grid-column: span 2; }
+.kArt { height: 64px; border-radius: 6px; background: radial-gradient(circle at 30% 30%, var(--kc), #10141a 75%); display: flex; align-items: center; justify-content: center; font-size: 30px; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+.kName, .kTitle { font-weight: 800; margin-top: 6px; font-size: 14px; }
+.kTitle { width: 100%; background: #0b0f15; color: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: 800 14px system-ui; }
+.kAuth { color: var(--dim); font-size: 11px; margin: 2px 0 6px; }
+.kSlot { display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 4px 0; background: rgba(0,0,0,.25); border-radius: 6px; padding: 4px 6px; }
+.kSlot span { font-weight: 700; min-width: 110px; } .kSlot em { color: var(--acc2); font-style: normal; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kSlot input { width: 92px; font-size: 11px; color: var(--dim); }
+.kSlot button { background: #3a1a1a; border: 0; border-radius: 4px; padding: 2px 6px; }
+.kBtns { display: flex; gap: 6px; } .kBtns button { flex: 1; font-size: 12px; padding: 6px 4px; border-radius: 6px; border: 1px solid var(--line); background: #10151b; font-weight: 700; }
+@media (max-width: 420px) { .kit.custom { grid-column: auto; } }
+
+.installBox { display: flex; flex-direction: column; gap: 4px; }
+.installBox b { font-size: 16px; } .installBox span { color: var(--dim); font-size: 13px; }
+.installBox .playBig { margin: 8px 0 0; min-width: 0; }

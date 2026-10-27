@@ -187,3 +187,4 @@ export function soundFor(id) {
   if (id === 'glock') return 'pistol';
   return 'knife';
 }
+export function audioCtx() { return ctx; }

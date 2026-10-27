@@ -1,14 +1,14 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793119717';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793119717';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793119717';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793119717';
-import { AgentModel } from './models.js?v=1793119717';
-import { Controls, isTouch } from './controls.js?v=1793119717';
-import { initAudio, play, setVolume } from './sfx.js?v=1793119717';
-import { Net } from './net.js?v=1793119717';
-import { Game } from './game.js?v=1793119717';
+import { MAPS, CELL } from './maps.js?v=1793122188';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793122188';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793122188';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793122188';
+import { AgentModel } from './models.js?v=1793122188';
+import { Controls, isTouch } from './controls.js?v=1793122188';
+import { initAudio, play, setVolume } from './sfx.js?v=1793122188';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd } from './music.js?v=1793122188';
+import { Game } from './game.js?v=1793122188';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -19,6 +19,7 @@ const save = S();
 const touch = isTouch();
 if (touch) document.body.classList.add('touch');
 setVolume(save.settings.volume);
+setMusicVolume(save.settings.music ?? 0.5); setKit(save.musicKit || 'cfs');
 
 // ---------- рендер ----------
 const canvas = $('view');
@@ -48,7 +49,8 @@ function showTab(tab) {
   if (tab === 'home') renderHome();
   play('tick');
 }
-$('menu').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { initAudio(); showTab(b.dataset.tab); } });
+onMusicEnd(() => { if (!game) playMusic('menu'); });
+$('menu').addEventListener('click', e => { initAudio(); if (!game && !musicMode()) playMusic('menu'); const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); });
 function coins() { $('coins').textContent = save.coins.toLocaleString('ru'); $('coins2').textContent = save.coins.toLocaleString('ru'); if (curTab === 'home' && homeReady) renderHome(); }
 coins();
 
@@ -164,6 +166,31 @@ function showDrop(skinId) {
 
 // ---------- инвентарь ----------
 $('invSort').onchange = () => renderInv();
+// ---------- music kit ----------
+async function renderKits() {
+  const box = $('kitList'); if (!box) return; box.innerHTML = '';
+  const cur = save.musicKit || 'cfs';
+  for (const k of KITS) {
+    const c = el('div', 'kit' + (cur === k.id ? ' on' : ''), `<div class="kArt" style="--kc:${k.col}"><span>♫</span></div><div class="kName">${esc(k.name)}</div><div class="kAuth">${esc(k.author)} · ${k.bpm} BPM</div><div class="kBtns"><button class="pv">▶ Слушать</button><button class="eq">${cur === k.id ? '✔ Надет' : 'Надеть'}</button></div>`);
+    c.querySelector('.pv').onclick = () => { initAudio(); playMusic('mvp', k.id); };
+    c.querySelector('.eq').onclick = () => { save.musicKit = k.id; setKit(k.id); persist(); renderKits(); playMusic('menu'); };
+    box.appendChild(c);
+  }
+  // свой кит: треки игрока
+  const slots = [['menu', 'Меню (по кругу)'], ['start', 'Начало раунда'], ['mvp', 'MVP раунда']];
+  const recs = await Promise.all(slots.map(([s]) => loadTrack(s)));
+  const c = el('div', 'kit custom' + (cur === 'custom' ? ' on' : ''), `<div class="kArt" style="--kc:#3cf06a"><span>★</span></div>
+    <input class="kTitle" maxlength="24" value="${esc(save.customKitName || 'Мой кит')}" title="Название кита">
+    <div class="kAuth">Свои треки (mp3, m4a, ogg) — хранятся только на этом устройстве</div>
+    ${slots.map(([s, lb], i) => `<label class="kSlot"><span>${lb}</span><em>${recs[i] ? esc(recs[i].name) : 'нет файла'}</em><input type="file" accept="audio/*" data-slot="${s}">${recs[i] ? `<button data-del="${s}">✕</button>` : ''}</label>`).join('')}
+    <div class="kBtns"><button class="pv">▶ Слушать</button><button class="eq">${cur === 'custom' ? '✔ Надет' : 'Надеть'}</button></div>`);
+  c.querySelector('.kTitle').oninput = e => { save.customKitName = e.target.value.trim() || 'Мой кит'; persist(); };
+  c.querySelectorAll('input[type=file]').forEach(inp => inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { await saveTrack(inp.dataset.slot, f); } catch (e) { alert('Не удалось сохранить файл: ' + e.message); } renderKits(); });
+  c.querySelectorAll('[data-del]').forEach(b => b.onclick = async e => { e.preventDefault(); await deleteTrack(b.dataset.del); renderKits(); });
+  c.querySelector('.pv').onclick = () => { initAudio(); playMusic('mvp', 'custom'); };
+  c.querySelector('.eq').onclick = () => { if (!recs[0] && !recs[1] && !recs[2]) { alert('Сначала добавьте хотя бы один трек'); return; } save.musicKit = 'custom'; setKit('custom'); persist(); renderKits(); playMusic('menu'); };
+  box.appendChild(c);
+}
 function renderGraffiti() {
   const box = $('grafList'); box.innerHTML = '';
   for (const g0 of GRAFFITI) {
@@ -173,7 +200,7 @@ function renderGraffiti() {
   }
 }
 function renderInv() {
-  renderGraffiti();
+  renderGraffiti(); renderKits();
   const box = $('invList'); box.innerHTML = '';
   const sort = $('invSort').value;
   const list = save.inv.slice();
@@ -327,7 +354,7 @@ function renderSettings() {
   const s = save.settings, box = $('settingsBox'); box.innerHTML = '';
   const range = (key, label, min, max, step, fmt = v => v) => {
     const l = el('label', '', `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${s[key]}"><span class="val">${fmt(s[key])}</span>`);
-    const inp = l.querySelector('input'); inp.oninput = () => { s[key] = +inp.value; l.querySelector('.val').textContent = fmt(s[key]); if (key === 'volume') setVolume(s[key]); persist(); };
+    const inp = l.querySelector('input'); inp.oninput = () => { s[key] = +inp.value; l.querySelector('.val').textContent = fmt(s[key]); if (key === 'volume') setVolume(s[key]); if (key === 'music') setMusicVolume(s[key]); persist(); };
     box.appendChild(l);
   };
   const check = (key, label) => { const l = el('label', '', `<span>${label}</span><input type="checkbox" ${s[key] ? 'checked' : ''}>`); l.querySelector('input').onchange = e => { s[key] = e.target.checked; persist(); }; box.appendChild(l); };
@@ -337,9 +364,26 @@ function renderSettings() {
   range('volume', 'Громкость', 0, 1, 0.05, v => Math.round(v * 100) + '%');
   const ql = el('label', '', `<span>Графика</span><select><option value="auto">Авто</option><option value="0">Низкая</option><option value="1">Средняя</option><option value="2">Высокая (тени)</option></select>`);
   const sel = ql.querySelector('select'); sel.value = s.quality; sel.onchange = () => { s.quality = sel.value; persist(); applyQuality(); }; box.appendChild(ql);
-  const cl = el('label', '', `<span>Цвет прицела</span><input type="color" value="${s.crosshair}">`); cl.querySelector('input').oninput = e => { s.crosshair = e.target.value; persist(); }; box.appendChild(cl);
+  range('music', 'Громкость музыки', 0, 1, 0.05, v => Math.round(v * 100) + '%');
+  const hl = el('label', '', `<span>Оружие в руке</span><select><option value="right">Правой</option><option value="left">Левой</option></select>`);
+  const hs = hl.querySelector('select'); hs.value = s.hand || 'right'; hs.onchange = () => { s.hand = hs.value; persist(); }; box.appendChild(hl);
+  range('vmfov', 'Обзор оружия (viewmodel FOV)', 54, 72, 1);
+  box.appendChild(el('h3', '', 'Прицел'));
+  const prev = el('div', 'chPrev', '<div class="cx"><i></i><i></i><i></i><i></i><b></b></div>'); box.appendChild(prev);
+  const upd = () => { const c = prev.querySelector('.cx'); c.style.setProperty('--c', s.crosshair); c.style.setProperty('--len', s.chLen + 'px'); c.style.setProperty('--th', s.chThick + 'px'); c.style.setProperty('--g', s.chGap + 'px'); c.style.setProperty('--o', s.chOutline ? '0 0 0 1px rgba(0,0,0,.8)' : 'none'); c.querySelector('b').style.display = s.chDot ? '' : 'none'; };
+  const cl = el('label', '', `<span>Цвет прицела</span><input type="color" value="${s.crosshair}">`); cl.querySelector('input').oninput = e => { s.crosshair = e.target.value; persist(); upd(); }; box.appendChild(cl);
+  for (const [k, lb, mn, mx] of [['chLen', 'Длина линий', 2, 20], ['chThick', 'Толщина', 1, 6], ['chGap', 'Зазор', 0, 16]]) {
+    const l = el('label', '', `<span>${lb}</span><input type="range" min="${mn}" max="${mx}" step="1" value="${s[k]}"><span class="val">${s[k]}</span>`);
+    l.querySelector('input').oninput = e => { s[k] = +e.target.value; l.querySelector('.val').textContent = s[k]; persist(); upd(); }; box.appendChild(l);
+  }
+  for (const [k, lb] of [['chDot', 'Точка в центре'], ['chOutline', 'Обводка'], ['chDynamic', 'Динамический (расходится при беге)']]) {
+    const l = el('label', '', `<span>${lb}</span><input type="checkbox" ${s[k] ? 'checked' : ''}>`); l.querySelector('input').onchange = e => { s[k] = e.target.checked; persist(); upd(); }; box.appendChild(l);
+  }
+  upd();
+  box.appendChild(el('h3', '', 'Прочее'));
   check('invertY', 'Инверсия по вертикали');
   check('fps', 'Показывать FPS');
+  const ib = el('div', 'hcard installBox'); ib.id = 'installBox'; box.appendChild(ib); renderInstall();
   const reset = el('button', 'big', 'Сбросить прогресс'); reset.onclick = () => { if (confirm('Удалить все монеты, предметы и статистику?')) { localStorage.removeItem('cfs_save_v1'); location.reload(); } }; box.appendChild(reset);
   const st = save.stats;
   $('statsBox').innerHTML = `<div>Убийств<b>${st.kills}</b></div><div>Смертей<b>${st.deaths}</b></div><div>K/D<b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b></div><div>Матчей<b>${st.matches}</b></div><div>Побед<b>${st.wins}</b></div><div>Кейсов открыто<b>${st.opened}</b></div>`;
@@ -362,13 +406,14 @@ const hud = {
     f.prepend(d); while (f.children.length > 5) f.lastChild.remove();
     setTimeout(() => d.remove(), 6000);
   },
-  roundStart(g) { closeBuy(); $('board').classList.add('hidden'); $('banner').className = 'hidden'; hud.bannerAt = 0; },
+  roundStart(g) { if (!g.practice) playMusic('start'); closeBuy(); $('board').classList.add('hidden'); $('banner').className = 'hidden'; hud.bannerAt = 0; },
   // баннер конца раунда как в CS + голос диктора
   roundBanner(winner, why, mvp, g) {
     const b = $('banner'), ct = winner === 'CT';
     b.className = ct ? 'ct' : 't';
     b.innerHTML = `<div class="bIcon">${ct ? CT_ICON : T_ICON}</div><div class="bText"><b>${ct ? 'COUNTER-TERRORISTS WIN' : 'TERRORISTS WIN'}</b><span>${esc(why)}</span>${mvp ? `<em>★ MVP раунда: ${esc(mvp.name)}${mvp.roundKills ? ` — ${mvp.roundKills} ${mvp.roundKills === 1 ? 'убийство' : mvp.roundKills < 5 ? 'убийства' : 'убийств'}` : ''}</em>` : ''}</div>`;
-    this.bannerAt = performance.now(); this.centerT = 0; $('center').style.opacity = 0;
+    this.bannerAt = performance.now();
+    if (mvp && mvp === g.player) playMusic('mvp'); this.centerT = 0; $('center').style.opacity = 0;
     this.announce(ct ? 'Counter-Terrorists win' : 'Terrorists win');
   },
   announce(text) {
@@ -433,12 +478,16 @@ function updateHud(g, dt) {
   }
   // прицел
   const cr = $('cross');
-  if (def && def.type !== 'knife') {
+  const S = g.settings;
+  if (def && def.type !== 'knife' && S.chDynamic !== false) {
     const sp = g.hspeed(p), mv = Math.max(0, Math.min(1, (sp - 1.3) / (def.speed - 1.3)));
-    const gap = 4 + (def.spread + def.move * mv + (!p.onGround ? 0.06 : 0) + Math.min(p.recoilIdx, 8) * def.recoil * 0.2) * 300;
+    const gap = (S.chGap ?? 4) + (def.spread + def.move * mv + (!p.onGround ? 0.06 : 0) + Math.min(p.recoilIdx, 8) * def.recoil * 0.2) * 300;
     cr.style.setProperty('--g', Math.min(40, gap).toFixed(1) + 'px');
-  } else cr.style.setProperty('--g', '5px');
-  cr.style.setProperty('--c', g.settings.crosshair);
+  } else cr.style.setProperty('--g', (S.chGap ?? 4) + 'px');
+  cr.style.setProperty('--c', S.crosshair);
+  cr.style.setProperty('--len', (S.chLen ?? 8) + 'px'); cr.style.setProperty('--th', (S.chThick ?? 2) + 'px');
+  cr.style.setProperty('--o', S.chOutline === false ? 'none' : '0 0 0 1px rgba(0,0,0,.7)');
+  cr.querySelector('b').style.display = S.chDot === false ? 'none' : '';
   const scoped = p.alive && p.scope > 0;
   $('scope').classList.toggle('hidden', !scoped);
   cr.style.display = scoped || (view !== p && g.spectTP) || (def && def.scope && !view.scope) ? 'none' : '';
@@ -447,6 +496,8 @@ function updateHud(g, dt) {
   $('flashOv').style.opacity = hud.flashT > 0 ? Math.min(1, hud.flashT / 1.2).toFixed(3) : 0;
   $('smokeOv').style.opacity = (g.camInSmoke() * 0.92).toFixed(2);
   if (hud.hurtT > 0) { hud.hurtT -= dt; if (hud.hurtT <= 0) $('hurtOv').style.opacity = 0; }
+  // музыка последних 10 секунд бомбы
+  if (B && B.planted && !B.done && B.timer < 10.4 && hud.bombMusic !== g.round) { hud.bombMusic = g.round; playMusic('bomb'); }
   // анимация баннера (раскрытие, держится ~4 с, затем гаснет)
   if (hud.bannerAt) {
     const t = (performance.now() - hud.bannerAt) / 1000, b = $('banner');
@@ -555,29 +606,17 @@ function endMatch(g) {
 }
 
 // ---------- запуск матча ----------
-// mp: { role:'host' } или { role:'client', start } — сетевой матч
-function startGame(mp) {
-  initAudio();
+function startGame() {
+  initAudio(); stopMusic(0.5);
   let map = MAPS.find(m => m.id === save.last.map) || MAPS[0];
-  let diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
-  let side = save.last.side === 'auto' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
-  let size = +save.last.size, winTo = +save.last.winTo;
-  if (mp && mp.role === 'host') { if (map.aim) map = MAPS[0]; side = lobby.players[0].team; net.roster = lobby.players.filter(x => x.nid !== 0); net.myName = myName(); }
-  if (mp && mp.role === 'client') {
-    const st = mp.start; map = MAPS.find(m => m.id === st.map) || MAPS[0]; diff = DIFFICULTIES.find(d => d.id === st.diff) || DIFFICULTIES[3];
-    size = st.size; winTo = st.winTo; net.actors = st.actors; net.myNid = st.you; net.firstSnap = st.snap;
-    side = (st.actors.find(a => a.nid === st.you) || {}).team || 'T';
-  }
+  const diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
+  const side = save.last.side === 'auto' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
+  const size = +save.last.size, winTo = +save.last.winTo;
   $('loading').classList.remove('hidden');
   setTimeout(() => {
     try {
-      game = new Game(renderer, { map, diff, side, size, winTo, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: mp ? {} : { ...(save.admin || {}) }, net: mp ? net : null }, hud);
+      game = new Game(renderer, { map, diff, side, size, winTo, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
     } catch (e) { $('loading').classList.add('hidden'); alert('Ошибка запуска: ' + e.message); console.error(e); return; }
-    if (mp && mp.role === 'host') {
-      const actors = game.actors.map(a => ({ id: a.id, name: a.name, team: a.team, ag: a.agent.id, bot: a.bot, nid: a.nid, skins: a.skins }));
-      const snap = game._snap();
-      for (const pl of net.roster) net.send(pl.nid, { t: 'start', map: map.id, diff: diff.id, size, winTo, actors, snap, you: pl.nid });
-    }
     $('menu').classList.add('hidden'); $('hud').classList.remove('hidden'); $('loading').classList.add('hidden');
     $('touch').classList.toggle('hidden', !touch);
     $('fps').classList.toggle('hidden', !save.settings.fps);
@@ -589,86 +628,14 @@ function startGame(mp) {
     last = performance.now();
   }, 30);
 }
-
-// ---------- мультиплеер: лобби ----------
-let net = null, lobby = null;
-const myName = () => (($('mpName').value || save.name || 'Игрок').trim() || 'Игрок').slice(0, 16);
-$('mpName').value = save.name || '';
-$('mpName').oninput = () => { save.name = $('mpName').value.trim().slice(0, 16); persist(); };
-const mpStatus = t => { $('mpStatus').textContent = t || ''; };
-function renderLobby() {
-  $('mpStart').classList.toggle('hidden', !!net);
-  $('mpLobby').classList.toggle('hidden', !net || !lobby);
-  if (!net || !lobby) return;
-  $('mpCodeShow').textContent = net.code || lobby.code || '';
-  const S = lobby.s || {}, mp = MAPS.find(m => m.id === S.map), df = DIFFICULTIES.find(d => d.id === S.diff);
-  $('mpInfo').textContent = `Карта: ${mp ? mp.name : '?'} · боты: ${df ? df.name : '?'} · команды до ${S.size}×${S.size} (свободные места займут боты) · матч до ${S.winTo}`;
-  for (const t of ['T', 'CT']) $('mp' + t).innerHTML = lobby.players.filter(x => x.team === t).map(x => `<div class="mpP${x.nid === (net.myNid ?? -1) ? ' me' : ''}">${x.nid === 0 ? '👑 ' : ''}${esc(x.name)}</div>`).join('') || '<div class="mpP empty">— боты —</div>';
-  $('mpGo').classList.toggle('hidden', net.role !== 'host');
-  $('mpWait').classList.toggle('hidden', net.role === 'host');
-}
-function pushLobby() {
-  lobby.s = { map: save.last.map === 'aim' ? 'dust2' : save.last.map, diff: save.last.diff, size: +save.last.size, winTo: +save.last.winTo };
-  net.broadcast({ t: 'lobby', players: lobby.players.map(x => ({ nid: x.nid, name: x.name, team: x.team })), s: lobby.s, code: net.code });
-  renderLobby();
-}
-function leaveLobby() { if (net) net.close(); net = null; lobby = null; renderLobby(); }
-$('mpHost').onclick = async () => {
-  initAudio(); mpStatus('Создаём комнату…');
-  try {
-    net = new Net();
-    await net.host();
-    lobby = { players: [{ nid: 0, name: myName(), team: save.last.side === 'CT' ? 'CT' : 'T' }] };
-    net.on('msg', (nid, m) => {
-      if (game && game.net === net) return game.onNet(nid, m);
-      if (m.t === 'hello') {
-        const nT = lobby.players.filter(x => x.team === 'T').length, nCT = lobby.players.length - nT;
-        lobby.players.push({ nid, name: String(m.name || 'Игрок').slice(0, 16), team: nT <= nCT ? 'T' : 'CT', agents: m.agents, skins: m.skins || {} });
-        net.send(nid, { t: 'welcome', nid }); pushLobby(); play('buy');
-      } else if (m.t === 'team') { const pl = lobby.players.find(x => x.nid === nid); if (pl && (m.team === 'T' || m.team === 'CT')) { pl.team = m.team; pushLobby(); } }
-      else if (m.t === 'gr') { const pl = lobby.players.find(x => x.nid === nid); if (pl) pl.gr = m.g; }
-    });
-    net.on('leave', nid => { if (game && game.net === net) game.netLeave(nid); lobby.players = lobby.players.filter(x => x.nid !== nid); if (!game) pushLobby(); });
-    mpStatus(''); pushLobby();
-  } catch (e) { mpStatus('Ошибка: ' + (e.message || e.type || e)); leaveLobby(); }
-};
-$('mpJoinBtn').onclick = async () => {
-  initAudio();
-  const code = $('mpCode').value.trim().toUpperCase(); if (code.length < 4) { mpStatus('Введите код комнаты'); return; }
-  mpStatus('Подключаемся…');
-  try {
-    net = new Net();
-    net.on('msg', (nid, m) => {
-      if (m.t === 'welcome') { net.myNid = m.nid; return; }
-      if (m.t === 'lobby') { lobby = m; renderLobby(); return; }
-      if (m.t === 'start') { net.myNid = m.you; startGame({ role: 'client', start: m }); return; }
-      if (game && game.net === net) game.onNet(0, m);
-    });
-    net.on('closed', () => { if (!net) return; const inGame = !!game; leaveLobby(); if (inGame) { quitGame(); } mpStatus('Соединение с хостом потеряно'); });
-    await net.join(code);
-    net.toHost({ t: 'hello', name: myName(), agents: save.agent, skins: loadout() });
-    net.toHost({ t: 'gr', g: save.graffiti || 'cfs' });
-    mpStatus('');
-  } catch (e) { mpStatus('Ошибка: ' + (e.message || e)); leaveLobby(); }
-};
-$('mpCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('mpJoinBtn').click(); });
-$('mpLobby').addEventListener('click', e => {
-  const b = e.target.closest('[data-team]'); if (!b || !net) return;
-  if (net.role === 'host') { lobby.players[0].team = b.dataset.team; pushLobby(); }
-  else net.toHost({ t: 'team', team: b.dataset.team });
-});
-$('mpGo').onclick = () => { if (net && net.role === 'host') startGame({ role: 'host' }); };
-$('mpLeave').onclick = () => { leaveLobby(); mpStatus(''); };
-$('mpCopy').onclick = () => { try { navigator.clipboard.writeText(net.code); mpStatus('Код скопирован'); } catch (e) { /* нет буфера */ } };
-renderLobby();
 function quitGame() {
   if (game) { game.dispose(); game = null; }
-  if (net) { leaveLobby(); }
   controls.enabled = false; controls.unlock(); controls.reset();
   $('hud').classList.add('hidden'); $('menu').classList.remove('hidden'); $('rotate').classList.add('hidden');
   closeBuy();
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   coins(); renderInv(); renderHome();
+  playMusic('menu');
 }
 function checkRotate() { $('rotate').classList.toggle('hidden', !(game && touch && innerHeight > innerWidth)); }
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight, false); if (game) game.resize(); checkRotate(); });
@@ -681,10 +648,26 @@ function frame(now) {
   if (window.__stop) return;
   if (!game) { if (!$('menu').classList.contains('hidden')) renderMenu3d(dt); return; }
   const paused = !$('pause').classList.contains('hidden') || !$('over').classList.contains('hidden');
-  if (!paused || game.net) game.update(dt);
+  if (!paused) game.update(dt);
   if (!game) return;
   game.render();
   updateHud(game, dt);
 }
 requestAnimationFrame(frame);
-window.__cfs = { get game() { return game; }, startGame, save, setNet: n => { net = n; }, hud };
+// ---------- установка (PWA) и офлайн ----------
+let installEvt = null;
+const standalone = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone;
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; renderInstall(); });
+addEventListener('appinstalled', () => { installEvt = null; renderInstall(); });
+function renderInstall() {
+  const box = $('installBox'); if (!box) return;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (standalone()) { box.innerHTML = '<b>✔ Игра установлена</b><span>Работает без интернета.</span>'; return; }
+  box.innerHTML = `<b>Установить игру</b><span>${installEvt ? 'Игра появится на рабочем столе и будет работать без интернета.' : ios ? 'В Safari нажмите «Поделиться» → «На экран Домой». После этого игра работает без интернета.' : 'В меню браузера выберите «Установить приложение» или «Добавить на главный экран». Игра будет работать без интернета.'}</span>${installEvt ? '<button class="playBig inline" id="installBtn"><span>УСТАНОВИТЬ</span></button>' : ''}`;
+  const b = $('installBtn'); if (b) b.onclick = async () => { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) { /* отмена */ } installEvt = null; renderInstall(); };
+}
+renderInstall();
+window.__cfs = { get game() { return game; }, startGame, save, hud };

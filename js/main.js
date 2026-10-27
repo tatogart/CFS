@@ -1,13 +1,14 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793117891';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793117891';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793117891';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793117891';
-import { AgentModel } from './models.js?v=1793117891';
-import { Controls, isTouch } from './controls.js?v=1793117891';
-import { initAudio, play, setVolume } from './sfx.js?v=1793117891';
-import { Game } from './game.js?v=1793117891';
+import { MAPS, CELL } from './maps.js?v=1793119717';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793119717';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793119717';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793119717';
+import { AgentModel } from './models.js?v=1793119717';
+import { Controls, isTouch } from './controls.js?v=1793119717';
+import { initAudio, play, setVolume } from './sfx.js?v=1793119717';
+import { Net } from './net.js?v=1793119717';
+import { Game } from './game.js?v=1793119717';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -554,16 +555,29 @@ function endMatch(g) {
 }
 
 // ---------- запуск матча ----------
-function startGame() {
+// mp: { role:'host' } или { role:'client', start } — сетевой матч
+function startGame(mp) {
   initAudio();
-  const map = MAPS.find(m => m.id === save.last.map) || MAPS[0];
-  const diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
-  const side = save.last.side === 'auto' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
+  let map = MAPS.find(m => m.id === save.last.map) || MAPS[0];
+  let diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
+  let side = save.last.side === 'auto' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
+  let size = +save.last.size, winTo = +save.last.winTo;
+  if (mp && mp.role === 'host') { if (map.aim) map = MAPS[0]; side = lobby.players[0].team; net.roster = lobby.players.filter(x => x.nid !== 0); net.myName = myName(); }
+  if (mp && mp.role === 'client') {
+    const st = mp.start; map = MAPS.find(m => m.id === st.map) || MAPS[0]; diff = DIFFICULTIES.find(d => d.id === st.diff) || DIFFICULTIES[3];
+    size = st.size; winTo = st.winTo; net.actors = st.actors; net.myNid = st.you; net.firstSnap = st.snap;
+    side = (st.actors.find(a => a.nid === st.you) || {}).team || 'T';
+  }
   $('loading').classList.remove('hidden');
   setTimeout(() => {
     try {
-      game = new Game(renderer, { map, diff, side, size: +save.last.size, winTo: +save.last.winTo, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
+      game = new Game(renderer, { map, diff, side, size, winTo, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: mp ? {} : { ...(save.admin || {}) }, net: mp ? net : null }, hud);
     } catch (e) { $('loading').classList.add('hidden'); alert('Ошибка запуска: ' + e.message); console.error(e); return; }
+    if (mp && mp.role === 'host') {
+      const actors = game.actors.map(a => ({ id: a.id, name: a.name, team: a.team, ag: a.agent.id, bot: a.bot, nid: a.nid, skins: a.skins }));
+      const snap = game._snap();
+      for (const pl of net.roster) net.send(pl.nid, { t: 'start', map: map.id, diff: diff.id, size, winTo, actors, snap, you: pl.nid });
+    }
     $('menu').classList.add('hidden'); $('hud').classList.remove('hidden'); $('loading').classList.add('hidden');
     $('touch').classList.toggle('hidden', !touch);
     $('fps').classList.toggle('hidden', !save.settings.fps);
@@ -575,8 +589,81 @@ function startGame() {
     last = performance.now();
   }, 30);
 }
+
+// ---------- мультиплеер: лобби ----------
+let net = null, lobby = null;
+const myName = () => (($('mpName').value || save.name || 'Игрок').trim() || 'Игрок').slice(0, 16);
+$('mpName').value = save.name || '';
+$('mpName').oninput = () => { save.name = $('mpName').value.trim().slice(0, 16); persist(); };
+const mpStatus = t => { $('mpStatus').textContent = t || ''; };
+function renderLobby() {
+  $('mpStart').classList.toggle('hidden', !!net);
+  $('mpLobby').classList.toggle('hidden', !net || !lobby);
+  if (!net || !lobby) return;
+  $('mpCodeShow').textContent = net.code || lobby.code || '';
+  const S = lobby.s || {}, mp = MAPS.find(m => m.id === S.map), df = DIFFICULTIES.find(d => d.id === S.diff);
+  $('mpInfo').textContent = `Карта: ${mp ? mp.name : '?'} · боты: ${df ? df.name : '?'} · команды до ${S.size}×${S.size} (свободные места займут боты) · матч до ${S.winTo}`;
+  for (const t of ['T', 'CT']) $('mp' + t).innerHTML = lobby.players.filter(x => x.team === t).map(x => `<div class="mpP${x.nid === (net.myNid ?? -1) ? ' me' : ''}">${x.nid === 0 ? '👑 ' : ''}${esc(x.name)}</div>`).join('') || '<div class="mpP empty">— боты —</div>';
+  $('mpGo').classList.toggle('hidden', net.role !== 'host');
+  $('mpWait').classList.toggle('hidden', net.role === 'host');
+}
+function pushLobby() {
+  lobby.s = { map: save.last.map === 'aim' ? 'dust2' : save.last.map, diff: save.last.diff, size: +save.last.size, winTo: +save.last.winTo };
+  net.broadcast({ t: 'lobby', players: lobby.players.map(x => ({ nid: x.nid, name: x.name, team: x.team })), s: lobby.s, code: net.code });
+  renderLobby();
+}
+function leaveLobby() { if (net) net.close(); net = null; lobby = null; renderLobby(); }
+$('mpHost').onclick = async () => {
+  initAudio(); mpStatus('Создаём комнату…');
+  try {
+    net = new Net();
+    await net.host();
+    lobby = { players: [{ nid: 0, name: myName(), team: save.last.side === 'CT' ? 'CT' : 'T' }] };
+    net.on('msg', (nid, m) => {
+      if (game && game.net === net) return game.onNet(nid, m);
+      if (m.t === 'hello') {
+        const nT = lobby.players.filter(x => x.team === 'T').length, nCT = lobby.players.length - nT;
+        lobby.players.push({ nid, name: String(m.name || 'Игрок').slice(0, 16), team: nT <= nCT ? 'T' : 'CT', agents: m.agents, skins: m.skins || {} });
+        net.send(nid, { t: 'welcome', nid }); pushLobby(); play('buy');
+      } else if (m.t === 'team') { const pl = lobby.players.find(x => x.nid === nid); if (pl && (m.team === 'T' || m.team === 'CT')) { pl.team = m.team; pushLobby(); } }
+      else if (m.t === 'gr') { const pl = lobby.players.find(x => x.nid === nid); if (pl) pl.gr = m.g; }
+    });
+    net.on('leave', nid => { if (game && game.net === net) game.netLeave(nid); lobby.players = lobby.players.filter(x => x.nid !== nid); if (!game) pushLobby(); });
+    mpStatus(''); pushLobby();
+  } catch (e) { mpStatus('Ошибка: ' + (e.message || e.type || e)); leaveLobby(); }
+};
+$('mpJoinBtn').onclick = async () => {
+  initAudio();
+  const code = $('mpCode').value.trim().toUpperCase(); if (code.length < 4) { mpStatus('Введите код комнаты'); return; }
+  mpStatus('Подключаемся…');
+  try {
+    net = new Net();
+    net.on('msg', (nid, m) => {
+      if (m.t === 'welcome') { net.myNid = m.nid; return; }
+      if (m.t === 'lobby') { lobby = m; renderLobby(); return; }
+      if (m.t === 'start') { net.myNid = m.you; startGame({ role: 'client', start: m }); return; }
+      if (game && game.net === net) game.onNet(0, m);
+    });
+    net.on('closed', () => { if (!net) return; const inGame = !!game; leaveLobby(); if (inGame) { quitGame(); } mpStatus('Соединение с хостом потеряно'); });
+    await net.join(code);
+    net.toHost({ t: 'hello', name: myName(), agents: save.agent, skins: loadout() });
+    net.toHost({ t: 'gr', g: save.graffiti || 'cfs' });
+    mpStatus('');
+  } catch (e) { mpStatus('Ошибка: ' + (e.message || e)); leaveLobby(); }
+};
+$('mpCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('mpJoinBtn').click(); });
+$('mpLobby').addEventListener('click', e => {
+  const b = e.target.closest('[data-team]'); if (!b || !net) return;
+  if (net.role === 'host') { lobby.players[0].team = b.dataset.team; pushLobby(); }
+  else net.toHost({ t: 'team', team: b.dataset.team });
+});
+$('mpGo').onclick = () => { if (net && net.role === 'host') startGame({ role: 'host' }); };
+$('mpLeave').onclick = () => { leaveLobby(); mpStatus(''); };
+$('mpCopy').onclick = () => { try { navigator.clipboard.writeText(net.code); mpStatus('Код скопирован'); } catch (e) { /* нет буфера */ } };
+renderLobby();
 function quitGame() {
   if (game) { game.dispose(); game = null; }
+  if (net) { leaveLobby(); }
   controls.enabled = false; controls.unlock(); controls.reset();
   $('hud').classList.add('hidden'); $('menu').classList.remove('hidden'); $('rotate').classList.add('hidden');
   closeBuy();
@@ -594,10 +681,10 @@ function frame(now) {
   if (window.__stop) return;
   if (!game) { if (!$('menu').classList.contains('hidden')) renderMenu3d(dt); return; }
   const paused = !$('pause').classList.contains('hidden') || !$('over').classList.contains('hidden');
-  if (!paused) game.update(dt);
+  if (!paused || game.net) game.update(dt);
   if (!game) return;
   game.render();
   updateHud(game, dt);
 }
 requestAnimationFrame(frame);
-window.__cfs = { get game() { return game; }, startGame, save };
+window.__cfs = { get game() { return game; }, startGame, save, setNet: n => { net = n; }, hud };

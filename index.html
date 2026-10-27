@@ -10,7 +10,7 @@
 <title>CFS Strike</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=1793117891">
+<link rel="stylesheet" href="css/style.css?v=1793119717">
 </head>
 <body>
 <canvas id="view"></canvas>
@@ -22,6 +22,7 @@
     <nav class="tabs" id="tabs">
       <button data-tab="home" class="on">Главная</button>
       <button data-tab="play">Играть</button>
+      <button data-tab="mp">По сети</button>
       <button data-tab="inv">Инвентарь</button>
       <button data-tab="cases">Кейсы</button>
       <button data-tab="agents">Агенты</button>
@@ -52,6 +53,27 @@
       </div>
       <button class="playBig inline" id="start"><span>В БОЙ</span></button>
       <p class="hint">ПК: WASD, мышь, R — перезарядка, E — заложить/разминировать, B — закупка, 1-5 — оружие, Tab — счёт, Shift — шаг, Ctrl — присесть.</p>
+    </section>
+    <section id="tab-mp" class="page panelPage">
+      <h2>Игра с друзьями</h2>
+      <p class="hint">Один игрок создаёт комнату, остальные вводят её код. Работает в одной Wi-Fi сети (данные идут напрямую между устройствами) и через интернет. Карта, боты и размер команд берутся из вкладки «Играть». Нужен доступ в интернет для поиска комнаты.</p>
+      <label class="slider">Ваш ник <input id="mpName" maxlength="16" placeholder="Игрок"></label>
+      <div id="mpStart">
+        <button class="playBig inline" id="mpHost"><span>СОЗДАТЬ КОМНАТУ</span></button>
+        <div class="mpJoin"><input id="mpCode" maxlength="5" placeholder="КОД" autocomplete="off"><button class="big go" id="mpJoinBtn">Войти по коду</button></div>
+      </div>
+      <div id="mpLobby" class="hidden">
+        <div class="mpCodeBox">Код комнаты: <b id="mpCodeShow"></b> <button id="mpCopy">Копировать</button></div>
+        <p class="hint" id="mpInfo"></p>
+        <div class="mpTeams">
+          <div><h3>Террористы</h3><div id="mpT" class="mpList"></div><button class="big" data-team="T">Играть за T</button></div>
+          <div><h3>Спецназ</h3><div id="mpCT" class="mpList"></div><button class="big" data-team="CT">Играть за CT</button></div>
+        </div>
+        <button class="playBig inline hidden" id="mpGo"><span>НАЧАТЬ МАТЧ</span></button>
+        <p class="hint center" id="mpWait">Ждём, пока хост начнёт матч…</p>
+        <button class="big" id="mpLeave">Выйти из комнаты</button>
+      </div>
+      <p class="hint center" id="mpStatus"></p>
     </section>
     <section id="tab-cases" class="page panelPage">
       <div class="grid cases" id="caseList"></div>
@@ -180,6 +202,6 @@
 <div id="rotate" class="hidden"><div>⟳</div>Поверните телефон горизонтально</div>
 <div id="loading" class="hidden">Загрузка карты…</div>
 
-<script type="module" src="js/main.js?v=1793117891"></script>
+<script type="module" src="js/main.js?v=1793119717"></script>
 </body>
 </html>

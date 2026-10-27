@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793117891';
-import { World } from './world.js?v=1793117891';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793117891';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793117891';
-import { play, soundFor } from './sfx.js?v=1793117891';
-import { Bot, planRound } from './bots.js?v=1793117891';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793117891';
+import { CELL } from './maps.js?v=1793119717';
+import { World } from './world.js?v=1793119717';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793119717';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793119717';
+import { play, soundFor } from './sfx.js?v=1793119717';
+import { Bot, planRound } from './bots.js?v=1793119717';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793119717';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -53,7 +53,9 @@ export class Game {
   constructor(renderer, opts, ui) {
     this.r = renderer; this.o = opts; this.ui = ui; this.ctrl = opts.controls;
     this.aimMode = !!opts.map.aim;
-    this.practice = opts.diff.id === 'none' || this.aimMode;
+    this.net = opts.net || null;
+    this.isHost = !!(this.net && this.net.role === 'host'); this.isClient = !!(this.net && this.net.role === 'client');
+    this.practice = !this.net && (opts.diff.id === 'none' || this.aimMode);
     this.aimStats = { kills: 0, hs: 0, shots: 0, hits: 0, t0: 0 };
     this.admin = opts.admin || {};
     this.diff = opts.diff;
@@ -104,14 +106,14 @@ export class Game {
     this.playerSide = opts.side;
     this._initTracers();
     this._spawnActors();
-    this.startRound(true);
+    if (this.isClient) this._clientInit(); else this.startRound(true);
     this.minimapBg = new Image(); this.minimapBg.src = mapThumbURL(opts.map, 4);
   }
 
   // ---------- актёры ----------
   _spawnActors() {
     const lo = this.o.loadout, side = this.playerSide, n = this.practice ? 0 : this.o.size;
-    const mkActor = (name, team, bot, agentId) => {
+    const mkActor = (name, team, bot, agentId, noBrain) => {
       const agent = agentById[agentId] || AGENTS.find(a => a.team === team);
       const a = {
         id: this.actors.length, name, team, bot, agent,
@@ -124,25 +126,52 @@ export class Game {
         skins: {},
       };
       a.model = new AgentModel(agent, 'knife');
-      if (!bot) a.model.root.visible = false;
       this.scene.add(a.model.root);
-      if (bot && !this.practice) { a.brain = new Bot(this, a, this.diff); }
+      if (bot && !this.practice && !noBrain && !this.isClient) { a.brain = new Bot(this, a, this.diff); }
       this.actors.push(a);
       return a;
     };
-    const p = this.player = mkActor('Вы', side, false, this.o.agents[side]);
-    p.skins = { ...lo };
+    // клиент: состав игроков приходит от хоста
+    if (this.isClient) {
+      for (const d of this.net.actors) {
+        const a = mkActor(d.name, d.team, d.bot, d.ag, true); a.nid = d.nid; a.skins = d.skins || {};
+        if (a.skins.gloves) a.model.setGloves(a.skins.gloves);
+        if (d.nid === this.net.myNid) { this.player = a; }
+      }
+      this.playerSide = this.player.team;
+      this._finishActors(this.player.team);
+      return;
+    }
+    const p = this.player = mkActor(this.net ? this.net.myName : 'Вы', side, false, this.o.agents[side]);
+    p.skins = { ...lo }; p.nid = 0;
     if (p.skins.gloves) p.model.setGloves(p.skins.gloves);
+    // хост: живые игроки из лобби
+    const humans = { T: 1, CT: 0 }; humans.T = side === 'T' ? 1 : 0; humans.CT = side === 'CT' ? 1 : 0;
+    if (this.isHost) for (const r of this.net.roster) {
+      const a = mkActor(r.name, r.team, false, r.agents && r.agents[r.team]); a.nid = r.nid; a.remote = true; a.skins = r.skins || {}; a.agents = r.agents;
+      if (a.skins.gloves) a.model.setGloves(a.skins.gloves);
+      humans[r.team]++;
+    }
     const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5);
     const enemy = side === 'T' ? 'CT' : 'T';
     const teamAgents = t => AGENTS.filter(a => a.team === t);
-    for (let i = 0; i < n - 1; i++) { const ag = teamAgents(side)[i % 5]; const b = mkActor(names.pop(), side, true, ag.id); this._botSkins(b); }
-    for (let i = 0; i < n; i++) { const ag = teamAgents(enemy)[(i + 2) % 5]; const b = mkActor(names.pop(), enemy, true, ag.id); this._botSkins(b); }
+    const noBots = this.net && this.diff.id === 'none';
+    const nSide = noBots ? 0 : Math.max(0, n - humans[side]), nEnemy = noBots ? 0 : Math.max(0, n - humans[enemy]);
+    for (let i = 0; i < nSide; i++) { const ag = teamAgents(side)[i % 5]; const b = mkActor(names.pop(), side, true, ag.id); this._botSkins(b); }
+    for (let i = 0; i < nEnemy; i++) { const ag = teamAgents(enemy)[(i + 2) % 5]; const b = mkActor(names.pop(), enemy, true, ag.id); this._botSkins(b); }
     // тренировка аима: мишени-боты, которые не стреляют
     if (this.aimMode) for (let i = 0; i < 8; i++) { const ag = teamAgents(enemy)[i % 5]; const b = mkActor('Мишень ' + (i + 1), enemy, true, ag.id); b.target = true; }
-    // имена союзников над головой
-    for (const a of this.actors) if (a.bot && a.team === side) { a.tag = textSprite(a.name, '#7ee08a'); this.scene.add(a.tag); }
+    this._finishActors(side);
+  }
+  _finishActors(side) {
+    for (const a of this.actors) a.model.root.visible = a !== this.player;
+    this._retag();
     this._buildViewmodel();
+  }
+  // имена союзников над головой (людей — жёлтым)
+  _retag() {
+    for (const a of this.actors) { if (a.tag) { this.scene.remove(a.tag); a.tag = null; } }
+    for (const a of this.actors) if (a !== this.player && a.team === this.player.team) { a.tag = textSprite(a.name, a.bot ? '#7ee08a' : '#ffd36a'); this.scene.add(a.tag); }
   }
   _botSkins(b) {
     if (Math.random() < 0.5) for (const s of SKINS) if (WEAPONS[s.weapon] && Math.random() < 0.12) b.skins[s.weapon] = s.id;
@@ -188,7 +217,7 @@ export class Game {
       for (const sl of [1, 2]) { const w = a.weapons[sl]; if (w && WEAPONS[w.id] && WEAPONS[w.id].mag) { w.mag = WEAPONS[w.id].mag; w.reserve = WEAPONS[w.id].reserve; } }
       a.alive = true; a.hp = 100; a.blind = 0; a.plantT = 0; a.defuseT = 0; a.scope = 0; a.roundKills = 0; a.reloadT = 0; a.switchT = 0;
       a.vel.set(0, 0, 0); a.pos.copy(this.spawnPos(a.team, counts[a.team]++)); a.crouchK = 0;
-      a.model.revive(); a.model.root.visible = a.bot;
+      a.model.revive(); a.model.root.visible = a !== this.player;
       // смотрим вдоль маршрута к ближайшей точке
       const c = this.world.sites.A.center, d = this.world.sites.B.center;
       const route = this.world.path(a.pos, a.pos.distanceTo(c) < a.pos.distanceTo(d) ? c : d);
@@ -207,15 +236,17 @@ export class Game {
       for (const a of this.actors) if (a.brain) a.brain.onRoundStart();
     }
     this.ui.roundStart && this.ui.roundStart(this);
-    this.centerMsg(this.aimMode ? 'Тренировка аима: стреляй по мишеням · B — другое оружие' : this.practice ? 'Тренировка: B — закупка, гранаты бесплатные' : (this.round === 1 ? 'Пистолетный раунд' : `Раунд ${this.round}`), 2.5);
+    this.ev({ e: 'round', r: this.round });
+    this.gmsg(this.aimMode ? 'Тренировка аима: стреляй по мишеням · B — другое оружие' : this.practice ? 'Тренировка: B — закупка, гранаты бесплатные' : (this.round === 1 ? 'Пистолетный раунд' : `Раунд ${this.round}`), 2.5);
   }
   _swapSides() {
-    for (const a of this.actors) { a.team = a.team === 'T' ? 'CT' : 'T'; a.money = 800; a.kills = a.kills; const ag = a.bot ? AGENTS.filter(x => x.team === a.team)[a.id % 5] : agentById[this.o.agents[a.team]];
+    for (const a of this.actors) { a.team = a.team === 'T' ? 'CT' : 'T'; a.money = 800; a.kills = a.kills; const ag = a.bot ? AGENTS.filter(x => x.team === a.team)[a.id % 5] : a.remote ? (agentById[a.agents && a.agents[a.team]] || AGENTS.find(x => x.team === a.team)) : agentById[this.o.agents[a.team]];
       this.scene.remove(a.model.root); a.agent = ag; a.model = new AgentModel(ag, 'knife'); if (a.skins.gloves) a.model.setGloves(a.skins.gloves); this.scene.add(a.model.root); this.resetLoadout(a, true); }
     this.score = { T: this.score.CT, CT: this.score.T }; this.lossStreak = { T: 0, CT: 0 };
     this.playerSide = this.player.team;
+    this._retag();
     this._buildViewmodel();
-    this.centerMsg('Смена сторон!', 3);
+    this.gmsg('Смена сторон!', 3);
   }
   endRound(winner, reason) {
     if (this.state === 'end') return;
@@ -235,6 +266,7 @@ export class Game {
     if (reason === 'bomb' && this.bomb && this.bomb.planter) mvp = this.bomb.planter;
     const why = reason === 'bomb' ? 'Бомба взорвана' : reason === 'defuse' ? 'Бомба обезврежена' : reason === 'time' ? 'Время вышло' : 'Противник уничтожен';
     this.ui.roundBanner ? this.ui.roundBanner(winner, why, mvp, this) : this.centerMsg(winner, 3);
+    this.ev({ e: 'end', w: winner, why, mvp: mvp ? mvp.id : -1 });
     play(winner === this.player.team ? 'win' : 'lose');
     this.ui.onRoundEnd && this.ui.onRoundEnd(this, winner);
   }
@@ -246,6 +278,8 @@ export class Game {
     else if (!aliveT && !planted) this.endRound('CT', 'elim');
   }
   centerMsg(t, dur = 2, color = '#fff') { this.ui.center(t, dur, color); }
+  gmsg(t, dur = 2, color = '#fff') { this.centerMsg(t, dur, color); this.ev({ e: 'msg', t, d: dur, c: color }); }
+  ev(m) { if (this.isHost) this.net.broadcast({ t: 'ev', ...m }); }
 
   // ---------- оружие ----------
   selectSlot(a, slot, instant) {
@@ -276,6 +310,7 @@ export class Game {
   }
   canTeam(a, id) { const d = WEAPONS[id] || GEAR[id]; return !(d && d.team && d.team !== a.team); }
   buy(a, id) {
+    if (this.isClient && a === this.player) { if (!this.canBuy(a) || !this.canTeam(a, id) || a.money < this.priceOf(a, id)) return false; this.net.toHost({ t: 'cmd', c: 'buy', v: id }); play('buy'); return true; }
     if (!this.canBuy(a) || !this.canTeam(a, id)) return false;
     const price = this.priceOf(a, id); if (a.money < price && !this.practice) return false;
     if (WEAPONS[id]) { const def = WEAPONS[id]; const cur = a.weapons[def.slot]; if (cur && cur.id === id) { cur.reserve = def.reserve; if (!this.practice) return false; } this.give(a, id); this.selectSlot(a, def.slot); }
@@ -285,6 +320,7 @@ export class Game {
     else if (id === 'kit') { if (a.kit || a.team !== 'CT') return false; a.kit = true; }
     if (!this.practice) a.money -= price;
     if (a === this.player) play('buy');
+    if (a.remote) this.net.send(a.nid, { t: 'ev', e: 'snd', s: 'buy' });
     return true;
   }
   _buildViewmodel(a = this.viewing || this.player) {
@@ -366,6 +402,7 @@ export class Game {
     if (def.scope && a.scope) { a.prevScope = a.scope; a.scope = 0; a.rescope = def.rate * 0.95; }
     // звук и вспышка
     const snd = soundFor(inst.id);
+    this.ev({ e: 'fire', a: a.id, w: inst.id });
     if (this.isView(a)) { play(snd, 0, 0, a === this.player ? 1 : 0.8); this.vmKick = 1; this.flash.visible = !def.silenced; this.flashT = 0.05; this.flash.material.rotation = Math.random() * 6; }
     else { const [d, pan] = this.listen(a.pos); play(snd, d, pan); this.worldFlash(a); }
     this.noise(a, def.silenced ? 8 : 35);
@@ -384,6 +421,7 @@ export class Game {
     const inst = a.cur; if (!inst || inst.nade || inst.c4) return; const def = WEAPONS[inst.id];
     if (!def.mag || a.reloadT > 0 || inst.mag >= def.mag || inst.reserve <= 0) return;
     a.reloadT = def.reload; a.scope = 0;
+    this.ev({ e: 'rl', a: a.id });
     if (this.isView(a)) play('reload'); else { const [d, pan] = this.listen(a.pos); play('reload', d, pan); }
   }
   // точки попаданий по актёру
@@ -416,7 +454,9 @@ export class Game {
     let from;
     if (a === this.player) from = new THREE.Vector3().copy(o).addScaledVector(dir, 0.6).add(new THREE.Vector3(Math.cos(a.yaw) * 0.12, -0.1, -Math.sin(a.yaw) * 0.12));
     else from = new THREE.Vector3().copy(o).addScaledVector(dir, 0.6).add(new THREE.Vector3(0, -0.15, 0));
-    if (Math.random() < (a === this.player ? 0.35 : 0.6)) this.tracer(from, end);
+    const tr = Math.random() < (a === this.player ? 0.35 : 0.6);
+    if (tr) this.tracer(from, end);
+    this.ev({ e: 'shot', a: a.id, f: tr ? [+from.x.toFixed(2), +from.y.toFixed(2), +from.z.toFixed(2)] : 0, p: [+end.x.toFixed(2), +end.y.toFixed(2), +end.z.toFixed(2)], h: h ? 1 : hit.t < maxD ? 2 : 0, n: [hit.n.x, hit.n.y, hit.n.z] });
     if (h) {
       this.damage(h.v, a, def.dmg * Math.pow(0.985, h.t / 5), h.zone, h.mult, def, dir);
       this.puff(end, '#a01010', 0.35);
@@ -427,6 +467,7 @@ export class Game {
   }
   knife(a) {
     const o = this.eyePos(a), dir = this.aimDir(a);
+    this.ev({ e: 'fire', a: a.id, w: 'knife' });
     if (this.isView(a)) { this.vmKick = 1; play('knife'); } else { const [d, pan] = this.listen(a.pos); play('knife', d, pan); }
     for (const v of this.actors) {
       if (!v.alive || v === a || (v.team === a.team && !this.practice)) continue;
@@ -440,7 +481,7 @@ export class Game {
     }
   }
   damage(v, a, raw, zone, mult, def, dir) {
-    if (!v.alive) return;
+    if (!v.alive || this.isClient) return;
     if (v === this.player && this.admin.god) return;
     if (a === this.player && v !== a && this.admin.oneshot) raw *= 20;
     let dmg = raw * mult;
@@ -449,6 +490,8 @@ export class Game {
     dmg = Math.round(dmg);
     v.hp -= dmg; v.lastHurt = this.time; v.lastAttacker = a;
     if (v.brain) v.brain.onHurt(a, dir);
+    if (a && a.remote) this.net.send(a.nid, { t: 'ev', e: 'hit', hs: zone === 'head' ? 1 : 0 });
+    if (v.remote) this.net.send(v.nid, { t: 'ev', e: 'hurt', d: dir ? [dir.x, dir.z] : null });
     if (a === this.player) { play(zone === 'head' ? 'head' : 'hit'); this.ui.hitmark(zone === 'head'); if (this.aimMode && def.type !== 'knife') this.aimStats.hits++; }
     if (v === this.player) { play('hurt'); this.ui.hurt(dir, this.player); }
     // замедление от попадания
@@ -470,6 +513,7 @@ export class Game {
     if (v.hasBomb) { v.hasBomb = false; this.dropBomb(v.pos); }
     const wid = def ? (def === WEAPONS.knife && a && a.cur && a.cur.model ? a.cur.model : Object.keys(WEAPONS).find(k => WEAPONS[k] === def) || def.icon) : 'skull';
     this.ui.feed(a, v, wid, hs, this.player);
+    this.ev({ e: 'kill', v: v.id, a: a ? a.id : -1, w: wid, hs: hs ? 1 : 0, fd: v.model.fallDir });
     this.checkWin();
   }
 
@@ -484,7 +528,9 @@ export class Game {
     }
     const mesh = buildWeapon(type, null); mesh.scale.setScalar(1.3);
     mesh.position.copy(o); this.scene.add(mesh);
-    this.nades.push({ type, pos: o.clone(), vel: vel.clone(), t: 0, owner: a, mesh, landed: false });
+    const nid = this.nadeSeq = (this.nadeSeq || 0) + 1;
+    this.nades.push({ id: nid, type, pos: o.clone(), vel: vel.clone(), t: 0, owner: a, mesh, landed: false });
+    this.ev({ e: 'nade', id: nid, ty: type, p: [o.x, o.y, o.z], v: [vel.x, vel.y, vel.z] });
     if (this.isView(a)) { this.vmKick = 1; play('throw'); }
     if (!this.practice || a.bot) {
       if (a.nades.length) this.selectSlot(a, 4, false); else this.selectSlot(a, a.weapons[1] ? 1 : 2);
@@ -522,6 +568,8 @@ export class Game {
   _bounce(n) { if (n.t - (n.lb || 0) > 0.12) { n.lb = n.t; const [d, pan] = this.listen(n.pos); play('bounce', d, pan); } }
   popNade(n) {
     if (n.dead) return; n.dead = true; this.scene.remove(n.mesh);
+    if (this.isHost) this.ev({ e: 'pop', id: n.id, ty: n.type, p: [n.pos.x, n.pos.y, n.pos.z] });
+    if (this.isClient) return;
     const [d, pan] = this.listen(n.pos), p = n.pos.clone();
     if (p.y < -40) return;
     if (n.type === 'he') {
@@ -714,7 +762,7 @@ export class Game {
     this._c4Mesh(this.bomb.pos);
     this.state = 'planted';
     a.money += 300;
-    this.centerMsg(`Бомба заложена на ${site}!`, 2.5, '#ff6a4a');
+    this.gmsg(`Бомба заложена на ${site}!`, 2.5, '#ff6a4a'); this.ev({ e: 'plant' });
     play('plant');
     this.selectSlot(a, a.weapons[1] ? 1 : 2);
     for (const b of this.actors) if (b.brain) b.brain.onPlanted(this.bomb);
@@ -723,7 +771,7 @@ export class Game {
     const B = this.bomb;
     if (!B) return;
     if (B.dropped) {
-      for (const a of this.actors) if (a.alive && a.team === 'T' && !(a === this.player && this.time < (B.noPick || 0)) && Math.hypot(a.pos.x - B.pos.x, a.pos.z - B.pos.z) < 0.9) {
+      for (const a of this.actors) if (a.alive && a.team === 'T' && !(a === (B.noPickBy || this.player) && this.time < (B.noPick || 0)) && Math.hypot(a.pos.x - B.pos.x, a.pos.z - B.pos.z) < 0.9) {
         a.hasBomb = true; this.bomb = null; this.scene.remove(this.c4mesh); this.c4mesh = null;
         if (a === this.player) this.centerMsg('Вы подобрали бомбу (5)', 1.5);
         return;
@@ -738,9 +786,237 @@ export class Game {
     else if (this.c4mesh && B.beep < rate * 0.6) this.c4mesh.userData.led.visible = false;
     if (B.timer <= 0) {
       B.done = true; const [d, pan] = this.listen(B.pos); play('boom', d * 0.3, pan); this.bigExplosion(B.pos.clone());
+      this.ev({ e: 'boom', p: [B.pos.x, B.pos.y, B.pos.z] });
       for (const v of this.actors) if (v.alive) { const dist = v.pos.distanceTo(B.pos); if (dist < 20) { const dmg = 500 * (1 - dist / 20); this.damage(v, null, dmg, 'chest', 1, { pen: 1 }, null); } }
       if (this.state !== 'end') this.endRound('T', 'bomb');
     }
+  }
+
+  // ---------- сеть: хост ----------
+  _netHostTick(dt) {
+    this.snapT = (this.snapT || 0) - dt;
+    if (this.snapT > 0) return;
+    this.snapT = 0.05;
+    this.net.broadcast(this._snap());
+  }
+  _snap() {
+    const r2 = v => Math.round(v * 100) / 100, B = this.bomb;
+    return {
+      t: 'snap',
+      g: { st: this.state, sT: r2(this.stateT), rt: r2(this.roundTime), sc: [this.score.T, this.score.CT], r: this.round,
+        b: B ? { p: B.planted ? 1 : 0, d: B.dropped ? 1 : 0, x: r2(B.pos.x), y: r2(B.pos.y), z: r2(B.pos.z), tm: r2(B.timer || 0), dn: B.done ? 1 : 0, s: B.site || '' } : 0 },
+      a: this.actors.map(a => ({
+        i: a.id, p: [r2(a.pos.x), r2(a.pos.y), r2(a.pos.z)], y: r2(a.yaw), pi: r2(a.pitch), h: Math.max(0, Math.ceil(a.hp)), ar: Math.ceil(a.armor), hm: a.helmet ? 1 : 0,
+        al: a.alive ? 1 : 0, c: r2(a.crouchK), og: a.onGround ? 1 : 0,
+        w: [1, 2, 3].map(k => { const w = a.weapons[k]; return w ? [w.id, w.mag, w.reserve, w.skin || 0, w.model || 0] : 0; }),
+        n: a.nades, cu: a.cur ? (a.cur.nade ? 'n' + a.cur.id : a.cur.c4 ? 'c4' : a.slot) : 0,
+        m: a.money, k: a.kills, d: a.deaths, rk: a.roundKills, hb: a.hasBomb ? 1 : 0, kt: a.kit ? 1 : 0, sc: a.scope, rl: a.reloadT > 0 ? 1 : 0,
+        pl: r2(a.plantT), df: r2(a.defuseT), tm: a.team, ag: a.agent.id,
+      })),
+    };
+  }
+  // сообщения от клиентов (у хоста) и от хоста (у клиента)
+  onNet(nid, m) {
+    if (this.isClient) return this._clientMsg(m);
+    const a = this.actors.find(x => x.nid === nid && x.remote); if (!a) return;
+    if (m.t === 'in') {
+      a.in.mx = +m.mx || 0; a.in.mz = +m.mz || 0; a.yaw = +m.y || 0; a.pitch = +m.p || 0;
+      a.in.fire = !!(m.b & 1); a.in.jump = !!(m.b & 2); a.in.crouch = !!(m.b & 4); a.in.walk = !!(m.b & 8); a.in.use = !!(m.b & 16);
+    } else if (m.t === 'cmd') this.act(a, m.c, m.v);
+    else if (m.t === 'gr') a.graffiti = m.g;
+  }
+  // игрок вышел — его место занимает бот
+  netLeave(nid) {
+    const a = this.actors.find(x => x.nid === nid && x.remote); if (!a) return;
+    a.remote = false; a.bot = true; a.name += ' (бот)'; a.in.fire = false;
+    if (this.diff.id !== 'none') { a.brain = new Bot(this, a, this.diff); try { a.brain.onRoundStart(); } catch (e) { /* бот подхватит в следующем раунде */ } }
+    this.gmsg(`${a.name.replace(' (бот)', '')} вышел из игры`, 2);
+  }
+
+  // ---------- сеть: клиент ----------
+  _clientInit() {
+    for (const a of this.actors) { this.resetLoadout(a, false); this.selectSlot(a, 2, true); }
+    this.state = 'freeze'; this.stateT = 6; this.roundTime = 115; this.inT = 0;
+    if (this.net.firstSnap) this._applySnap(this.net.firstSnap, true);
+  }
+  _clientMsg(m) {
+    if (m.t === 'snap') return this._applySnap(m);
+    if (m.t !== 'ev') return;
+    const A = i => this.actors[i], V = q => new THREE.Vector3(q[0], q[1], q[2]), p = this.player;
+    switch (m.e) {
+      case 'shot': {
+        const end = V(m.p);
+        if (m.f) this.tracer(V(m.f), end);
+        if (m.h === 1) this.puff(end, '#a01010', 0.35);
+        else if (m.h === 2) { this.decal(end, V(m.n)); this.puff(end, '#9a9184', 0.25); }
+        break;
+      }
+      case 'fire': {
+        const a = A(m.a); if (!a || a === p && !p.alive) break;
+        a.lastFired = this.time;
+        const snd = soundFor(m.w);
+        if (this.isView(a)) { play(snd, 0, 0, a === p ? 1 : 0.8); this.vmKick = 1; const def = WEAPONS[m.w]; if (def && def.type !== 'knife') { this.flash.visible = !def.silenced; this.flashT = 0.05; } if (a === p && def && def.recoil) { p.punch.p += def.recoil * 0.9; } }
+        else { const [d, pan] = this.listen(a.pos); play(snd, d, pan); if (m.w !== 'knife') this.worldFlash(a); }
+        break;
+      }
+      case 'rl': { const a = A(m.a); if (!a) break; if (this.isView(a)) play('reload'); else { const [d, pan] = this.listen(a.pos); play('reload', d, pan); } if (a === p) { const def = p.cur && WEAPONS[p.cur.id]; p.reloadT = def ? def.reload : 2; } break; }
+      case 'hit': play(m.hs ? 'head' : 'hit'); this.ui.hitmark(!!m.hs); break;
+      case 'hurt': play('hurt'); this.ui.hurt(m.d ? new THREE.Vector3(m.d[0], 0, m.d[1]) : null, p); break;
+      case 'kill': {
+        const v = A(m.v), a = m.a >= 0 ? A(m.a) : null; if (!v) break;
+        v.alive = false; v.hp = 0; v.model.kill(m.fd || 1); v.model.root.visible = true;
+        if (v === p) this.vm.visible = false;
+        this.ui.feed(a, v, m.w, !!m.hs, p);
+        if (a === p && this.ui.onKill) this.ui.onKill(!!m.hs);
+        break;
+      }
+      case 'nade': {
+        const mesh = buildWeapon(m.ty, null); mesh.scale.setScalar(1.3); const pos = V(m.p); mesh.position.copy(pos); this.scene.add(mesh);
+        this.nades.push({ id: m.id, type: m.ty, pos, vel: V(m.v), t: 0, owner: null, mesh, landed: false });
+        break;
+      }
+      case 'pop': {
+        const i = this.nades.findIndex(n => n.id === m.id);
+        if (i >= 0) { this.scene.remove(this.nades[i].mesh); this.nades.splice(i, 1); }
+        this._clientPop(m.ty, V(m.p));
+        break;
+      }
+      case 'boom': { const pos = V(m.p), [d, pan] = this.listen(pos); play('boom', d * 0.3, pan); this.bigExplosion(pos); break; }
+      case 'msg': this.centerMsg(m.t, m.d, m.c); break;
+      case 'snd': play(m.s); break;
+      case 'plant': play('plant'); this.ui.announce && this.ui.announce('Bomb has been planted'); break;
+      case 'end': this.ui.roundBanner && this.ui.roundBanner(m.w, m.why, m.mvp >= 0 ? A(m.mvp) : null, this); play(m.w === p.team ? 'win' : 'lose'); break;
+      case 'round': this._clientRoundReset(m.r); break;
+      case 'spray': { const a = A(m.a); if (a) this._placeSpray(a, V(m.p), V(m.n), m.g); break; }
+      case 'over': this.over = true; this.ui.matchOver(this); break;
+    }
+  }
+  _clientRoundReset(r) {
+    this.round = r;
+    for (const n of this.nades) n.mesh && this.scene.remove(n.mesh); this.nades = [];
+    for (const s of this.smokes) this.scene.remove(s.grp); this.smokes = [];
+    for (const f of this.fires) this.scene.remove(f.grp); this.fires = [];
+    for (const d of this.decals) this.scene.remove(d); this.decals = [];
+    for (const a of this.actors) { a.alive = true; a.hp = 100; a.blind = 0; a.reloadT = 0; a.scope = 0; a.model.revive(); a.model.root.visible = a !== this.player; a.snapPos = true; }
+    this.spect = null; this.vm.visible = true; this.camYaw = null;
+    this.ui.roundStart && this.ui.roundStart(this);
+  }
+  _clientPop(type, p) {
+    const [d, pan] = this.listen(p);
+    if (type === 'he') { play('he', d, pan); this.bigExplosion(p.clone(), 0.35); }
+    else if (type === 'flash') {
+      play('flash', d, pan); this.explosionFx(p, 1.5, '#ffffff');
+      const v = this.player, fp = p.clone().setY(p.y + 0.2);
+      if (v.alive) {
+        const e = this.eyePos(v), dist = e.distanceTo(fp);
+        if (dist < 32 && this.world.los(fp, e) && !this.smokeBlocks(fp, e)) {
+          const dot = new THREE.Vector3().subVectors(fp, e).normalize().dot(this.aimDir(v));
+          let amt = dot > 0.6 ? 1 : dot > 0.1 ? 0.6 : dot > -0.4 ? 0.3 : 0.12; amt *= Math.max(0.2, 1 - dist / 34);
+          const dur = 4.6 * amt; if (dur > v.blind) v.blind = dur; this.ui.flashed(dur);
+        }
+      }
+    } else if (type === 'smoke') { play('smoke', d, pan); this.spawnSmoke(p.setY(Math.max(0, p.y))); }
+    else if (type === 'molotov') {
+      play('fire', d, pan);
+      const gp = p.clone().setY(Math.max(0, this.world.hAtPos(p.x, p.z)));
+      if (this.smokes.some(s => s.c.distanceTo(gp) < s.r * 0.8)) this.puff(gp, '#888', 0.8); else this.spawnFire(gp, null);
+    }
+  }
+  _applySnap(m, first) {
+    const g = m.g, V3 = THREE.Vector3;
+    this.state = g.st; this.stateT = g.sT; this.roundTime = g.rt; this.score = { T: g.sc[0], CT: g.sc[1] }; this.round = g.r;
+    if (g.b) {
+      const B = this.bomb || (this.bomb = { beep: 0 }), np = new V3(g.b.x, g.b.y, g.b.z);
+      B.planted = !!g.b.p; B.dropped = !!g.b.d; B.timer = g.b.tm; B.done = !!g.b.dn; B.site = g.b.s;
+      if (!B.pos || B.pos.distanceTo(np) > 0.01 || !this.c4mesh) { B.pos = np; this._c4Mesh(np); }
+    } else if (this.bomb) { this.bomb = null; if (this.c4mesh) { this.scene.remove(this.c4mesh); this.c4mesh = null; } }
+    let retag = false;
+    for (const e of m.a) {
+      const a = this.actors[e.i]; if (!a) continue;
+      const me = a === this.player;
+      if (a.team !== e.tm) { a.team = e.tm; retag = true; }
+      if (a.agent.id !== e.ag) {
+        this.scene.remove(a.model.root); a.agent = agentById[e.ag] || a.agent; a.model = new AgentModel(a.agent, 'knife');
+        if (a.skins.gloves) a.model.setGloves(a.skins.gloves); a.model.root.visible = !me; this.scene.add(a.model.root);
+      }
+      a.hp = e.h; a.armor = e.ar; a.helmet = !!e.hm; a.money = e.m; a.kills = e.k; a.deaths = e.d; a.roundKills = e.rk;
+      a.hasBomb = !!e.hb; a.kit = !!e.kt; a.plantT = e.pl; a.defuseT = e.df; a.nades = e.n || [];
+      if (!e.rl) a.reloadT = 0;
+      if (a.alive && !e.al) { a.alive = false; a.model.kill(1); a.model.root.visible = true; if (me) this.vm.visible = false; }
+      else if (!a.alive && e.al) { a.alive = true; a.model.revive(); a.snapPos = true; }
+      for (let k = 1; k <= 3; k++) {
+        const w = e.w[k - 1], c = a.weapons[k];
+        if (!w) a.weapons[k] = null;
+        else if (c && c.id === w[0] && (c.skin || 0) === w[3] && (c.model || 0) === w[4]) { c.mag = w[1]; c.reserve = w[2]; }
+        else a.weapons[k] = { id: w[0], mag: w[1], reserve: w[2], skin: w[3] || null, model: w[4] || undefined };
+      }
+      // текущее оружие (своё — если давно не переключал сам)
+      if (!me || this.time - (a.localSw || -9) > 0.5) {
+        let cur = a.cur, slot = a.slot;
+        if (typeof e.cu === 'number' && e.cu) { slot = e.cu; cur = a.weapons[e.cu] || cur; }
+        else if (e.cu === 'c4') { slot = 5; if (!a.cur || !a.cur.c4) cur = { id: 'c4', c4: true }; }
+        else if (typeof e.cu === 'string' && e.cu[0] === 'n') { slot = 4; if (!a.cur || a.cur.id !== e.cu.slice(1)) cur = { id: e.cu.slice(1), nade: true }; }
+        if (cur !== a.cur) { a.cur = cur; a.slot = slot; if (me) a.switchT = 0.3; }
+        if (a.cur) a.model.setWeapon(a.cur.nade || a.cur.c4 ? a.cur.id : (a.cur.model || a.cur.id), a.cur.skin);
+      }
+      if (!me || this.time - (a.localScope || -9) > 0.6) a.scope = e.sc;
+      const sp = new V3(e.p[0], e.p[1], e.p[2]);
+      a.srv = sp;
+      if (me) {
+        if (first || a.snapPos || a.pos.distanceTo(sp) > 3) { a.pos.copy(sp); a.vel.set(0, 0, 0); a.snapPos = false; }
+        if (first) { a.yaw = e.y; a.pitch = e.pi; }
+      } else {
+        a.tYaw = e.y; a.tPitch = e.pi; a.crouchK = e.c; a.onGround = !!e.og;
+        if (first || a.snapPos) { a.pos.copy(sp); a.yaw = e.y; a.snapPos = false; }
+      }
+    }
+    if (retag) { this.playerSide = this.player.team; this._retag(); }
+  }
+  _clientUpdate(dt) {
+    this.time += dt;
+    if (this.over) return;
+    if (this.state === 'live') this.roundTime -= dt;
+    this.stateT -= dt;
+    const p = this.player, B = this.bomb;
+    if (B && B.planted && !B.done) {
+      B.timer -= dt; B.beep = (B.beep || 0) - dt;
+      const rate = B.timer > 20 ? 1 : B.timer > 10 ? 0.5 : B.timer > 4 ? 0.25 : 0.12;
+      if (B.beep <= 0) { B.beep = rate; const [d, pan] = this.listen(B.pos); play('beep', d * 0.5, pan); if (this.c4mesh) this.c4mesh.userData.led.visible = true; }
+      else if (this.c4mesh && B.beep < rate * 0.6) this.c4mesh.userData.led.visible = false;
+    }
+    this._playerInput(dt);
+    if (p.in.jump) this.jumpLatch = true;
+    // ввод хосту ~30 раз в секунду
+    this.inT -= dt;
+    if (this.inT <= 0) {
+      this.inT = 1 / 30;
+      const i = p.in, r3 = v => Math.round(v * 1000) / 1000;
+      this.net.toHost({ t: 'in', mx: r3(i.mx), mz: r3(i.mz), y: r3(p.yaw), p: r3(p.pitch), b: (i.fire ? 1 : 0) | (i.jump || this.jumpLatch ? 2 : 0) | (i.crouch ? 4 : 0) | (i.walk ? 8 : 0) | (i.use ? 16 : 0) });
+      this.jumpLatch = false;
+    }
+    // своё движение предсказываем, мягко поправляя к позиции хоста
+    if (p.alive) {
+      if (this.state === 'freeze') { p.in.mx = p.in.mz = 0; p.in.jump = false; }
+      this._move(p, dt);
+      if (p.srv) { const d = p.pos.distanceTo(p.srv); if (d > 3) p.pos.copy(p.srv); else if (d > 0.7) p.pos.lerp(p.srv, Math.min(1, dt * 5)); }
+    }
+    p.reloadT = Math.max(0, p.reloadT - dt); p.switchT = Math.max(0, p.switchT - dt); p.blind = Math.max(0, p.blind - dt);
+    const rec = Math.min(1, dt * 7); p.punch.p -= p.punch.p * rec; p.punch.y -= p.punch.y * rec;
+    // остальные — плавно к снимку
+    for (const a of this.actors) {
+      if (a === p || !a.srv) continue;
+      const px = a.pos.x, pz = a.pos.z;
+      a.pos.lerp(a.srv, Math.min(1, dt * 14));
+      if (dt > 0) a.vel.set((a.pos.x - px) / dt, 0, (a.pos.z - pz) / dt);
+      let dy = (a.tYaw || 0) - a.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
+      a.yaw += dy * Math.min(1, dt * 16); a.pitch += ((a.tPitch || 0) - a.pitch) * Math.min(1, dt * 16);
+      // шаги по звуку
+      const hs = this.hspeed(a);
+      if (a.alive && a.onGround && hs > 3.2 && a.crouchK < 0.5) { a.stepT -= dt * hs; if (a.stepT <= 0) { a.stepT = 2.2; const [d, pan] = this.listen(a.pos); if (d < 30) play('step', d, pan); } }
+    }
+    this._updNades(dt);
+    this._effects(dt);
+    this._visuals(dt);
   }
 
   // ---------- граффити ----------
@@ -750,16 +1026,21 @@ export class Game {
     const o = this.eyePos(a), d = this.aimDir(a);
     const hit = this.world.rayHit(o.x, o.y, o.z, d.x, d.y, d.z, 4);
     if (hit.t >= 4) { if (a === this.player) this.centerMsg('Подойдите ближе к стене', 1); return; }
-    const g0 = GRAFFITI.find(x => x.id === (gid || this.o.graffiti)) || GRAFFITI[0];
+    const p0 = this.snapHit(new THREE.Vector3().copy(o).addScaledVector(d, hit.t), hit.n).addScaledVector(hit.n, 0.02);
+    gid = gid || (a === this.player ? this.o.graffiti : a.graffiti) || 'cfs';
+    this._placeSpray(a, p0, hit.n, gid);
+    a.sprayCd = this.time + 8;
+    this.ev({ e: 'spray', a: a.id, p: [p0.x, p0.y, p0.z], n: [hit.n.x, hit.n.y, hit.n.z], g: gid });
+  }
+  _placeSpray(a, p, n, gid) {
+    const g0 = GRAFFITI.find(x => x.id === gid) || GRAFFITI[0];
     this._sprayTex = this._sprayTex || {};
     if (!this._sprayTex[g0.id]) { const cv = document.createElement('canvas'); cv.width = cv.height = 256; const t = new THREE.CanvasTexture(drawGraffiti(cv, g0)); t.colorSpace = THREE.SRGBColorSpace; this._sprayTex[g0.id] = t; }
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3), new THREE.MeshLambertMaterial({ map: this._sprayTex[g0.id], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, opacity: 0.95 }));
-    const p = this.snapHit(new THREE.Vector3().copy(o).addScaledVector(d, hit.t), hit.n).addScaledVector(hit.n, 0.02);
     m.position.copy(p);
-    if (Math.abs(hit.n.y) > 0.9) { m.rotation.x = -Math.PI / 2; m.rotation.z = a.yaw; } else m.lookAt(p.clone().add(hit.n));
+    if (Math.abs(n.y) > 0.9) { m.rotation.x = -Math.PI / 2; m.rotation.z = a.yaw; } else m.lookAt(p.clone().add(n));
     if (a.sprayMesh) this.scene.remove(a.sprayMesh);
     a.sprayMesh = m; this.scene.add(m);
-    a.sprayCd = this.time + 8;
     const [dd, pan] = this.listen(p); play('spray', this.isView(a) ? 0 : dd, pan);
   }
 
@@ -821,25 +1102,42 @@ export class Game {
     p.in.fire = st.fire;
     if (c.edge('fireR')) p.released = true;
     if (!st.fire) p.released = true;
-    if (c.edge('reload')) this.reload(p);
-    for (const s of [1, 2, 3, 4, 5]) if (c.edge('slot' + s)) this.selectSlot(p, s);
-    if (c.edge('last')) this.selectSlot(p, p.last);
-    if (c.edge('next') || c.edge('swap')) this.cycle(p, 1);
-    if (c.edge('prev')) this.cycle(p, -1);
-    if (c.edge('nade')) { if (p.nades.length) this.selectSlot(p, 4); else this.centerMsg('Нет гранат', 1); }
-    if (c.edge('aim')) {
-      const def = p.cur && WEAPONS[p.cur.id];
-      if (def && def.scope && p.switchT <= 0 && p.reloadT <= 0) p.scope = (p.scope + 1) % 3;
-    }
+    if (c.edge('reload')) this.act(p, 'reload');
+    for (const s of [1, 2, 3, 4, 5]) if (c.edge('slot' + s)) this.act(p, 'slot', s);
+    if (c.edge('last')) this.act(p, 'slot', p.last);
+    if (c.edge('next') || c.edge('swap')) this.act(p, 'cycle', 1);
+    if (c.edge('prev')) this.act(p, 'cycle', -1);
+    if (c.edge('nade')) { if (p.nades.length) this.act(p, 'slot', 4); else this.centerMsg('Нет гранат', 1); }
+    if (c.edge('aim')) this.act(p, 'aim');
     if (c.edge('inspect') && !p.scope && p.reloadT <= 0) this.inspectT = 3.2;
     if (p.in.fire || p.reloadT > 0) this.inspectT = 0;
-    if (c.edge('spray')) this.spray(p);
-    if (c.edge('bomb')) this.selectSlot(p, 5);
-    if (c.edge('drop') && p.hasBomb) {
-      p.hasBomb = false; const d = this.aimDir(p); this.dropBomb(new THREE.Vector3(p.pos.x + d.x * 1.5, 0, p.pos.z + d.z * 1.5));
-      this.bomb.noPick = this.time + 1.5; if (p.slot === 5) this.selectSlot(p, p.weapons[1] ? 1 : 2);
-    }
+    if (c.edge('spray')) this.act(p, 'spray', this.o.graffiti);
+    if (c.edge('bomb')) this.act(p, 'slot', 5);
+    if (c.edge('drop')) this.act(p, 'drop');
     c.edge('fireP');
+  }
+  // действие игрока: локально, у хоста для удалённых игроков, у клиента — отправка хосту
+  act(a, c, v) {
+    if (this.isClient && a === this.player) {
+      this.net.toHost({ t: 'cmd', c, v });
+      if (c === 'slot') { this.selectSlot(a, v); a.localSw = this.time; }
+      else if (c === 'cycle') { this.cycle(a, v); a.localSw = this.time; }
+      else if (c === 'aim') { const def = a.cur && WEAPONS[a.cur.id]; if (def && def.scope && a.reloadT <= 0) { a.scope = (a.scope + 1) % 3; a.localScope = this.time; } }
+      return;
+    }
+    switch (c) {
+      case 'reload': this.reload(a); break;
+      case 'slot': this.selectSlot(a, v); break;
+      case 'cycle': this.cycle(a, v); break;
+      case 'aim': { const def = a.cur && WEAPONS[a.cur.id]; if (def && def.scope && a.switchT <= 0 && a.reloadT <= 0) a.scope = (a.scope + 1) % 3; break; }
+      case 'spray': this.spray(a, v); break;
+      case 'buy': this.buy(a, v); break;
+      case 'drop':
+        if (!a.hasBomb) break;
+        a.hasBomb = false; { const d = this.aimDir(a); this.dropBomb(new THREE.Vector3(a.pos.x + d.x * 1.5, 0, a.pos.z + d.z * 1.5)); }
+        this.bomb.noPick = this.time + 1.5; this.bomb.noPickBy = a; if (a.slot === 5) this.selectSlot(a, a.weapons[1] ? 1 : 2);
+        break;
+    }
   }
   spectNext(dir = 1) {
     // сначала союзники, если их нет — любой живой
@@ -948,15 +1246,16 @@ export class Game {
 
   // ---------- главный цикл ----------
   update(dt) {
+    if (this.isClient) return this._clientUpdate(dt);
     this.time += dt;
     // состояние раунда
     if (!this.practice) {
       this.stateT -= dt;
-      if (this.state === 'freeze' && this.stateT <= 0) { this.state = 'live'; this.centerMsg('Вперёд!', 1); play('round'); }
+      if (this.state === 'freeze' && this.stateT <= 0) { this.state = 'live'; this.gmsg('Вперёд!', 1); play('round'); this.ev({ e: 'snd', s: 'round' }); }
       else if (this.state === 'live') { this.roundTime -= dt; if (this.roundTime <= 0) this.endRound('CT', 'time'); }
       else if (this.state === 'end' && this.stateT <= 0) {
         const max = (this.o.winTo - 1) * 2;
-        if (this.score.T >= this.o.winTo || this.score.CT >= this.o.winTo || this.round >= max) { this.over = true; this.ui.matchOver(this); return; }
+        if (this.score.T >= this.o.winTo || this.score.CT >= this.o.winTo || this.round >= max) { this.over = true; this._netHostTick(1); this.ev({ e: 'over' }); this.ui.matchOver(this); return; }
         this.startRound(false);
       }
     }
@@ -983,6 +1282,12 @@ export class Game {
     for (const a of this.actors) this._weapons(a, dt);
     this._updNades(dt);
     this._updBomb(dt);
+    this._effects(dt);
+    this.checkWin();
+    this._visuals(dt);
+    if (this.isHost) this._netHostTick(dt);
+  }
+  _effects(dt) {
     // дым
     for (let k = this.smokes.length - 1; k >= 0; k--) {
       const s = this.smokes[k]; s.t += dt;
@@ -1011,7 +1316,8 @@ export class Game {
       if (e.t <= 0) { this.scene.remove(e.obj); e.obj.material && e.obj.material.dispose(); this.fx.splice(k, 1); }
     }
     for (const t of this.tracers) if (t.l.visible) { t.t -= dt; if (t.t <= 0) t.l.visible = false; }
-    this.checkWin();
+  }
+  _visuals(dt) {
     // модели
     for (const a of this.actors) {
       if (a === this.player && a.alive) continue;
@@ -1035,7 +1341,7 @@ export class Game {
     this.viewing = view;
     const fp = view !== p && !this.spectTP;
     p.model.root.visible = !p.alive && view !== p;
-    for (const a of this.actors) if (a.bot) {
+    for (const a of this.actors) if (a !== p) {
       a.model.root.visible = !(fp && a === view && a.alive);
       if (a.tag && a === view && view !== p) a.tag.visible = false;
     }

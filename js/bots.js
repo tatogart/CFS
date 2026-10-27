@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793105792';
-import { WEAPONS } from './data.js?v=1793105792';
+import { CELL } from './maps.js?v=1793106875';
+import { WEAPONS } from './data.js?v=1793106875';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -269,7 +269,7 @@ export class Bot {
       g.nadeClaims[key] = g.round;
       this.usedCTnades.add(n.mark + n.type);
       const jitter = { esports: 0, hard: 0.35, medium: 1.4, easy: 3, harmless: 4 }[this.d.id] || 0;
-      tgt.x += rand(-jitter, jitter); tgt.z += rand(-jitter, jitter);
+      tgt.x += rand(-jitter, jitter); tgt.z += rand(-jitter, jitter); tgt.y = g.world.flAt(tgt.x, tgt.z);
       this.nadeQueue.push({ type: n.type, tgt, name: n.name, tries: 0 });
     }
     // дым первым, потом молотов, флешки последними
@@ -288,9 +288,9 @@ export class Bot {
     q.next = g.time + 0.15;
     if (d > 34) return false;
     let v;
-    if (q.type === 'flash') v = solveThrow(g.world, from, q.tgt.clone().setY(2.6), 1.4) || solveThrow(g.world, from, q.tgt.clone().setY(0.1));
-    else if (q.type === 'he') v = solveThrow(g.world, from, q.tgt.clone().setY(0.4), 1.6) || solveThrow(g.world, from, q.tgt.clone().setY(0.1));
-    else v = solveThrow(g.world, from, q.tgt.clone().setY(0.06));
+    if (q.type === 'flash') v = solveThrow(g.world, from, q.tgt.clone().setY(q.tgt.y + 2.6), 1.4) || solveThrow(g.world, from, q.tgt.clone().setY(q.tgt.y + 0.1));
+    else if (q.type === 'he') v = solveThrow(g.world, from, q.tgt.clone().setY(q.tgt.y + 0.4), 1.6) || solveThrow(g.world, from, q.tgt.clone().setY(q.tgt.y + 0.1));
+    else v = solveThrow(g.world, from, q.tgt.clone().setY(q.tgt.y + 0.06));
     if (!v) return false;
     // разворачиваемся по направлению броска
     a.yaw = Math.atan2(-v.x, -v.z); a.pitch = Math.atan2(v.y, Math.hypot(v.x, v.z));

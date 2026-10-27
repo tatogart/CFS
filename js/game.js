@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793105792';
-import { World } from './world.js?v=1793105792';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES } from './data.js?v=1793105792';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793105792';
-import { play, soundFor } from './sfx.js?v=1793105792';
-import { Bot, planRound } from './bots.js?v=1793105792';
-import { weaponIconURL, mapThumbURL } from './art.js?v=1793105792';
+import { CELL } from './maps.js?v=1793106875';
+import { World } from './world.js?v=1793106875';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES } from './data.js?v=1793106875';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793106875';
+import { play, soundFor } from './sfx.js?v=1793106875';
+import { Bot, planRound } from './bots.js?v=1793106875';
+import { weaponIconURL, mapThumbURL } from './art.js?v=1793106875';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -974,6 +974,9 @@ export class Game {
     }
     // вид от первого лица (свой или наблюдаемого)
     const e = this.eyePos(view);
+    if (this.eyeY == null || Math.abs(e.y - this.eyeY) > 1.6 || view !== this.lastView) this.eyeY = e.y;
+    else this.eyeY += (e.y - this.eyeY) * Math.min(1, dt * 16);
+    this.lastView = view; e.y = this.eyeY;
     if (!view.alive) e.y = view.pos.y + 0.3;
     this.camera.position.copy(e);
     let yaw = view.yaw, pitch = view.pitch;

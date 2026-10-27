@@ -1,5 +1,5 @@
 // Процедурная графика: узоры скинов, миниатюры оружия, кейсов и карт
-import { skinById, WEAPONS, KNIVES } from './data.js?v=1793105792';
+import { skinById, WEAPONS, KNIVES } from './data.js?v=1793106875';
 
 export function rng(seed) {
   let a = seed >>> 0;
@@ -397,6 +397,7 @@ export function mapThumbURL(map, px = 5) {
     else if (ch === 'R') col = '#8a3b2e';
     else if (ch === 'w') col = '#3f86b5';
     else col = th.floor;
+    if (gr.elev && col && col[0] === '#' && ch !== '#') { const e = gr.elev[j * W + i]; if (e) col = shade(col, Math.min(0.45, e * 0.1)); }
     g.fillStyle = col; g.fillRect(i * px, j * px, px, px);
   }
   // буквы точек

@@ -1,7 +1,7 @@
 // Мир: сетка карты, геометрия, лучи, навигация
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL, setCell } from './maps.js?v=1793105792';
-import { rng, shade } from './art.js?v=1793105792';
+import { CELL, setCell } from './maps.js?v=1793106875';
+import { rng, shade } from './art.js?v=1793106875';
 
 const WALK = new Set(['.', 'w', 'T', 'K', 'A', 'B', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 
@@ -84,25 +84,37 @@ export class World {
     const grid = map.grid; this.h = grid.length; this.w = grid[0].length;
     this.cells = grid.map(r => r.split(''));
     this.H = new Float32Array(this.w * this.h);
+    // FL — высота пола клетки (рампы, платформы), W — можно ли ходить
+    this.FL = grid.elev ? Float32Array.from(grid.elev) : new Float32Array(this.w * this.h);
+    this.W = new Uint8Array(this.w * this.h);
     this.marks = {}; this.sites = { A: [], B: [] }; this.spawns = { T: [], CT: [] };
     const R = rng(map.id.length * 977 + 13);
     const blockH = {};
     for (let j = 0; j < this.h; j++) for (let i = 0; i < this.w; i++) {
       const ch = this.cells[j][i], k = j * this.w + i;
-      let hh = 0;
+      const fl = this.FL[k];
+      let hh = fl;
       if (ch === '#') { const bk = (i >> 2) + ',' + (j >> 2); if (!(bk in blockH)) blockH[bk] = 4.5 + Math.floor(R() * 4) * 0.8; hh = blockH[bk]; }
-      else if (ch === 'c') hh = 1.0; else if (ch === 'C') hh = 2.0; else if (ch === 'R') hh = 3.4; else if (ch === 'v') hh = -60;
+      else if (ch === 'c') hh = fl + 1.0; else if (ch === 'C') hh = fl + 2.0; else if (ch === 'R') hh = fl + 3.4; else if (ch === 'v') hh = -60;
+      else this.W[k] = 1;
       this.H[k] = hh;
       if (ch === 'A' || ch === 'B') this.sites[ch].push([i, j]);
       if (ch === 'T') this.spawns.T.push([i, j]);
       if (ch === 'K') this.spawns.CT.push([i, j]);
       if (ch >= '1' && ch <= '9') this.marks[ch] = [i, j];
     }
-    // ящики на точках тоже часть точки
+    // стены всегда выше соседних платформ
+    for (let j = 0; j < this.h; j++) for (let i = 0; i < this.w; i++) {
+      const k = j * this.w + i; if (this.cells[j][i] !== '#') continue;
+      let m = 0; for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const q = this.idx(i + di, j + dj); if (q >= 0 && this.W[q]) m = Math.max(m, this.FL[q]); }
+      this.H[k] += m;
+    }
+        // ящики на точках тоже часть точки
     for (const s of ['A', 'B']) {
       let sx = 0, sz = 0; for (const [i, j] of this.sites[s]) { sx += i; sz += j; }
       const n = this.sites[s].length;
-      this.sites[s].center = new THREE.Vector3((sx / n + 0.5) * CELL, 0, (sz / n + 0.5) * CELL);
+      const ci = Math.round(sx / n - 0.5 + 0.5), cj = Math.round(sz / n);
+      this.sites[s].center = new THREE.Vector3((sx / n + 0.5) * CELL, this.FL[this.idx(Math.floor(sx / n), Math.floor(sz / n))] || 0, (sz / n + 0.5) * CELL);
     }
     this.siteOf = new Uint8Array(this.w * this.h);
     const inRect = (s) => { let x0 = 1e9, x1 = -1, z0 = 1e9, z1 = -1; for (const [i, j] of this.sites[s]) { x0 = Math.min(x0, i); x1 = Math.max(x1, i); z0 = Math.min(z0, j); z1 = Math.max(z1, j); } return [x0, x1, z0, z1]; };
@@ -113,8 +125,12 @@ export class World {
   idx(i, j) { return (i < 0 || j < 0 || i >= this.w || j >= this.h) ? -1 : j * this.w + i; }
   hAt(i, j) { const k = this.idx(i, j); return k < 0 ? 99 : this.H[k]; }
   hAtPos(x, z) { return this.hAt(Math.floor(x / CELL), Math.floor(z / CELL)); }
-  walk(i, j) { const k = this.idx(i, j); return k >= 0 && this.H[k] === 0; }
-  cellCenter(i, j, y = 0) { return new THREE.Vector3((i + 0.5) * CELL, y, (j + 0.5) * CELL); }
+  walk(i, j) { const k = this.idx(i, j); return k >= 0 && this.W[k] === 1; }
+  fl(i, j) { const k = this.idx(i, j); return k < 0 ? 0 : this.FL[k]; }
+  flAt(x, z) { return this.fl(Math.floor(x / CELL), Math.floor(z / CELL)); }
+  // можно ли перейти между соседними клетками (ступенька не выше 0.5 м)
+  step(i, j, a, b) { return Math.abs(this.fl(i, j) - this.fl(a, b)) <= 0.5; }
+  cellCenter(i, j, y) { return new THREE.Vector3((i + 0.5) * CELL, y == null ? this.fl(i, j) : y, (j + 0.5) * CELL); }
   siteAt(x, z) { const k = this.idx(Math.floor(x / CELL), Math.floor(z / CELL)); return k < 0 ? 0 : this.siteOf[k]; }
   inSpawn(x, z, team) { const k = this.idx(Math.floor(x / CELL), Math.floor(z / CELL)); if (k < 0) return false; const ch = this.cells[Math.floor(z / CELL)][Math.floor(x / CELL)]; return ch === (team === 'T' ? 'T' : 'K'); }
 
@@ -128,14 +144,14 @@ export class World {
     // UV по высоте: повтор текстуры
     const counts = { wall: 0 }, walls = [];
     for (let j = 0; j < this.h; j++) for (let i = 0; i < this.w; i++) {
-      const hh = this.H[j * this.w + i]; if (hh < 4) continue;
+      const hh = this.H[j * this.w + i]; if (this.cells[j][i] !== '#') continue;
       let exposed = false;
-      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = this.hAt(i + di, j + dj); if (n < 4 && n !== 99) exposed = true; }
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k2 = this.idx(i + di, j + dj); if (k2 >= 0 && this.cells[j + dj][i + di] !== '#') exposed = true; }
       if (exposed) walls.push([i, j, hh]);
     }
     // группируем по высоте для правильного тайлинга текстуры
     const byH = {};
-    for (const w of walls) (byH[w[2]] = byH[w[2]] || []).push(w);
+    for (const w of walls) { w[2] = Math.round(w[2] * 2) / 2; (byH[w[2]] = byH[w[2]] || []).push(w); }
     for (const hk in byH) {
       const hh = +hk, list = byH[hk];
       const g2 = geo.clone(); g2.scale(1, hh, 1);
@@ -160,7 +176,7 @@ export class World {
       const fl = []; for (let j = 0; j < this.h; j++) for (let i = 0; i < this.w; i++) if (this.H[j * this.w + i] >= 0) fl.push([i, j]);
       floorTex.repeat.set(1, 1);
       const m = new THREE.InstancedMesh(fgeo, new THREE.MeshLambertMaterial({ map: floorTex }), fl.length);
-      const mtx = new THREE.Matrix4(); fl.forEach(([i, j], n) => { mtx.makeTranslation((i + 0.5) * CELL, 0, (j + 0.5) * CELL); m.setMatrixAt(n, mtx); });
+      const mtx = new THREE.Matrix4(); fl.forEach(([i, j], n) => { mtx.makeTranslation((i + 0.5) * CELL, this.fl(i, j), (j + 0.5) * CELL); m.setMatrixAt(n, mtx); });
       m.receiveShadow = true; this.group.add(m);
       // край небоскрёба и город внизу
       const city = new THREE.Group(), R = rng(77), cm = new THREE.MeshLambertMaterial({ color: '#8c99a6' }), cm2 = new THREE.MeshLambertMaterial({ color: '#6d7a88' });
@@ -169,12 +185,26 @@ export class World {
       const slab = new THREE.Mesh(new THREE.BoxGeometry(fw - 4 * CELL, 3, fh - 4 * CELL), new THREE.MeshLambertMaterial({ color: '#7d8287' })); slab.position.set(fw / 2, -1.55, fh / 2); city.add(slab);
       this.group.add(city);
     }
+    // приподнятые площадки, рампы и лестницы: столбики высотой с пол клетки
+    {
+      const raised = [];
+      for (let j = 0; j < this.h; j++) for (let i = 0; i < this.w; i++) { const k = j * this.w + i; if (this.cells[j][i] !== '#' && this.cells[j][i] !== 'v' && this.FL[k] > 0.01) raised.push([i, j, this.FL[k]]); }
+      if (raised.length) {
+        const t2 = floorTex.clone(); t2.needsUpdate = true; t2.repeat.set(0.5, 0.5);
+        const sideTex = wallTex.clone(); sideTex.needsUpdate = true; sideTex.repeat.set(1, 0.4);
+        const top = new THREE.MeshLambertMaterial({ map: t2 }), side = new THREE.MeshLambertMaterial({ map: sideTex, color: '#d8d0c4' });
+        const m = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL, 1, CELL).translate(0, -0.5, 0), [side, side, top, side, side, side], raised.length);
+        const mtx = new THREE.Matrix4(), sc = new THREE.Matrix4();
+        raised.forEach(([i, j, f], n) => { mtx.makeTranslation((i + 0.5) * CELL, f, (j + 0.5) * CELL); sc.makeScale(1, f, 1); mtx.multiply(sc); m.setMatrixAt(n, mtx); });
+        m.receiveShadow = true; m.castShadow = q >= 2; this.group.add(m);
+      }
+    }
     // вода, ящики, вагоны, цветные спавны
     const addCells = (pred, geoFn, mt) => {
       const list = []; for (let j = 0; j < this.h; j++) for (let i = 0; i < this.w; i++) if (pred(this.cells[j][i])) list.push([i, j]);
       if (!list.length) return;
       const g = geoFn(); const m = new THREE.InstancedMesh(g.geo, mt, list.length); const mtx = new THREE.Matrix4();
-      list.forEach(([i, j], n) => { mtx.makeTranslation((i + 0.5) * CELL, g.y, (j + 0.5) * CELL); m.setMatrixAt(n, mtx); });
+      list.forEach(([i, j], n) => { mtx.makeTranslation((i + 0.5) * CELL, g.y + this.fl(i, j), (j + 0.5) * CELL); m.setMatrixAt(n, mtx); });
       m.castShadow = q >= 2; m.receiveShadow = true; this.group.add(m);
     };
     addCells(c => c === 'w', () => ({ geo: new THREE.PlaneGeometry(CELL, CELL).rotateX(-Math.PI / 2), y: 0.02 }), new THREE.MeshLambertMaterial({ map: waterTex, transparent: true, opacity: 0.9 }));
@@ -187,7 +217,7 @@ export class World {
       g.font = 'bold 110px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(190,20,20,0.75)'; g.fillText(s, 64, 70);
       const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
       const d = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
-      d.rotation.x = -Math.PI / 2; const c = this.sites[s].center; d.position.set(c.x, 0.03, c.z); this.group.add(d);
+      d.rotation.x = -Math.PI / 2; const c = this.sites[s].center; d.position.set(c.x, this.flAt(c.x, c.z) + 0.03, c.z); this.group.add(d);
     }
   }
 
@@ -242,8 +272,8 @@ export class World {
       if (k === goal) { found = true; break; }
       const i = k % W, j = (k / W) | 0;
       for (const [di, dj, c] of DIRS) {
-        const a = i + di, b = j + dj; if (!this.walk(a, b)) continue;
-        if (di && dj && (!this.walk(i + di, j) || !this.walk(i, j + dj))) continue;
+        const a = i + di, b = j + dj; if (!this.walk(a, b) || !this.step(i, j, a, b)) continue;
+        if (di && dj && (!this.walk(i + di, j) || !this.walk(i, j + dj) || !this.step(i, j, i + di, j) || !this.step(i, j, i, j + dj))) continue;
         const nk = b * W + a; if (closed[nk]) continue;
         let cost = c;
         // ближе к стенам дороже — боты не трутся об углы
@@ -270,9 +300,13 @@ export class World {
   }
   walkLine(a, b) {
     const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.ceil(d / 0.4);
+    let pi = Math.floor(a.x / CELL), pj = Math.floor(a.z / CELL);
     for (let s = 0; s <= n; s++) {
       const t = s / n, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
-      for (const [ox, oz] of [[0.45, 0], [-0.45, 0], [0, 0.45], [0, -0.45]]) if (!this.walk(Math.floor((x + ox) / CELL), Math.floor((z + oz) / CELL))) return false;
+      const ci = Math.floor(x / CELL), cj = Math.floor(z / CELL);
+      for (const [ox, oz] of [[0.45, 0], [-0.45, 0], [0, 0.45], [0, -0.45]]) { const a2 = Math.floor((x + ox) / CELL), b2 = Math.floor((z + oz) / CELL); if (!this.walk(a2, b2) || !this.step(ci, cj, a2, b2)) return false; }
+      if (s && (pi !== ci || pj !== cj) && !this.step(pi, pj, ci, cj)) return false;
+      pi = ci; pj = cj;
     }
     return true;
   }

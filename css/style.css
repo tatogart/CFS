@@ -287,3 +287,5 @@ body.touch .bitem { padding: 4px; font-size: 11px; }
 }
 
 .tb.insp { right: calc(248px + var(--safe-r)); font-size: 14px; }
+
+#flashOv { z-index: 50; }

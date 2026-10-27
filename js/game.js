@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793103772';
-import { World } from './world.js?v=1793103772';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES } from './data.js?v=1793103772';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793103772';
-import { play, soundFor } from './sfx.js?v=1793103772';
-import { Bot, planRound } from './bots.js?v=1793103772';
-import { weaponIconURL, mapThumbURL } from './art.js?v=1793103772';
+import { CELL } from './maps.js?v=1793105575';
+import { World } from './world.js?v=1793105575';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES } from './data.js?v=1793105575';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793105575';
+import { play, soundFor } from './sfx.js?v=1793105575';
+import { Bot, planRound } from './bots.js?v=1793105575';
+import { weaponIconURL, mapThumbURL } from './art.js?v=1793105575';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -31,7 +31,9 @@ function textSprite(text, color) {
 export class Game {
   constructor(renderer, opts, ui) {
     this.r = renderer; this.o = opts; this.ui = ui; this.ctrl = opts.controls;
-    this.practice = opts.diff.id === 'none';
+    this.aimMode = !!opts.map.aim;
+    this.practice = opts.diff.id === 'none' || this.aimMode;
+    this.aimStats = { kills: 0, hs: 0, shots: 0, hits: 0, t0: 0 };
     this.admin = opts.admin || {};
     this.diff = opts.diff;
     this.settings = opts.settings;
@@ -113,6 +115,8 @@ export class Game {
     const teamAgents = t => AGENTS.filter(a => a.team === t);
     for (let i = 0; i < n - 1; i++) { const ag = teamAgents(side)[i % 5]; const b = mkActor(names.pop(), side, true, ag.id); this._botSkins(b); }
     for (let i = 0; i < n; i++) { const ag = teamAgents(enemy)[(i + 2) % 5]; const b = mkActor(names.pop(), enemy, true, ag.id); this._botSkins(b); }
+    // тренировка аима: мишени-боты, которые не стреляют
+    if (this.aimMode) for (let i = 0; i < 8; i++) { const ag = teamAgents(enemy)[i % 5]; const b = mkActor('Мишень ' + (i + 1), enemy, true, ag.id); b.target = true; }
     // имена союзников над головой
     for (const a of this.actors) if (a.bot && a.team === side) { a.tag = textSprite(a.name, '#7ee08a'); this.scene.add(a.tag); }
     this._buildViewmodel();
@@ -165,6 +169,8 @@ export class Game {
       const tgt = route && route.length > 1 ? route[1] : c;
       a.yaw = Math.atan2(-(tgt.x - a.pos.x), -(tgt.z - a.pos.z)); a.pitch = 0;
       if (this.practice) { a.money = 16000; }
+      if (a.target) { this.give(a, a.team === 'T' ? 'ak47' : 'm4a4'); this.selectSlot(a, 1, true); this.aimRespawn(a); }
+      if (this.aimMode && a === this.player && !a.weapons[1]) { this.give(a, a.team === 'T' ? 'ak47' : 'm4a4'); this.selectSlot(a, 1, true); }
       a.hasBomb = false;
       this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
     }
@@ -175,7 +181,7 @@ export class Game {
       for (const a of this.actors) if (a.brain) a.brain.onRoundStart();
     }
     this.ui.roundStart && this.ui.roundStart(this);
-    this.centerMsg(this.practice ? 'Тренировка: B — закупка, гранаты бесплатные' : (this.round === 1 ? 'Пистолетный раунд' : `Раунд ${this.round}`), 2.5);
+    this.centerMsg(this.aimMode ? 'Тренировка аима: стреляй по мишеням · B — другое оружие' : this.practice ? 'Тренировка: B — закупка, гранаты бесплатные' : (this.round === 1 ? 'Пистолетный раунд' : `Раунд ${this.round}`), 2.5);
   }
   _swapSides() {
     for (const a of this.actors) { a.team = a.team === 'T' ? 'CT' : 'T'; a.money = 800; a.kills = a.kills; const ag = a.bot ? AGENTS.filter(x => x.team === a.team)[a.id % 5] : agentById[this.o.agents[a.team]];
@@ -261,6 +267,7 @@ export class Game {
     const g = new THREE.Group(); g.add(gun);
     const R = arms.userData.right, L = arms.userData.left;
     R.position.set(0.01, -0.05, 0.05); R.rotation.set(0.75, 0.25, 0); g.add(R);
+    if (inst.id === 'knife') { gun.scale.setScalar(1.8); gun.rotation.set(0.3, 0, -0.15); R.position.set(0.0, -0.06, inst.model === 'karambit' ? 0.2 : 0.17); R.rotation.set(0.9, 0.2, 0); }
     const fore = gun.userData.fore;
     if (inst.nade || inst.c4 || WEAPONS[id] && WEAPONS[id].type === 'knife' || KNIVES[id] || id === 'knife') { L.position.set(-0.36, -0.2, 0.12); L.rotation.set(0.6, -0.4, 0); }
     else if (WEAPONS[id] && WEAPONS[id].type === 'pistol') { L.position.set(-0.03, -0.07, 0.04); L.rotation.set(0.75, -0.35, 0); }
@@ -270,7 +277,7 @@ export class Game {
     this.vmGun = g; this.vmMuzzle = gun.userData.muzzle.clone();
     this.vm.add(g);
     const t = WEAPONS[id] ? WEAPONS[id].type : 'nade';
-    this.vmBase = t === 'pistol' ? new THREE.Vector3(0.13, -0.13, -0.36) : t === 'knife' || t === 'nade' || !WEAPONS[id] ? new THREE.Vector3(0.15, -0.14, -0.32) : new THREE.Vector3(0.14, -0.15, -0.34);
+    this.vmBase = inst.id === 'knife' ? new THREE.Vector3(0.12, -0.1, -0.38) : t === 'pistol' ? new THREE.Vector3(0.13, -0.13, -0.36) : t === 'knife' || t === 'nade' || !WEAPONS[id] ? new THREE.Vector3(0.15, -0.14, -0.32) : new THREE.Vector3(0.14, -0.15, -0.34);
     this.vmKick = 0; this.vmDraw = 1;
   }
   eyePos(a, out = new THREE.Vector3()) { return out.set(a.pos.x, a.pos.y + EYE - (EYE - EYE_C) * a.crouchK, a.pos.z); }
@@ -292,6 +299,7 @@ export class Game {
     a.released = false;
     inst.mag--; a.fireCd = def.rate; a.lastFired = this.time;
     if (a === this.player && this.admin.ammo) inst.mag++;
+    if (a === this.player && this.aimMode) { this.aimStats.shots++; if (!this.aimStats.t0) this.aimStats.t0 = this.time; inst.reserve = WEAPONS[inst.id].reserve; }
     if (this.time - a.lastShot > def.rate * 2.2) a.recoilIdx = Math.max(0, a.recoilIdx - (this.time - a.lastShot) * 10);
     a.lastShot = this.time;
     // разброс
@@ -402,7 +410,7 @@ export class Game {
     dmg = Math.round(dmg);
     v.hp -= dmg; v.lastHurt = this.time; v.lastAttacker = a;
     if (v.brain) v.brain.onHurt(a, dir);
-    if (a === this.player) { play(zone === 'head' ? 'head' : 'hit'); this.ui.hitmark(zone === 'head'); }
+    if (a === this.player) { play(zone === 'head' ? 'head' : 'hit'); this.ui.hitmark(zone === 'head'); if (this.aimMode && def.type !== 'knife') this.aimStats.hits++; }
     if (v === this.player) { play('hurt'); this.ui.hurt(dir, this.player); }
     // замедление от попадания
     v.vel.x *= 0.5; v.vel.z *= 0.5;
@@ -417,6 +425,7 @@ export class Game {
     if (a && a !== v) {
       if (a.team !== v.team) { a.kills++; a.roundKills++; a.money = Math.min(16000, a.money + (def.kill || 300)); }
       if (a === this.player && this.ui.onKill) this.ui.onKill(hs);
+      if (a === this.player && this.aimMode) { this.aimStats.kills++; if (hs) this.aimStats.hs++; }
     }
     // бомба выпадает
     if (v.hasBomb) { v.hasBomb = false; this.dropBomb(v.pos); }
@@ -682,6 +691,39 @@ export class Game {
     }
   }
 
+  // ---------- тренировка аима ----------
+  aimRespawn(a) {
+    const w = this.world, p = this.player, e = new THREE.Vector3();
+    for (let tries = 0; tries < 60; tries++) {
+      const i = 3 + Math.floor(Math.random() * (w.w - 6)), j = 3 + Math.floor(Math.random() * (w.h - 12));
+      if (!w.walk(i, j)) continue;
+      const c = w.cellCenter(i, j), d = c.distanceTo(p.pos);
+      if (d < 9 || d > 70) continue;
+      if (this.actors.some(o => o !== a && o.alive && o.target && o.pos.distanceTo(c) < 4)) continue;
+      if (tries < 40 && !w.los(this.eyePos(p, e), c.clone().setY(1.4))) continue;
+      a.pos.copy(c); break;
+    }
+    a.alive = true; a.hp = 100; a.armor = 0; a.vel.set(0, 0, 0); a.model.revive(); a.model.root.visible = true;
+    a.strafeT = 0; a.respT = 0;
+  }
+  _aimTargets(dt) {
+    const p = this.player;
+    for (const a of this.actors) {
+      if (!a.target) continue;
+      if (!a.alive) { a.respT = (a.respT || 0) + dt; if (a.respT > 0.6) this.aimRespawn(a); continue; }
+      const dx = p.pos.x - a.pos.x, dz = p.pos.z - a.pos.z, d = Math.hypot(dx, dz) || 1;
+      a.yaw = Math.atan2(-dx, -dz); a.pitch = 0;
+      a.strafeT -= dt;
+      if (a.strafeT <= 0) { a.strafeT = 0.35 + Math.random() * 1.1; const r = Math.random(); a.sdir = r < 0.25 ? 0 : r < 0.62 ? 1 : -1; a.in.crouch = Math.random() < 0.15; a.in.walk = Math.random() < 0.2; a.in.jump = Math.random() < 0.06; }
+      else a.in.jump = false;
+      a.in.mx = (-dz / d) * a.sdir; a.in.mz = (dx / d) * a.sdir;
+      // не уходить в стену
+      const nx = a.pos.x + a.in.mx * 1.2, nz = a.pos.z + a.in.mz * 1.2;
+      if (!this.world.walk(Math.floor(nx / CELL), Math.floor(nz / CELL))) { a.sdir = -a.sdir; a.in.mx = -a.in.mx; a.in.mz = -a.in.mz; }
+      a.in.fire = false;
+    }
+  }
+
   // ---------- игрок ----------
   _playerInput(dt) {
     const p = this.player, c = this.ctrl, st = c.s;
@@ -857,6 +899,7 @@ export class Game {
         this.vm.visible = true; this.selectSlot(p, p.weapons[1] ? 1 : 2, true); this.centerMsg('Возрождение', 1);
       }
     }
+    if (this.aimMode) this._aimTargets(dt);
     const frozen = this.state === 'freeze';
     for (const a of this.actors) if (a.brain && a.alive) a.brain.update(dt, frozen);
     for (const a of this.actors) {
@@ -965,15 +1008,30 @@ export class Game {
       const knifeT = view.cur && (view.cur.id === 'knife') ? this.vmKick : 0;
       this.vmGun.position.set(b.x + Math.sin(this.bobT) * 0.012 * bob, b.y - Math.abs(Math.cos(this.bobT)) * 0.012 * bob - reload * 0.12 - this.vmDraw * 0.25 - view.crouchK * 0.01, b.z + this.vmKick * 0.05 * (knifeT ? -1.5 : 1));
       this.vmGun.rotation.set(this.vmKick * 0.08 + reload * 0.7 - this.vmDraw * 0.6 - knifeT * 0.6, 0.05 + knifeT * 0.8, -reload * 0.3 + knifeT * 0.5);
+      const isKnife = view.cur && view.cur.id === 'knife', km = isKnife ? (view.cur.model || 'knife') : null;
+      const gunM = this.vmGun.children[0];
+      // нож: прокрутка при доставании
+      if (isKnife && this.vmDraw > 0) { const d = this.vmDraw; this.vmGun.rotation.z += d * d * Math.PI * 2 * (km === 'butterfly' ? 2 : 1); }
+      if (gunM) gunM.children.forEach(h => { if (h.userData.handle) h.rotation.x = 0; });
       // осмотр: поворачиваем оружие к себе, крутим и возвращаем
       if (this.inspectT > 0 && view === p) {
         this.inspectT = Math.max(0, this.inspectT - dt);
         const u = 1 - this.inspectT / 3.2, e = Math.sin(Math.min(1, u * 4) * Math.PI / 2) * Math.sin(Math.min(1, (1 - u) * 4) * Math.PI / 2);
-        const ph = u < 0.5 ? 0 : (u - 0.5) * 2;
-        this.vmGun.rotation.y += e * (0.9 + Math.sin(ph * Math.PI) * 0.7);
-        this.vmGun.rotation.z += e * (0.5 - Math.sin(ph * Math.PI) * 1.1);
-        this.vmGun.rotation.x += e * 0.15;
-        this.vmGun.position.x -= e * 0.07; this.vmGun.position.y += e * 0.04; this.vmGun.position.z += e * 0.03;
+        const su = Math.max(0, Math.min(1, (u - 0.18) / 0.62)), spin = su * su * (3 - 2 * su);
+        if (isKnife) {
+          this.vmGun.rotation.y += e * 0.7; this.vmGun.position.x -= e * 0.06; this.vmGun.position.y += e * 0.05;
+          if (km === 'karambit') { this.vmGun.rotation.x += spin * Math.PI * 4; this.vmGun.rotation.z += e * 0.4; }
+          else if (km === 'butterfly') {
+            this.vmGun.rotation.z += spin * Math.PI * 6;
+            if (gunM) gunM.children.forEach(h => { if (h.userData.handle) h.rotation.x = Math.abs(Math.sin(spin * Math.PI * 3)) * Math.PI * 0.95 * h.userData.handle; });
+          } else { this.vmGun.position.y += Math.sin(spin * Math.PI) * 0.14; this.vmGun.rotation.y += spin * Math.PI * 2; this.vmGun.rotation.x += Math.sin(spin * Math.PI) * 0.6; }
+        } else {
+          const ph = u < 0.5 ? 0 : (u - 0.5) * 2;
+          this.vmGun.rotation.y += e * (0.9 + Math.sin(ph * Math.PI) * 0.7);
+          this.vmGun.rotation.z += e * (0.5 - Math.sin(ph * Math.PI) * 1.1);
+          this.vmGun.rotation.x += e * 0.15;
+          this.vmGun.position.x -= e * 0.07; this.vmGun.position.y += e * 0.04; this.vmGun.position.z += e * 0.03;
+        }
       }
       this.vmGun.updateMatrixWorld();
       if (this.flashT > 0) { this.flashT -= dt; const m = this.vmMuzzle.clone().applyMatrix4(this.vmGun.matrixWorld); this.flash.position.copy(m); } else this.flash.visible = false;

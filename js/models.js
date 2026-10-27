@@ -1,7 +1,7 @@
 // 3D-модели: агенты (человечки с IK-руками), оружие
 import * as THREE from '../vendor/three.module.min.js';
-import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793103772';
-import { skinById, WEAPONS } from './data.js?v=1793103772';
+import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793105575';
+import { skinById, WEAPONS } from './data.js?v=1793105575';
 
 const matCache = new Map();
 export function mat(color, opts = {}) {
@@ -55,6 +55,7 @@ export function buildWeapon(id, skinId) {
   const bodyMat = NADE_COLORS[id] ? mat(NADE_COLORS[id]) : skinMaterial(skinId, isKnife ? 'knife' : 'rifle');
   const woodMat = skinId ? bodyMat : (id === 'ak47' ? skinMaterial(null, 'wood') : bodyMat);
   const dark = mat('#1d1f22');
+  if (isKnife) return buildKnife(id, bodyMat, dark, grp, def);
   for (const p of def.parts) {
     const [x, y, z, w, h, d, k, rot = 0, shape] = p;
     let geo;
@@ -66,9 +67,58 @@ export function buildWeapon(id, skinId) {
     const m = new THREE.Mesh(geo, k === 'd' ? dark : k === 'w' ? woodMat : bodyMat);
     m.position.set(x, y, z); m.rotation.x = rot; grp.add(m);
   }
-  if (id === 'karambit') { grp.children[2].rotation.x = -0.6; grp.children[2].position.y = 0.04; }
   grp.userData.fore = new THREE.Vector3(...def.fore);
   grp.userData.muzzle = new THREE.Vector3(...def.muzzle);
+  return grp;
+}
+
+// ---------- НОЖИ: настоящие формы клинков (вытянутый контур) ----------
+// контур задаётся в плоскости (u — вперёд по клинку, v — вверх), толщина — по X
+function bladeGeo(key, pts, depth, bevel = 0.0012) {
+  return G('blade_' + key, () => {
+    const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], pts[i][1]); sh.closePath();
+    const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: 1 });
+    g.translate(0, 0, -depth / 2); g.rotateY(Math.PI / 2);
+    const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6 + 0.5, uv.getY(i) * 6 + 0.5);
+    g.computeVertexNormals(); return g;
+  });
+}
+const arc = (cu, cv, r, a0, a1, n) => { const o = []; for (let i = 0; i <= n; i++) { const a = (a0 + (a1 - a0) * i / n) * Math.PI / 180; o.push([cu + Math.cos(a) * r, cv + Math.sin(a) * r]); } return o; };
+function buildKnife(id, blade, dark, grp, def) {
+  const grip = mat('#2a2b2e'), metal = mat('#8d939a');
+  const add = (geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); grp.add(o); return o; };
+  const rod = (w, h, d) => G(`b${w}_${h}_${d}`, () => box(w, h, d));
+  if (id === 'karambit') {
+    // изогнутый коготь
+    const outer = arc(0.0, -0.075, 0.08, 90, -28, 14), inner = arc(0.0, -0.075, 0.055, -12, 95, 12);
+    add(bladeGeo('kar', [[-0.012, 0.004], ...outer, ...inner, [-0.012, -0.02]], 0.004), blade);
+    add(rod(0.022, 0.03, 0.1), grip, 0, -0.006, 0.055);
+    for (const z of [0.02, 0.05, 0.08]) add(rod(0.024, 0.032, 0.006), dark, 0, -0.006, z);
+    const ring = add(G('karring', () => new THREE.TorusGeometry(0.02, 0.006, 8, 18).rotateY(Math.PI / 2)), metal, 0, -0.008, 0.125);
+    ring.userData.ring = true;
+  } else if (id === 'butterfly') {
+    add(bladeGeo('bfly', [[0, -0.011], [0.12, -0.011], [0.155, 0.0], [0.13, 0.006], [0.1, 0.011], [0, 0.011]], 0.0035), blade, 0, 0, -0.005);
+    // две рукояти с прорезями
+    for (const sx of [-1, 1]) { const h = new THREE.Group(); h.position.set(sx * 0.009, 0, 0); grp.add(h);
+      const m = new THREE.Mesh(rod(0.007, 0.026, 0.12), metal); m.position.z = 0.06; h.add(m);
+      for (let k = 0; k < 4; k++) { const sl = new THREE.Mesh(rod(0.008, 0.008, 0.016), dark); sl.position.set(0, 0, 0.025 + k * 0.026); h.add(sl); }
+      h.userData.handle = sx; }
+    add(G('bpin', () => new THREE.CylinderGeometry(0.004, 0.004, 0.026, 8).rotateZ(Math.PI / 2)), metal, 0, 0, 0.003);
+  } else {
+    // штык-нож / обычный нож
+    const big = id === 'bayonet';
+    const L = big ? 0.17 : 0.13, H = big ? 0.016 : 0.014;
+    add(bladeGeo(id, [[0, -H], [L * 0.82, -H], [L, -0.002], [L * 0.86, H * 0.45], [L * 0.6, H], [0, H]], 0.0045), blade);
+    add(rod(0.006, 0.004, L * 0.6), dark, 0, H * 0.35, -L * 0.35);
+    add(rod(0.016, 0.06, 0.012), metal, 0, -0.004, 0.004);
+    add(G('kgrip' + big, () => new THREE.CylinderGeometry(0.015, 0.017, 0.11, 10).rotateX(Math.PI / 2)), grip, 0, -0.004, 0.065);
+    for (const z of [0.03, 0.06, 0.09]) add(G('kring', () => new THREE.CylinderGeometry(0.0175, 0.0175, 0.006, 10).rotateX(Math.PI / 2)), dark, 0, -0.004, z);
+    add(rod(0.02, 0.024, 0.012), metal, 0, -0.004, 0.122);
+  }
+  // клинок смотрит вперёд (-Z), рукоять — назад к ладони
+  grp.userData.fore = new THREE.Vector3(...def.fore);
+  grp.userData.muzzle = new THREE.Vector3(...def.muzzle);
+  grp.userData.knife = id;
   return grp;
 }
 

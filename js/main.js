@@ -1,13 +1,13 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793103772';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, skinById, weaponName, agentById } from './data.js?v=1793103772';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793103772';
-import { weaponIconURL, caseIconURL, mapThumbURL } from './art.js?v=1793103772';
-import { AgentModel } from './models.js?v=1793103772';
-import { Controls, isTouch } from './controls.js?v=1793103772';
-import { initAudio, play, setVolume } from './sfx.js?v=1793103772';
-import { Game } from './game.js?v=1793103772';
+import { MAPS, CELL } from './maps.js?v=1793105575';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, skinById, weaponName, agentById } from './data.js?v=1793105575';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793105575';
+import { weaponIconURL, caseIconURL, mapThumbURL } from './art.js?v=1793105575';
+import { AgentModel } from './models.js?v=1793105575';
+import { Controls, isTouch } from './controls.js?v=1793105575';
+import { initAudio, play, setVolume } from './sfx.js?v=1793105575';
+import { Game } from './game.js?v=1793105575';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -392,7 +392,8 @@ function updateHud(g, dt) {
   const B = g.bomb;
   let tt = g.state === 'freeze' ? g.stateT : g.state === 'end' ? g.stateT : g.roundTime;
   if (B && B.planted && !B.done) tt = B.timer;
-  if (g.practice) set('timer', 'ТРЕНИРОВКА');
+  if (g.aimMode) { const A = g.aimStats, mins = Math.max(1 / 60, (g.time - (A.t0 || g.time)) / 60); set('timer', `🎯 ${A.kills} · HS ${A.kills ? Math.round(A.hs / A.kills * 100) : 0}% · точн. ${A.shots ? Math.round(A.hits / A.shots * 100) : 0}% · ${A.t0 ? Math.round(A.kills / mins) : 0}/мин`); }
+  else if (g.practice) set('timer', 'ТРЕНИРОВКА');
   else set('timer', `${Math.floor(Math.max(0, tt) / 60)}:${String(Math.floor(Math.max(0, tt) % 60)).padStart(2, '0')}`);
   $('timer').classList.toggle('bomb', !!(B && B.planted && !B.done));
   if (!g.practice) {

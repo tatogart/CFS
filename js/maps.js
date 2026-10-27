@@ -5,7 +5,7 @@
 //  'R' вагон/машина (3.4м)                  'v' пропасть (Vertigo)
 //  'T' спавн террористов  'K' спавн спецназа  'A' / 'B' точки закладки
 //  '1'..'9' пол с меткой цели гранат (раскидка)
-export const CELL = 2;
+export const CELL = 3;
 
 function build(w, h, fill, steps) {
   const g = [];

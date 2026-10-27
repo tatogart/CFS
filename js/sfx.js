@@ -1,6 +1,6 @@
 // Звуки: синтезируются один раз в буферы при старте, без файлов.
 // Дальние звуки приглушаются фильтром, есть панорама и ограничение числа голосов.
-let ctx = null, master = null, vol = 0.7, B = {}, voices = 0;
+let ctx = null, master = null, reverb = null, vol = 0.8, B = {}, voices = 0;
 const MAX_VOICES = 28;
 
 export function initAudio() {
@@ -11,6 +11,17 @@ export function initAudio() {
     comp.threshold.value = -14; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
     master = ctx.createGain(); master.gain.value = vol;
     master.connect(comp); comp.connect(ctx.destination);
+    // реверберация: синтезированный импульсный отклик (ранние отражения + хвост)
+    const SR = ctx.sampleRate, L = Math.floor(SR * 1.8), ir = ctx.createBuffer(2, L, SR);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < L; i++) { const t = i / SR; d[i] = (Math.random() * 2 - 1) * Math.exp(-t / 0.42) * (t < 0.006 ? t / 0.006 : 1); }
+      for (let k = 0; k < 9; k++) { const at = Math.floor((0.012 + Math.random() * 0.09) * SR); d[at] += (Math.random() < 0.5 ? -1 : 1) * (0.9 - k * 0.07); }
+    }
+    reverb = ctx.createConvolver(); reverb.buffer = ir;
+    const rl = ctx.createBiquadFilter(); rl.type = 'lowpass'; rl.frequency.value = 4500;
+    const wet = ctx.createGain(); wet.gain.value = 0.55;
+    reverb.connect(rl); rl.connect(wet); wet.connect(master);
     build();
   } catch (e) { ctx = null; }
 }
@@ -41,8 +52,10 @@ function gun(o) {
       const thump = Math.sin(ph) * Math.exp(-t / o.thumpDec) * o.thumpA;
       lp2 += kt * (x - lp2); lp3 += kt * (lp2 - lp3);
       const tail = lp3 * 3 * o.tail * Math.exp(-t / o.tailDec) * (1 - Math.exp(-t / 0.015));
-      d[i] = Math.tanh((crack + body + thump + tail) * (o.drive || 1.6));
+      const sub = Math.sin(TAU * 52 * t) * Math.exp(-t / 0.05) * (o.sub || 0.6);
+      d[i] = Math.tanh((crack * 1.3 + body + thump + tail + sub) * (o.drive || 1.6) * 1.35);
     }
+    if (o.bolt) clickAt(d, SR, o.bolt, [2300, 3400, 5200], 0.22, 0.01);
   });
 }
 // затухающие синусы (металл, «динь», клики)
@@ -99,12 +112,12 @@ function tones(notes, len, soft = 1) {
 
 function build() {
   const v = (k, fn, cnt = 2) => { B[k] = []; for (let i = 0; i < cnt; i++) B[k].push(fn()); };
-  v('ak47', () => gun({ len: 0.75, crack: 0.9, body: 1400, bodyDec: 0.05, thump: 70, thumpDec: 0.06, thumpA: 1.1, tail: 0.5, tailF: 700, tailDec: 0.22 }));
-  v('rifle', () => gun({ len: 0.7, crack: 0.8, body: 1900, bodyDec: 0.04, thump: 85, thumpDec: 0.05, thumpA: 0.9, tail: 0.45, tailF: 800, tailDec: 0.2 }));
-  v('smg', () => gun({ len: 0.5, crack: 0.8, body: 2400, bodyDec: 0.03, thump: 110, thumpDec: 0.035, thumpA: 0.6, tail: 0.35, tailF: 1000, tailDec: 0.14 }));
-  v('pistol', () => gun({ len: 0.55, crack: 1.0, body: 2600, bodyDec: 0.03, thump: 120, thumpDec: 0.035, thumpA: 0.6, tail: 0.35, tailF: 1100, tailDec: 0.16 }));
-  v('deagle', () => gun({ len: 0.9, crack: 1.0, body: 1300, bodyDec: 0.07, thump: 60, thumpDec: 0.09, thumpA: 1.3, tail: 0.6, tailF: 650, tailDec: 0.3, drive: 2 }));
-  v('awp', () => gun({ len: 1.4, crack: 1.1, body: 1100, bodyDec: 0.09, thump: 48, thumpDec: 0.14, thumpA: 1.5, tail: 0.75, tailF: 500, tailDec: 0.45, drive: 2.2 }));
+  v('ak47', () => gun({ len: 0.75, crack: 0.9, body: 1400, bodyDec: 0.05, thump: 70, thumpDec: 0.06, thumpA: 1.1, tail: 0.5, tailF: 700, tailDec: 0.22 , bolt: 0.07}));
+  v('rifle', () => gun({ len: 0.7, crack: 0.8, body: 1900, bodyDec: 0.04, thump: 85, thumpDec: 0.05, thumpA: 0.9, tail: 0.45, tailF: 800, tailDec: 0.2 , bolt: 0.065}));
+  v('smg', () => gun({ len: 0.5, crack: 0.8, body: 2400, bodyDec: 0.03, thump: 110, thumpDec: 0.035, thumpA: 0.6, tail: 0.35, tailF: 1000, tailDec: 0.14 , bolt: 0.05}));
+  v('pistol', () => gun({ len: 0.55, crack: 1.0, body: 2600, bodyDec: 0.03, thump: 120, thumpDec: 0.035, thumpA: 0.6, tail: 0.35, tailF: 1100, tailDec: 0.16 , bolt: 0.06}));
+  v('deagle', () => gun({ len: 0.9, crack: 1.0, body: 1300, bodyDec: 0.07, thump: 60, thumpDec: 0.09, thumpA: 1.3, tail: 0.6, tailF: 650, tailDec: 0.3, drive: 2 , bolt: 0.08}));
+  v('awp', () => gun({ len: 1.4, crack: 1.1, body: 1100, bodyDec: 0.09, thump: 46, thumpDec: 0.16, thumpA: 1.8, tail: 0.8, tailF: 500, tailDec: 0.5, drive: 2.6, sub: 1.0, bolt: 0.55 }));
   v('silenced', () => mkbuf(0.25, (d, n, SR) => { let a = 0; const k = lpK(1800, SR); for (let i = 0; i < n; i++) { const t = i / SR, x = Math.random() * 2 - 1; a += k * (x - a); d[i] = a * Math.exp(-t / 0.025) * 2 + Math.sin(TAU * 180 * t) * Math.exp(-t / 0.02) * 0.4; } clickAt(d, SR, 0.03, [3200, 4700], 0.35); }));
   v('step', () => mkbuf(0.14, (d, n, SR) => { let a = 0, b2 = 0; const k = lpK(380 + Math.random() * 200, SR); for (let i = 0; i < n; i++) { const t = i / SR, x = Math.random() * 2 - 1; a += k * (x - a); b2 += k * (a - b2); d[i] = b2 * 4 * Math.exp(-t / 0.022) + Math.sin(TAU * 75 * t) * Math.exp(-t / 0.02) * 0.5 + (x - a) * 0.08 * Math.exp(-Math.abs(t - 0.035) / 0.006); } }), 4);
   B.knife = [whoosh(0.22, 500, 2600), whoosh(0.2, 700, 3000)];
@@ -138,9 +151,10 @@ function build() {
   B.round = [tones([[660, 0, 0.12, 0.3], [990, 0.13, 0.2, 0.3]], 0.4, 0)];
 }
 
+const REV = { ak47: 0.5, rifle: 0.5, smg: 0.45, pistol: 0.45, deagle: 0.55, awp: 0.6, silenced: 0.2, he: 0.7, boom: 0.8, flash: 0.6, fire: 0.3, step: 0.15, bounce: 0.2, beep: 0.25, knife: 0.15, reload: 0.15, hurt: 0.15, smoke: 0.3 };
 const VARY = new Set(['ak47', 'rifle', 'smg', 'pistol', 'deagle', 'awp', 'silenced', 'step', 'knife', 'bounce', 'hit']);
 // громкость по типам
-const GAIN = { ak47: 0.8, rifle: 0.75, smg: 0.65, pistol: 0.7, deagle: 0.85, awp: 0.95, silenced: 0.5, step: 0.45, knife: 0.5, throw: 0.4, reload: 0.5, draw: 0.4, empty: 0.5,
+const GAIN = { ak47: 0.95, rifle: 0.9, smg: 0.8, pistol: 0.8, deagle: 0.95, awp: 1.0, silenced: 0.5, step: 0.45, knife: 0.5, throw: 0.4, reload: 0.5, draw: 0.4, empty: 0.5,
   hit: 0.55, head: 0.6, hurt: 0.6, he: 1.0, boom: 1.0, flash: 0.9, ring: 0.35, smoke: 0.5, fire: 0.7, bounce: 0.4, beep: 0.45, plant: 0.5, defuse: 0.5,
   tick: 0.25, ui: 0.3, buy: 0.4, win: 0.5, lose: 0.5, rare: 0.5, round: 0.4 };
 // d — дистанция, pan — стерео (-1..1), k — множитель громкости
@@ -158,6 +172,7 @@ export function play(name, d = 0, pan = 0, k = 1) {
   const g = ctx.createGain(); g.gain.value = g0; node.connect(g); node = g;
   if (ctx.createStereoPanner && pan) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); node.connect(p); node = p; }
   node.connect(master);
+  if (reverb && REV[name]) { const sg = ctx.createGain(); sg.gain.value = g0 * REV[name] * (0.6 + Math.min(1.4, d / 25)); g.connect(sg); sg.connect(reverb); }
   voices++; src.onended = () => { voices--; };
   src.start();
 }

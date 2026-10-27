@@ -23,6 +23,7 @@ setVolume(save.settings.volume);
 const canvas = $('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !touch, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
 function quality() { const q = save.settings.quality; return q === 'auto' ? (touch ? 0 : 2) : +q; }
 function applyQuality() {
   const q = quality();

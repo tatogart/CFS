@@ -42,15 +42,27 @@ export class Game {
     this.scene.fog = new THREE.Fog(th.fog, 40, th.void ? 260 : 140);
     this.world = new World(opts.map, this.quality);
     this.scene.add(this.world.group);
-    const hemi = new THREE.HemisphereLight('#ffffff', th.floor, 0.85); this.scene.add(hemi);
-    const sun = this.sun = new THREE.DirectionalLight(th.sun, 1.5);
+    const hemi = new THREE.HemisphereLight(th.sky, th.floor, 1.25); this.scene.add(hemi);
+    const sun = this.sun = new THREE.DirectionalLight(th.sun, 2.6);
+    // небо: купол с градиентом и солнцем
+    {
+      const cv = document.createElement('canvas'); cv.width = 32; cv.height = 256; const g = cv.getContext('2d');
+      const gr = g.createLinearGradient(0, 0, 0, 256);
+      gr.addColorStop(0, '#2f6fb8'); gr.addColorStop(0.42, th.sky); gr.addColorStop(0.5, th.fog); gr.addColorStop(1, th.fog);
+      g.fillStyle = gr; g.fillRect(0, 0, 32, 256);
+      const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(450, 24, 16), new THREE.MeshBasicMaterial({ map: tx, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false }));
+      dome.renderOrder = -1; this.scene.add(dome); this.dome = dome;
+      const sunS = new THREE.Sprite(new THREE.SpriteMaterial({ map: softSprite(), color: '#fff6dc', fog: false, depthWrite: false, transparent: true, toneMapped: false }));
+      sunS.scale.setScalar(80); dome.add(sunS); sunS.position.set(300, 260, 200).normalize().multiplyScalar(420);
+    }
     const cx = this.world.w * CELL / 2, cz = this.world.h * CELL / 2;
     sun.position.set(cx + 30, 60, cz + 20); sun.target.position.set(cx, 0, cz); this.scene.add(sun, sun.target);
     if (this.quality >= 2) {
       sun.castShadow = true; const s = sun.shadow; s.mapSize.set(2048, 2048); const ext = Math.max(cx, cz) + 4;
       s.camera.left = -ext; s.camera.right = ext; s.camera.top = ext; s.camera.bottom = -ext; s.camera.near = 10; s.camera.far = 160; s.bias = -0.0006;
     }
-    this.scene.add(new THREE.AmbientLight('#ffffff', 0.25));
+    this.scene.add(new THREE.AmbientLight('#ffffff', 0.35));
     this.camera = new THREE.PerspectiveCamera(this.settings.fov, innerWidth / innerHeight, 0.05, 600);
     this.baseFov = this.settings.fov;
     // вьюмодель
@@ -464,7 +476,7 @@ export class Game {
     const [d, pan] = this.listen(n.pos), p = n.pos.clone();
     if (p.y < -40) return;
     if (n.type === 'he') {
-      play('he', d, pan); this.explosionFx(p, 3);
+      play('he', d, pan); this.bigExplosion(p.clone(), 0.35);
       for (const v of this.actors) {
         if (!v.alive) continue;
         const e = this.eyePos(v), dist = e.distanceTo(p); if (dist > 8) continue;
@@ -534,6 +546,61 @@ export class Game {
     this.fires.push({ c: p.clone(), r: 2.6, t: 7, grp, parts, owner });
   }
   inFire(p) { for (const f of this.fires) if (Math.hypot(p.x - f.c.x, p.z - f.c.z) < f.r + 0.3 && p.y < f.c.y + 1) return f; return null; }
+  // взрыв: огненный шар, дым, ударная волна, искры, вспышка света, тряска камеры
+  bigExplosion(p, k = 1) {
+    const grp = new THREE.Group(); grp.position.copy(p); this.scene.add(grp);
+    const parts = [], tex = softSprite();
+    const N = Math.round((this.quality >= 1 ? 46 : 30) * Math.max(0.5, k));
+    for (let i = 0; i < N; i++) {
+      const fire = i < N * 0.55;
+      const m = new THREE.SpriteMaterial({ map: tex, color: fire ? (i % 3 ? '#ff7a1a' : '#ffd36a') : '#2a2622', blending: fire ? THREE.AdditiveBlending : THREE.NormalBlending, transparent: true, depthWrite: false, opacity: fire ? 1 : 0 });
+      const s = new THREE.Sprite(m);
+      const a = Math.random() * Math.PI * 2, up = Math.random();
+      const sp = (fire ? 9 : 4) * k * (0.4 + Math.random());
+      s.userData = { v: new THREE.Vector3(Math.cos(a) * sp * (1 - up * 0.5), (fire ? 6 : 5) * k * up + 1, Math.sin(a) * sp * (1 - up * 0.5)), fire, life: fire ? 0.9 + Math.random() * 0.5 : 4 + Math.random() * 3, sz: (fire ? 3 : 4) * k * (0.6 + Math.random()), t: 0, delay: fire ? 0 : 0.15 + Math.random() * 0.3 };
+      s.position.set(0, 0.6, 0); s.scale.setScalar(0.1); grp.add(s); parts.push(s);
+    }
+    // искры
+    const sparks = [];
+    for (let i = 0; i < 40 * k; i++) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: '#ffe08a', blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+      const a = Math.random() * Math.PI * 2, sp = (8 + Math.random() * 16) * k;
+      s.userData = { v: new THREE.Vector3(Math.cos(a) * sp, (4 + Math.random() * 12) * k, Math.sin(a) * sp), t: 0, life: 0.8 + Math.random() * 0.8 };
+      s.position.set(0, 0.6, 0); s.scale.setScalar(0.25); grp.add(s); sparks.push(s);
+    }
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.4, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffd8a0', transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
+    ring.position.y = 0.08; grp.add(ring);
+    const scorch = new THREE.Mesh(new THREE.CircleGeometry(4 * k + 0.8, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.6, depthWrite: false }));
+    scorch.position.y = 0.03; grp.add(scorch);
+    const light = new THREE.PointLight('#ffa040', 80 * k, 60 * k, 1.6); light.position.y = 2; grp.add(light);
+    // тряска и вспышка
+    const dist = this.camera.position.distanceTo(p);
+    this.shake = Math.max(this.shake || 0, Math.min(1.2, (k * 30) / (dist + 6)));
+    if (dist < 30 * k && this.world.los(p.clone().setY(1.5), this.camera.position)) this.ui.flashed && this.ui.flashed(0.25 * k + 0.1, true);
+    let t = 0;
+    this.fx.push({ obj: grp, upd: dt => {
+      t += dt;
+      for (const s of parts) {
+        const u = s.userData; if (t < u.delay) continue; u.t += dt;
+        const f = u.t / u.life; if (f >= 1) { s.visible = false; continue; }
+        s.position.addScaledVector(u.v, dt); u.v.multiplyScalar(u.fire ? 1 - dt * 3 : 1 - dt * 1.2);
+        if (!u.fire) u.v.y += dt * 1.6;
+        s.scale.setScalar(u.sz * (u.fire ? 0.4 + f * 1.1 : 0.5 + f * 1.4));
+        s.material.opacity = u.fire ? (1 - f) * (1 - f) : Math.min(0.75, u.t * 2) * (1 - f);
+        if (u.fire) s.material.color.setRGB(1, 0.75 - f * 0.5, 0.35 - f * 0.3);
+      }
+      for (const s of sparks) {
+        const u = s.userData; u.t += dt; const f = u.t / u.life; if (f >= 1) { s.visible = false; continue; }
+        u.v.y -= GRAV * dt; s.position.addScaledVector(u.v, dt); if (s.position.y < 0.05) { s.position.y = 0.05; u.v.y *= -0.3; u.v.x *= 0.6; u.v.z *= 0.6; }
+        s.material.opacity = 1 - f;
+      }
+      const rf = Math.min(1, t / 0.55); ring.scale.setScalar(1 + rf * 16 * k); ring.material.opacity = 0.8 * (1 - rf);
+      light.intensity = 80 * k * Math.max(0, 1 - t / 0.7);
+      scorch.material.opacity = t > 6 ? Math.max(0, 0.6 - (t - 6) * 0.3) : 0.6;
+      if (t > 8) { grp.traverse(o => { o.material && o.material.dispose(); }); return false; }
+      return true;
+    } });
+  }
   explosionFx(p, size, color = '#ffb04a') {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: softSprite(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
     s.position.copy(p); s.scale.setScalar(size * 2); this.scene.add(s); this.fx.push({ obj: s, t: 0.35, grow: size * 6 });
@@ -608,7 +675,7 @@ export class Game {
     if (B.beep <= 0) { B.beep = rate; const [d, pan] = this.listen(B.pos); play('beep', d * 0.5, pan); if (this.c4mesh) this.c4mesh.userData.led.visible = true; }
     else if (this.c4mesh && B.beep < rate * 0.6) this.c4mesh.userData.led.visible = false;
     if (B.timer <= 0) {
-      B.done = true; const [d, pan] = this.listen(B.pos); play('boom', d * 0.3, pan); this.explosionFx(B.pos.clone().setY(1), 10);
+      B.done = true; const [d, pan] = this.listen(B.pos); play('boom', d * 0.3, pan); this.bigExplosion(B.pos.clone());
       for (const v of this.actors) if (v.alive) { const dist = v.pos.distanceTo(B.pos); if (dist < 20) { const dmg = 500 * (1 - dist / 20); this.damage(v, null, dmg, 'chest', 1, { pen: 1 }, null); } }
       if (this.state !== 'end') this.endRound('T', 'bomb');
     }
@@ -811,7 +878,9 @@ export class Game {
       if (f.t <= 0) { this.scene.remove(f.grp); this.fires.splice(k, 1); }
     }
     for (let k = this.fx.length - 1; k >= 0; k--) {
-      const e = this.fx[k]; e.t -= dt;
+      const e = this.fx[k];
+      if (e.upd) { if (!e.upd(dt)) { this.scene.remove(e.obj); this.fx.splice(k, 1); } continue; }
+      e.t -= dt;
       if (e.grow) e.obj.scale.addScalar(e.grow * dt);
       if (e.obj.material) e.obj.material.opacity = Math.max(0, Math.min(1, e.t * 5));
       if (e.t <= 0) { this.scene.remove(e.obj); e.obj.material && e.obj.material.dispose(); this.fx.splice(k, 1); }
@@ -870,7 +939,9 @@ export class Game {
       this.camYaw += dy * k; this.camPitch += (pitch - this.camPitch) * k;
       yaw = this.camYaw; pitch = this.camPitch;
     }
-    const vp = pitch + view.punch.p * 0.5, vy = yaw + view.punch.y * 0.5;
+    this.shake = Math.max(0, (this.shake || 0) - dt * 1.4);
+    const sh = this.shake * this.shake * 0.06;
+    const vp = pitch + view.punch.p * 0.5 + (Math.random() - 0.5) * sh, vy = yaw + view.punch.y * 0.5 + (Math.random() - 0.5) * sh;
     this.camera.rotation.order = 'YXZ'; this.camera.rotation.set(vp, vy, 0);
     const fov = view.scope === 1 ? 40 : view.scope === 2 ? 15 : this.baseFov;
     if (this.camera.fov !== fov) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
@@ -897,6 +968,7 @@ export class Game {
   }
   render() {
     const r = this.r;
+    if (this.dome) this.dome.position.copy(this.camera.position);
     r.autoClear = true; r.render(this.scene, this.camera);
     if (this.vm.visible) { r.autoClear = false; r.clearDepth(); r.render(this.vmScene, this.vmCam); r.autoClear = true; }
   }

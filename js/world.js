@@ -5,41 +5,76 @@ import { rng, shade } from './art.js';
 
 const WALK = new Set(['.', 'w', 'T', 'K', 'A', 'B', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 
-function texCanvas(kind, base, alt, seed) {
-  const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
-  const g = cv.getContext('2d'), R = rng(seed);
-  g.fillStyle = base; g.fillRect(0, 0, S, S);
-  const noise = (n, a, sz = 2) => { for (let i = 0; i < n; i++) { g.fillStyle = R() < 0.5 ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`; g.fillRect(R() * S, R() * S, sz, sz); } };
-  switch (kind) {
-    case 'bricks': {
-      const bh = 16, bw = 32; g.strokeStyle = shade(base, -0.35); g.lineWidth = 2;
-      for (let y = 0; y < S; y += bh) { const off = (y / bh) % 2 ? bw / 2 : 0;
-        for (let x = -bw; x < S; x += bw) { g.fillStyle = R() < 0.3 ? alt : base; g.fillRect(x + off + 1, y + 1, bw - 2, bh - 2); g.strokeRect(x + off, y, bw, bh); } }
-      noise(900, 0.06); break;
+// value-noise fbm для «живых» текстур
+function makeNoise(S, seed, oct = 4) {
+  const R = rng(seed), out = new Float32Array(S * S);
+  let amp = 1, tot = 0;
+  for (let o = 0; o < oct; o++) {
+    const g = 4 << o, grid = new Float32Array((g + 1) * (g + 1));
+    for (let i = 0; i < grid.length; i++) grid[i] = R();
+    for (let i = 0; i <= g; i++) { grid[i * (g + 1) + g] = grid[i * (g + 1)]; grid[g * (g + 1) + i] = grid[i]; }
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const fx = x / S * g, fy = y / S * g, ix = fx | 0, iy = fy | 0, tx = fx - ix, ty = fy - iy;
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      const a = grid[iy * (g + 1) + ix], b = grid[iy * (g + 1) + ix + 1], c = grid[(iy + 1) * (g + 1) + ix], d = grid[(iy + 1) * (g + 1) + ix + 1];
+      out[y * S + x] += amp * ((a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy);
     }
-    case 'plaster': noise(2500, 0.05, 3); g.fillStyle = shade(base, -0.15); for (let i = 0; i < 6; i++) { g.globalAlpha = 0.25; g.beginPath(); g.ellipse(R() * S, R() * S, 10 + R() * 20, 6 + R() * 12, R() * 3, 0, 7); g.fill(); } g.globalAlpha = 1; g.fillStyle = shade(base, -0.3); g.fillRect(0, S - 10, S, 10); break;
-    case 'stone': {
-      g.strokeStyle = shade(base, -0.4); g.lineWidth = 2;
-      for (let y = 0; y < S; y += 21) for (let x = (y / 21 % 2) * 14; x < S; x += 28 + R() * 10) { g.fillStyle = R() < 0.4 ? alt : shade(base, (R() - 0.5) * 0.15); g.fillRect(x, y, 26, 19); g.strokeRect(x, y, 26, 19); }
-      noise(1200, 0.07); break;
-    }
-    case 'panel': {
-      g.strokeStyle = shade(base, -0.25); g.lineWidth = 2;
-      for (let y = 0; y < S; y += 32) for (let x = 0; x < S; x += 64) { g.fillStyle = shade(base, (R() - 0.5) * 0.08); g.fillRect(x, y, 64, 32); g.strokeRect(x, y, 64, 32); g.fillStyle = shade(base, -0.4); g.fillRect(x + 4, y + 4, 2, 2); g.fillRect(x + 58, y + 4, 2, 2); }
-      g.fillStyle = alt; g.fillRect(0, S - 18, S, 6); noise(600, 0.04); break;
-    }
-    case 'concrete': noise(3000, 0.05, 2); g.strokeStyle = shade(base, -0.2); g.lineWidth = 1; g.strokeRect(0, 0, S, S); g.beginPath(); g.moveTo(0, S / 2); g.lineTo(S, S / 2); g.stroke(); break;
-    case 'sand': noise(4000, 0.05, 2); for (let i = 0; i < 20; i++) { g.fillStyle = shade(base, -0.12); g.globalAlpha = 0.3; g.fillRect(R() * S, R() * S, 8 + R() * 18, 2); } g.globalAlpha = 1; break;
-    case 'tiles': g.strokeStyle = shade(base, -0.25); g.lineWidth = 2; for (let y = 0; y < S; y += 32) for (let x = 0; x < S; x += 32) { g.fillStyle = shade(base, (R() - 0.5) * 0.12); g.fillRect(x, y, 32, 32); g.strokeRect(x, y, 32, 32); } noise(1200, 0.04); break;
-    case 'cobble': for (let i = 0; i < 70; i++) { g.fillStyle = shade(base, (R() - 0.5) * 0.25); g.strokeStyle = shade(base, -0.35); g.beginPath(); g.ellipse(R() * S, R() * S, 7 + R() * 6, 5 + R() * 5, R() * 3, 0, 7); g.fill(); g.stroke(); } noise(800, 0.05); break;
-    case 'grass': noise(5000, 0.08, 2); g.fillStyle = shade(base, 0.15); for (let i = 0; i < 300; i++) g.fillRect(R() * S, R() * S, 1, 3); break;
-    case 'gravel': for (let i = 0; i < 1400; i++) { g.fillStyle = shade(base, (R() - 0.5) * 0.5); g.fillRect(R() * S, R() * S, 2 + R() * 2, 2 + R() * 2); } break;
-    case 'wood': g.strokeStyle = shade(base, -0.4); g.lineWidth = 3; g.strokeRect(2, 2, S - 4, S - 4); for (let y = 0; y < S; y += 16) { g.fillStyle = shade(base, (R() - 0.5) * 0.2); g.fillRect(4, y + 1, S - 8, 14); } g.beginPath(); g.moveTo(4, 4); g.lineTo(S - 4, S - 4); g.moveTo(S - 4, 4); g.lineTo(4, S - 4); g.lineWidth = 6; g.stroke(); break;
-    case 'metal': noise(1500, 0.05); g.fillStyle = shade(base, -0.25); for (let x = 0; x < S; x += 16) g.fillRect(x, 0, 3, S); break;
-    case 'water': { const gr = g.createLinearGradient(0, 0, S, S); gr.addColorStop(0, '#2f6f96'); gr.addColorStop(1, '#3f8fb5'); g.fillStyle = gr; g.fillRect(0, 0, S, S); g.strokeStyle = 'rgba(255,255,255,0.15)'; for (let i = 0; i < 12; i++) { g.beginPath(); const y = R() * S; g.moveTo(0, y); g.bezierCurveTo(S / 3, y - 6, S * 2 / 3, y + 6, S, y); g.stroke(); } break; }
+    tot += amp; amp *= 0.5;
   }
-  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
-  return t;
+  for (let i = 0; i < out.length; i++) out[i] /= tot;
+  return out;
+}
+function hex2rgb(h) { if (h[0] !== '#') return h.match(/\d+/g).slice(0, 3).map(Number); const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function texCanvas(kind, base, alt, seed) {
+  const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const g = cv.getContext('2d'), R = rng(seed);
+  const n1 = makeNoise(S, seed * 7 + 1, 5), n2 = makeNoise(S, seed * 13 + 5, 3);
+  const [br, bg, bb] = hex2rgb(base), [ar, ag, ab] = hex2rgb(alt);
+  // карта «высот» по шаблону: швы кладки, плитки и т.п. (1 — поверхность, 0 — шов)
+  const H = new Float32Array(S * S).fill(1), tint = new Float32Array(S * S);
+  const rect = (x0, y0, w, h, gap, t) => {
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+      const X = ((x % S) + S) % S, Y = ((y % S) + S) % S, e = Math.min(x - x0, y - y0, x0 + w - 1 - x, y0 + h - 1 - y);
+      H[Y * S + X] = e < gap ? 0 : Math.min(1, 0.55 + (e - gap) * 0.25); tint[Y * S + X] = t;
+    }
+  };
+  switch (kind) {
+    case 'bricks': for (let y = 0, r = 0; y < S; y += 16, r++) for (let x = (r % 2) * 16 - 32; x < S; x += 32) rect(x, y, 32, 16, 1, R()); break;
+    case 'stone': for (let y = 0, r = 0; y < S; y += 32, r++) { let x = -R() * 30; while (x < S) { const w = 30 + R() * 30; rect(Math.round(x), y, Math.round(w), 32, 2, R()); x += w; } } break;
+    case 'panel': for (let y = 0; y < S; y += 128) for (let x = 0; x < S; x += 128) rect(x, y, 128, 128, 2, R() * 0.4); break;
+    case 'tiles': for (let y = 0; y < S; y += 64) for (let x = 0; x < S; x += 64) rect(x, y, 64, 64, 2, R()); break;
+    case 'cobble': for (let k = 0; k < 420; k++) { const cx = R() * S, cy = R() * S, rr = 6 + R() * 5, t = R(); for (let y = -rr; y <= rr; y++) for (let x = -rr; x <= rr; x++) { const d = Math.hypot(x, y * 1.2) / rr; if (d < 1) { const X = ((Math.round(cx + x) % S) + S) % S, Y = ((Math.round(cy + y) % S) + S) % S; H[Y * S + X] = d > 0.86 ? 0.5 : 1 - d * d * 0.25; tint[Y * S + X] = t; } } } break;
+    case 'wood': for (let y = 0; y < S; y += 32) rect(0, y, S, 32, 2, R()); break;
+    case 'metal': for (let x = 0; x < S; x += 32) rect(x, 0, 32, S, 1, R() * 0.3); break;
+    case 'concrete': rect(0, 0, S, S, 1, 0.5); break;
+  }
+  const img = g.createImageData(S, S), d = img.data;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = y * S + x, n = n1[i], m = n2[i];
+    let h = H[i];
+    // освещение рельефа: сравнение с соседом сверху-слева
+    const hu = H[((y - 1 + S) % S) * S + ((x - 1 + S) % S)];
+    let shade = 0.86 + (h - hu) * 0.3 + (n - 0.5) * 0.32;
+    const t = tint[i] * 0.35 + m * 0.3;
+    let r = br + (ar - br) * t, gg = bg + (ag - bg) * t, b = bb + (ab - bb) * t;
+    if (kind === 'grass') { shade = 0.75 + n * 0.5 + (R() - 0.5) * 0.25; }
+    else if (kind === 'sand' || kind === 'gravel') shade = 0.8 + n * 0.35 + (R() - 0.5) * (kind === 'gravel' ? 0.5 : 0.12);
+    else if (kind === 'plaster') shade = 0.78 + n * 0.35 + (m > 0.62 ? -(m - 0.62) * 0.8 : 0);
+    else if (kind === 'water') { r = 40; gg = 105 + n * 40; b = 140 + n * 50; shade = 1; }
+    if (h === 0) shade *= 0.62;
+    // грязь: тёмные пятна
+    const dirt = Math.max(0, m - 0.6) * 0.9;
+    shade *= 1 - dirt;
+    d[i * 4] = Math.max(0, Math.min(255, r * shade)); d[i * 4 + 1] = Math.max(0, Math.min(255, gg * shade)); d[i * 4 + 2] = Math.max(0, Math.min(255, b * shade)); d[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  // детали поверх
+  if (kind === 'wood') { g.strokeStyle = 'rgba(30,18,8,0.7)'; g.lineWidth = 8; g.strokeRect(4, 4, S - 8, S - 8); g.beginPath(); g.moveTo(8, 8); g.lineTo(S - 8, S - 8); g.stroke(); }
+  if (kind === 'concrete' || kind === 'plaster') { g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 1; for (let k = 0; k < 3; k++) { g.beginPath(); let x = R() * S, y = R() * S; g.moveTo(x, y); for (let j = 0; j < 8; j++) { x += (R() - 0.5) * 30; y += R() * 14; g.lineTo(x, y); } g.stroke(); } }
+  if (kind === 'metal') { g.fillStyle = 'rgba(0,0,0,0.35)'; for (let y = 16; y < S; y += 64) for (let x = 8; x < S; x += 32) { g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill(); } }
+  if (kind === 'panel') { g.fillStyle = alt; g.globalAlpha = 0.7; g.fillRect(0, S - 30, S, 10); g.globalAlpha = 1; }
+  const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 8;
+  return tx;
 }
 
 export class World {
@@ -85,7 +120,7 @@ export class World {
   _build() {
     const th = this.map.theme, q = this.quality;
     const wallTex = texCanvas(th.wallTex, th.wall, th.wall2, 1), floorTex = texCanvas(th.floorTex, th.floor, shade(th.floor, -0.1), 2);
-    const crateTex = texCanvas('wood', th.crate, th.crate, 3), bigTex = texCanvas('metal', shade(th.crate, -0.1), th.crate, 4), waterTex = texCanvas('water', '#2f6f96', '#3f8fb5', 5);
+    const crateTex = texCanvas('wood', th.crate, shade(th.crate, -0.25), 3), bigTex = texCanvas('metal', shade(th.crate, -0.1), th.crate, 4), waterTex = texCanvas('water', '#2f6f96', '#3f8fb5', 5);
     const trainTex = texCanvas('metal', '#7a2f25', '#5a1f18', 6);
     const wallMat = new THREE.MeshLambertMaterial({ map: wallTex });
     const geo = new THREE.BoxGeometry(CELL, 1, CELL);
@@ -150,7 +185,7 @@ export class World {
       const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d');
       g.font = 'bold 110px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(190,20,20,0.75)'; g.fillText(s, 64, 70);
       const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
-      const d = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+      const d = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
       d.rotation.x = -Math.PI / 2; const c = this.sites[s].center; d.position.set(c.x, 0.03, c.z); this.group.add(d);
     }
   }

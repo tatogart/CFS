@@ -191,3 +191,50 @@ export function soundFor(id) {
   return 'knife';
 }
 export function audioCtx() { return ctx; }
+
+// ---------- фон карты: ветер, гул, птицы ----------
+let amb = null;
+export function startAmbience(style) {
+  stopAmbience(0);
+  if (!ctx) return;
+  const SR = ctx.sampleRate, len = SR * 6, buf = ctx.createBuffer(2, len, SR);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch); let l = 0;
+    for (let i = 0; i < len; i++) { l = (l + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = l * 3.5; }
+    const X = SR; for (let i = 0; i < X; i++) { const t = i / X; d[i] = d[i] * t + d[len - X + i] * (1 - t); }  // бесшовная петля
+  }
+  const indoor = style === 'indoor' || style === 'industrial';
+  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = indoor ? 160 : 520;
+  const g = ctx.createGain(); g.gain.value = 0; g.gain.linearRampToValueAtTime(indoor ? 0.16 : 0.11, ctx.currentTime + 3);
+  const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 0.06; lg.gain.value = indoor ? 0.02 : 0.05; lfo.connect(lg); lg.connect(g.gain); lfo.start();
+  src.connect(lp); lp.connect(g); g.connect(master); src.start();
+  const nodes = [src, lfo], timers = [];
+  if (indoor) { for (const f of [60, 120]) { const o = ctx.createOscillator(), og = ctx.createGain(); o.frequency.value = f; og.gain.value = f === 60 ? 0.012 : 0.005; o.connect(og); og.connect(g); o.start(); nodes.push(o); } }
+  // птицы на открытых картах
+  const birds = { dust: 1, inferno: 1, jungle: 2, lake: 2, park: 1, egypt: 1 }[style] || 0;
+  if (birds) {
+    const chirp = () => {
+      if (!amb || amb.g !== g) return;
+      const t0 = ctx.currentTime + 0.05, n = 2 + Math.floor(Math.random() * 4), base = 2600 + Math.random() * 1800, pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      const out = ctx.createGain(); out.gain.value = 0.025 + Math.random() * 0.02;
+      if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; out.connect(pan); pan.connect(master); } else out.connect(master);
+      for (let k = 0; k < n; k++) {
+        const o = ctx.createOscillator(), e = ctx.createGain(), t = t0 + k * (0.09 + Math.random() * 0.06);
+        o.type = 'sine'; o.frequency.setValueAtTime(base, t); o.frequency.exponentialRampToValueAtTime(base * (1.2 + Math.random() * 0.4), t + 0.05);
+        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(1, t + 0.01); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+        o.connect(e); e.connect(out); o.start(t); o.stop(t + 0.09);
+      }
+      timers.push(setTimeout(chirp, (2500 + Math.random() * 7000) / birds));
+    };
+    timers.push(setTimeout(chirp, 1500));
+  }
+  amb = { g, nodes, timers };
+}
+export function stopAmbience(fade = 1) {
+  if (!amb || !ctx) { amb = null; return; }
+  const a = amb; amb = null;
+  a.timers.forEach(clearTimeout);
+  a.g.gain.cancelScheduledValues(ctx.currentTime); a.g.gain.setValueAtTime(a.g.gain.value, ctx.currentTime); a.g.gain.linearRampToValueAtTime(0, ctx.currentTime + fade + 0.01);
+  setTimeout(() => { for (const n of a.nodes) { try { n.stop(); } catch (e) { /* уже остановлен */ } } try { a.g.disconnect(); } catch (e) { /* */ } }, fade * 1000 + 100);
+}

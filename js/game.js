@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793130934';
-import { World } from './world.js?v=1793130934';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793130934';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793130934';
-import { play, soundFor } from './sfx.js?v=1793130934';
-import { Bot, planRound } from './bots.js?v=1793130934';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793130934';
+import { CELL } from './maps.js?v=1793131168';
+import { World } from './world.js?v=1793131168';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793131168';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793131168';
+import { play, soundFor } from './sfx.js?v=1793131168';
+import { Bot, planRound } from './bots.js?v=1793131168';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793131168';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -234,7 +234,7 @@ export class Game {
       if (this.practice) { a.money = 16000; }
       if (a.target) { this.give(a, a.team === 'T' ? 'ak47' : 'm4a4'); this.selectSlot(a, 1, true); this.aimRespawn(a); }
       if (this.aimMode && a === this.player && !a.weapons[1]) { this.give(a, a.team === 'T' ? 'ak47' : 'm4a4'); this.selectSlot(a, 1, true); }
-      a.hasBomb = false;
+      a.hasBomb = false; a.lastAttacker = null;
       if (this.dm) this.dmLoadout(a);
       if (!this.ar) this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
     }
@@ -898,7 +898,7 @@ export class Game {
     }
   }
   dmRespawn(a) {
-    a.respT = 0; a.alive = true; a.hp = 100; a.blind = 0; a.vel.set(0, 0, 0); a.crouchK = 0; a.scope = 0; a.reloadT = 0;
+    a.respT = 0; a.alive = true; a.hp = 100; a.lastAttacker = null; a.blind = 0; a.vel.set(0, 0, 0); a.crouchK = 0; a.scope = 0; a.reloadT = 0;
     a.pos.copy(this.dmSpawnPos(a)); a.model.revive(); a.model.root.visible = a !== this.player;
     this.dmLoadout(a); if (!this.ar) this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
     if (a === this.player) { this.vm.visible = true; this.spect = null; this.dmgLog = {}; }
@@ -1227,11 +1227,25 @@ export class Game {
     let view = p;
     if (!p.alive && !this.practice) {
       this.deadT = (this.deadT || 0) + dt;
+      const killer = p.lastAttacker;
+      // freeze cam как в CS: камера на месте смерти разворачивается к убийце и приближает его
+      if (this.deadT <= 2.6 && killer && killer !== p && killer.model) {
+        const k = Math.min(1, this.deadT / 0.7), e = this.eyePos(killer);
+        const from = this.fcFrom || (this.fcFrom = this.eyePos(p).clone());
+        const back = new THREE.Vector3(from.x - e.x, 0, from.z - e.z).normalize();
+        this.camera.position.set(from.x + back.x * 0.6 * k, from.y + 0.35 * k, from.z + back.z * 0.6 * k);
+        const look = this.fcLook || (this.fcLook = this.camera.position.clone().add(this.aimDir(p, new THREE.Vector3())));
+        look.lerp(e, Math.min(1, dt * 5)); this.camera.lookAt(look);
+        const fov = this.baseFov * (1 - 0.45 * k); if (Math.abs(this.camera.fov - fov) > 0.1) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
+        p.model.root.visible = true; killer.model.root.visible = true; this.vm.visible = false; this.viewing = p;
+        if (this.dome) this.dome.position.copy(this.camera.position);
+        return;
+      }
       if (this.deadT > 1.5) {
         if (!this.spect || !this.spect.alive) this.spectNext(1);
         if (this.spect) view = this.spect;
       }
-    } else this.deadT = 0;
+    } else { this.deadT = 0; this.fcFrom = null; this.fcLook = null; }
     this.viewing = view;
     const fp = view !== p && !this.spectTP;
     p.model.root.visible = !p.alive && view !== p;

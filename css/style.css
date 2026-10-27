@@ -469,3 +469,11 @@ body.touch #banner { top: 14%; padding: 8px 12px; } body.touch #banner b { font-
 #dmgRep b { color: #fff; } #dmgRep small { color: #8a96a6; } #dmgRep em { color: #6a7686; }
 #dmgRep .t { color: var(--t); } #dmgRep .ct { color: var(--ct); }
 body.touch #chat { bottom: calc(150px + var(--safe-b)); left: calc(180px + var(--safe-l)); font-size: 11px; width: 34vw; }
+
+/* StatTrak и износ */
+.stt { color: #ff8a2a; font-weight: 800; }
+.item .wear { font-size: 10px; color: #8a96a6; letter-spacing: .5px; margin-top: 1px; }
+.item.st { box-shadow: inset 0 0 0 1px rgba(255,138,42,.45); }
+.dWear { display: block; font-size: 13px; color: #9fb0c2; font-weight: 500; margin-top: 4px; }
+#inspInfo { position: absolute; left: 50%; bottom: calc(14% + var(--safe-b)); transform: translateX(-50%); text-align: center; background: rgba(8,11,16,.7); padding: 6px 14px; border-radius: 3px; border-bottom: 2px solid var(--rc, #4b69ff); pointer-events: none; font-family: "Barlow Condensed", system-ui, sans-serif; transition: opacity .3s; }
+#inspInfo b { font-size: 20px; display: block; } #inspInfo small { color: #9fb0c2; font-size: 13px; letter-spacing: .5px; }

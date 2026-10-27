@@ -1,14 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793130934';
-import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793130934';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793130934';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793130934';
-import { AgentModel } from './models.js?v=1793130934';
-import { Controls, isTouch } from './controls.js?v=1793130934';
-import { initAudio, play, setVolume } from './sfx.js?v=1793130934';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793130934';
-import { Game } from './game.js?v=1793130934';
+import { MAPS, CELL } from './maps.js?v=1793131168';
+import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793131168';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793131168';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793131168';
+import { AgentModel } from './models.js?v=1793131168';
+import { Controls, isTouch } from './controls.js?v=1793131168';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793131168';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793131168';
+import { styleOf } from './decor.js?v=1793131168';
+import { Game } from './game.js?v=1793131168';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -116,11 +117,12 @@ renderPlay();
 $('start').onclick = () => startGame();
 
 // ---------- кейсы ----------
-function itemCard(skinId, extra = '') {
+function itemCard(skinId, extra = '', it = null) {
   const sk = skinById[skinId], r = RARITY[sk.rarity];
-  const d = el('div', 'item');
+  const d = el('div', 'item' + (it && it.st ? ' st' : ''));
   d.style.setProperty('--rc', r.color);
-  d.innerHTML = `<img src="${weaponIconURL(sk.weapon, sk.id)}" alt=""><div class="wn">${esc(weaponName(sk.weapon))}</div><div class="sn">${esc(sk.name)}</div>${extra}`;
+  const meta = it ? `<div class="wear">${it.st ? `<b class="stt">StatTrak™ ${it.kills || 0}</b> · ` : ''}${wearOf(it.wear)[2]} ${it.wear.toFixed(3)}</div>` : '';
+  d.innerHTML = `<img src="${weaponIconURL(sk.weapon, sk.id)}" alt=""><div class="wn">${it && it.st ? '<span class="stt">ST™</span> ' : ''}${esc(weaponName(sk.weapon))}</div><div class="sn">${esc(sk.name)}</div>${meta}${extra}`;
   return d;
 }
 function renderCases() {
@@ -192,7 +194,7 @@ function showDrop(skinId) {
   const card = $('dropCard'); card.style.setProperty('--rc', r.color);
   card.style.animation = 'none'; card.offsetHeight; card.style.animation = '';
   $('dropRar').textContent = r.name; $('dropImg').src = weaponIconURL(sk.weapon, sk.id, 512, 192);
-  $('dropName').textContent = `${weaponName(sk.weapon)} | ${sk.name}`;
+  $('dropName').innerHTML = `${item.st ? '<span class="stt">StatTrak™</span> ' : ''}${esc(weaponName(sk.weapon))} | ${esc(sk.name)}<small class="dWear">${wearOf(item.wear)[1]} · ${item.wear.toFixed(4)}</small>`;
   $('dropSell').textContent = `Продать · ◈ ${r.sell}`;
   $('dropKeep').onclick = () => { $('drop').classList.add('hidden'); };
   $('dropSell').onclick = () => { sellItem(item.uid); $('drop').classList.add('hidden'); updOpenBtn(); coins(); };
@@ -264,7 +266,7 @@ function renderInv() {
   if (!list.length) { box.appendChild(el('div', 'empty', 'Инвентарь пуст. Открой кейс во вкладке «Кейсы»!')); return; }
   for (const it of list) {
     const sk = skinById[it.skin], eq = isEquipped(it.uid);
-    const c = itemCard(it.skin, `${eq ? '<span class="eq">НАДЕТО</span>' : ''}<div class="acts"><button class="e">${eq ? 'Снять' : 'Надеть'}</button><button class="s">◈ ${RARITY[sk.rarity].sell}</button></div>`);
+    const c = itemCard(it.skin, `${eq ? '<span class="eq">НАДЕТО</span>' : ''}<div class="acts"><button class="e">${eq ? 'Снять' : 'Надеть'}</button><button class="s">◈ ${RARITY[sk.rarity].sell}</button></div>`, it);
     c.querySelector('.e').onclick = () => { equipItem(it.uid); M.id = null; setMenuAgent(save.agent[M.side]); renderInv(); play('buy'); };
     c.querySelector('.s').onclick = () => { if (confirm(`Продать ${weaponName(sk.weapon)} | ${sk.name}?`)) { sellItem(it.uid); coins(); renderInv(); } };
     box.appendChild(c);
@@ -570,7 +572,11 @@ const hud = {
     } catch (e) { /* нет синтеза речи */ }
   },
   onRoundEnd() {},
-  onKill() {},
+  onKill() {
+    const g = game; if (!g || !g.player.cur) return;
+    const cur = g.player.cur, slot = cur.id === 'knife' ? 'knife' : cur.id;
+    const it = cur.skin && statTrak(slot); if (it) { hud._stDirty = true; clearTimeout(hud._stT); hud._stT = setTimeout(persist, 1500); }
+  },
   matchOver(g) { endMatch(g); },
   menuOpen() { return !$('buy').classList.contains('hidden') || !$('pause').classList.contains('hidden') ; },
   pause() { openPause(); },
@@ -593,7 +599,22 @@ function buildSlots(g) {
   if (p.hasBomb) { const d = el('div', p.slot === 5 ? 'on' : '', '5 💣 C4'); d.onclick = d.ontouchstart = e => { e.preventDefault(); e.stopPropagation(); g.selectSlot(p, 5); }; box.appendChild(d); }
 }
 let fpsAcc = 0, fpsN = 0, fpsT = 0;
+function inspectHud(g) {
+  const box = $('inspInfo'), p = g.player, on = g.inspectT > 0 && p.alive && p.cur && !p.cur.nade && !p.cur.c4;
+  const key = on ? p.cur.id + '|' + p.cur.skin : '';
+  if (key !== hud.inspKey) {
+    hud.inspKey = key;
+    if (on) {
+      const slot = p.cur.id === 'knife' ? 'knife' : p.cur.id, it = save.inv.find(x => x.uid === save.equip[slot]);
+      const sk = p.cur.skin && skinById[p.cur.skin], wn = p.cur.id === 'knife' && p.cur.model ? weaponName(p.cur.model) : weaponName(p.cur.id);
+      box.style.setProperty('--rc', sk ? RARITY[sk.rarity].color : '#6a7686');
+      box.innerHTML = `<b>${it && it.st && sk ? '<span class="stt">StatTrak™</span> ' : ''}${esc(wn)}${sk ? ' | ' + esc(sk.name) : ''}</b><small>${sk ? RARITY[sk.rarity].name : 'Стандартное'}${it && sk ? ' · ' + wearOf(it.wear)[1] + ' ' + it.wear.toFixed(4) : ''}${it && it.st && sk ? ` · <span class="stt">убийств: ${it.kills || 0}</span>` : ''}</small>`;
+    }
+  }
+  box.style.opacity = on ? 1 : 0;
+}
 function updateHud(g, dt) {
+  inspectHud(g);
   const p = g.player, view = g.viewing || p;
   const set = (id, v) => { const e = $(id); if (e._v !== v) { e._v = v; e.textContent = v; } };
   set('hpV', Math.max(0, Math.ceil(view.hp))); $('hpV').classList.toggle('low', view.hp < 30);
@@ -788,7 +809,7 @@ function endMatch(g) {
     return { name: a.name, team: a.team, agent: a.agent, gun: w ? w.id : (a.team === 'T' ? 'ak47' : 'm4a4'), skin: w ? w.skin : null, gloves: a.skins && a.skins.gloves, k: a.kills, d: a.deaths, mvps: a.mvps || 0, hs: a.hs || 0, me: a === p, place: order.indexOf(a) + 1, badge: badges.get(a) || '' };
   });
   const data = { dm, won, draw, place, total: order.length, my, th, team: p.team, map: g.o.map.name, mode: (MODES.find(m => m[0] === g.mode) || [])[1] || '', players, reward, xpFrom, xpGain, rank };
-  game.dispose(); game = null;
+  game.dispose(); game = null; stopAmbience(2);
   controls.enabled = false; controls.reset(); closeBuy();
   $('hud').classList.add('hidden'); $('pause').classList.add('hidden');
   showEnd(data);
@@ -1025,7 +1046,7 @@ function renderLoading(dt) {
   if (Ld.t >= Ld.dur) finishLoad();
 }
 function finishLoad() {
-  LOADING = null;
+  LOADING = null; startAmbience(styleOf(game.o.map));
   $('load').classList.add('hidden'); $('hud').classList.remove('hidden');
   $('touch').classList.toggle('hidden', !touch);
   $('fps').classList.toggle('hidden', !save.settings.fps);
@@ -1036,6 +1057,7 @@ function finishLoad() {
   last = performance.now();
 }
 function quitGame() {
+  stopAmbience();
   if (window.__updateReady) { location.reload(); return; }
   if (game) { game.dispose(); game = null; }
   controls.enabled = false; controls.unlock(); controls.reset();

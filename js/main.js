@@ -1,14 +1,14 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793129478';
-import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793129478';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793129478';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793129478';
-import { AgentModel } from './models.js?v=1793129478';
-import { Controls, isTouch } from './controls.js?v=1793129478';
-import { initAudio, play, setVolume } from './sfx.js?v=1793129478';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793129478';
-import { Game } from './game.js?v=1793129478';
+import { MAPS, CELL } from './maps.js?v=1793129857';
+import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793129857';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793129857';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793129857';
+import { AgentModel } from './models.js?v=1793129857';
+import { Controls, isTouch } from './controls.js?v=1793129857';
+import { initAudio, play, setVolume } from './sfx.js?v=1793129857';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793129857';
+import { Game } from './game.js?v=1793129857';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -348,7 +348,7 @@ function onHide(h) {
   const yb = $('ytBox');
   if (h) { if (yb.querySelector('iframe')) { yb.innerHTML = ''; yb.dataset.id = ''; yb.dataset.wasOn = '1'; } }
   else if (yb.dataset.wasOn) { yb.dataset.wasOn = ''; if (!game) updYt(); }
-  if (h && game && $('pause').classList.contains('hidden')) openPause();
+  if (h && game && !LOADING && $('pause').classList.contains('hidden')) openPause();
 }
 document.addEventListener('visibilitychange', () => onHide(document.hidden));
 addEventListener('pagehide', () => onHide(true));
@@ -902,32 +902,125 @@ function renderEnd(dt) {
 }
 
 // ---------- запуск матча ----------
+// ---------- поиск матча → «матч найден» → загрузка (как в CS2) ----------
+const TIPS = [
+  'Стреляйте короткими очередями: первые пули самые точные.',
+  'Остановитесь перед выстрелом — в движении разброс огромный.',
+  'Звуки шагов слышны далеко. Shift — тихий шаг.',
+  'Флешку кидайте за угол, отвернувшись от неё.',
+  'Молотов выгоняет врага с позиции, а дым перекрывает обзор.',
+  'Комплект сапёра ускоряет разминирование вдвое.',
+  'В «Гонке вооружений» убийство ножом отнимает уровень у жертвы.',
+  'Держите прицел на уровне головы — так не придётся его поднимать.',
+  'После проигранного раунда команда получает больше денег.',
+  'Сэкономьте раунд, если денег не хватает на винтовку и броню.',
+  'Броня со шлемом спасает от выстрела в голову из AK-47 только на дальних дистанциях.',
+  'AWP убивает с одного попадания в тело. Не выглядывайте под снайпера дважды.',
+  'Бомба взрывается через 40 секунд после установки.',
+  'Перезаряжайтесь в укрытии, а не посреди перестрелки.',
+];
+let MM = null, LOADING = null;
 function startGame() {
-  initAudio(); const yb = $('ytBox'); yb.innerHTML = ''; yb.dataset.id = ''; yb.classList.add('hidden'); stopMusic(0.5);
-  let map = modeMap(save.last.mode || 'casual');
-  const diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
-  const side = save.last.side === 'auto' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
+  if (MM || LOADING) return;
+  initAudio();
   const mode = save.last.mode || 'casual';
+  const diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
+  if (mode !== 'casual' && diff.id === 'none') { alert('Для этого режима выберите уровень ботов'); return; }
+  // полноэкранный режим можно включить только по нажатию — делаем сразу
+  if (touch) { try { const d = document.documentElement; (d.requestFullscreen || d.webkitRequestFullscreen || (() => {})).call(d); screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* нет полноэкранного режима */ } }
+  if (window.__fast) { beginLoad(); return; }
+  const ranked = mode === 'comp' || mode === 'wing';
+  const total = mode === 'wing' ? 4 : 10;
+  MM = { t: 0, find: 1.6 + Math.random() * (ranked ? 3 : 1.5), mode, ranked, total, phase: 'search' };
+  $('mmBar').classList.remove('hidden'); play('tick');
+  const tick = () => {
+    if (!MM) return;
+    MM.t += 0.1;
+    if (MM.phase === 'search') {
+      $('mmTime').textContent = `${Math.floor(MM.t / 60)}:${String(Math.floor(MM.t % 60)).padStart(2, '0')}`;
+      if (MM.t >= MM.find) { if (MM.ranked) showAccept(); else { $('mmBar').classList.add('hidden'); MM = null; beginLoad(); return; } }
+    } else if (MM.phase === 'accept') {
+      const left = 20 - (MM.t - MM.acceptT);
+      $('accBar').style.width = Math.max(0, left / 20 * 100) + '%';
+      // боты принимают по одному
+      if (MM.accepted && MM.bots < MM.total - 1 && MM.t >= MM.nextBot) { MM.bots++; MM.nextBot = MM.t + 0.15 + Math.random() * 0.7; play('tick'); renderAccSlots(); }
+      if (MM.accepted && MM.bots >= MM.total - 1 && !MM.done) { MM.done = true; $('accTitle').textContent = 'ВСЕ ИГРОКИ ПРИНЯЛИ МАТЧ'; setTimeout(() => { $('accept').classList.add('hidden'); MM = null; beginLoad(); }, 900); }
+      if (left <= 0 && !MM.accepted) { $('accept').classList.add('hidden'); MM = null; alert('Вы не приняли матч'); return; }
+    }
+    setTimeout(tick, 100);
+  };
+  tick();
+}
+function showAccept() {
+  MM.phase = 'accept'; MM.acceptT = MM.t; MM.bots = 0; MM.accepted = false;
+  $('mmBar').classList.add('hidden'); $('accept').classList.remove('hidden');
+  $('accTitle').textContent = 'ВАШ МАТЧ ГОТОВ!';
+  $('accMode').textContent = `${(MODES.find(m => m[0] === MM.mode) || [])[1]} · ${modeMap(MM.mode).name}`;
+  $('accBtn').disabled = false; $('accBtn').querySelector('span').textContent = 'ПРИНЯТЬ';
+  renderAccSlots(); play('round');
+}
+function renderAccSlots() { const n = MM.total, ok = (MM.accepted ? 1 : 0) + MM.bots; $('accSlots').innerHTML = Array.from({ length: n }, (_, i) => `<i class="${i < ok ? 'ok' : ''}"></i>`).join(''); $('accCount').textContent = `${ok} / ${n}`; }
+$('accBtn').onclick = () => { if (!MM || MM.accepted) return; MM.accepted = true; MM.nextBot = MM.t + 0.3; $('accBtn').disabled = true; $('accBtn').querySelector('span').textContent = 'ПРИНЯТО'; play('buy'); renderAccSlots(); };
+$('mmCancel').onclick = () => { MM = null; $('mmBar').classList.add('hidden'); };
+
+function beginLoad() {
+  const yb = $('ytBox'); yb.innerHTML = ''; yb.dataset.id = ''; yb.classList.add('hidden'); stopMusic(0.5);
+  const mode = save.last.mode || 'casual';
+  const map = modeMap(mode);
+  const diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
+  const side = save.last.side === 'auto' || mode === 'dm' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
   let size = +save.last.size, winTo = +save.last.winTo;
   if (mode === 'comp') { size = 5; winTo = 13; }
   if (mode === 'wing') { size = 2; winTo = 9; }
   if (mode === 'ar') { size = 5; }
-  if (mode !== 'casual' && diff.id === 'none') { alert('Для этого режима выберите уровень ботов'); return; }
-  $('loading').classList.remove('hidden');
+  const L = $('load'), mname = (MODES.find(m => m[0] === mode) || [])[1];
+  $('menu').classList.add('hidden'); L.classList.remove('hidden');
+  $('ldMode').textContent = mname; $('ldMap').textContent = map.name; $('ldDesc').textContent = map.desc;
+  $('ldTip').textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+  $('ldRoster').innerHTML = ''; $('ldBar').style.width = '0%'; $('ldStage').textContent = 'Подключение к серверу…'; $('ldPct').textContent = '0%';
+  $('ldBg').style.backgroundImage = `url(${mapThumbURL(map, 6)})`;
+  playMusic('start');
+  // даём оверлею отрисоваться, потом строим карту
   setTimeout(() => {
     try {
       game = new Game(renderer, { nick: nick(), map, diff, side, size, winTo, mode, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
-    } catch (e) { $('loading').classList.add('hidden'); alert('Ошибка запуска: ' + e.message); console.error(e); return; }
-    $('menu').classList.add('hidden'); $('hud').classList.remove('hidden'); $('loading').classList.add('hidden');
-    $('touch').classList.toggle('hidden', !touch);
-    $('fps').classList.toggle('hidden', !save.settings.fps);
-    $('feed').innerHTML = '';
-    controls.reset(); controls.enabled = true; controls.touchSens = save.settings.touchSens;
-    if (!touch) controls.lock();
-    if (touch) { try { const d = document.documentElement; (d.requestFullscreen || d.webkitRequestFullscreen || (() => {})).call(d); screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* нет полноэкранного режима */ } }
-    checkRotate();
-    last = performance.now();
-  }, 30);
+    } catch (e) { L.classList.add('hidden'); $('menu').classList.remove('hidden'); alert('Ошибка запуска: ' + e.message); console.error(e); return; }
+    const g = game, cx = g.world.w * CELL / 2, cz = g.world.h * CELL / 2;
+    const roster = t => g.actors.filter(a => a.team === t).map(a => `<div class="ldP${a === g.player ? ' me' : ''}"><span class="avatar" style="--av:${a === g.player ? AV_COLORS[save.avatar || 0] : t === 'T' ? '#a8823f' : '#41689c'};width:22px;height:22px;font-size:12px">${esc(a.name[0] || '?')}</span>${esc(a.name)}</div>`).join('');
+    $('ldRoster').innerHTML = mode === 'dm' ? `<div class="ldCol"><h5>Участники</h5>${g.actors.map(a => `<div class="ldP${a === g.player ? ' me' : ''}">${esc(a.name)}</div>`).join('')}</div>`
+      : `<div class="ldCol t"><h5>Террористы</h5>${roster('T')}</div><div class="ldCol ct"><h5>Спецназ</h5>${roster('CT')}</div>`;
+    LOADING = { g, t: 0, t0: 0, dur: window.__fast ? 0.05 : 6.5 + Math.random() * 2, cx, cz, R: Math.max(cx, cz) * 1.1, tipT: 0 };
+    renderer.compile && renderer.compile(g.scene, g.camera);
+  }, 60);
+}
+const LD_STAGES = [[0, 'Подключение к серверу…'], [0.12, 'Загрузка карты…'], [0.3, 'Загрузка текстур…'], [0.5, 'Компиляция шейдеров…'], [0.68, 'Загрузка моделей игроков…'], [0.84, 'Синхронизация с сервером…'], [0.95, 'Ожидание игроков…']];
+function renderLoading(dt) {
+  const Ld = LOADING, g = Ld.g, now = performance.now(); Ld.t += Math.min(0.1, Math.max(0, (now - (Ld.t0 || now)) / 1000)); Ld.t0 = now;
+  // прогресс неровный, как настоящая загрузка: рывки и паузы
+  const k = Math.min(1, Ld.t / Ld.dur), p = Math.min(1, k + Math.sin(k * 17) * 0.025 * (1 - k));
+  const shown = Math.floor(Math.pow(p, 1.3) * 100);
+  $('ldBar').style.width = shown + '%'; $('ldPct').textContent = shown + '%';
+  let st = LD_STAGES[0][1]; for (const [at, txt] of LD_STAGES) if (k >= at) st = txt; $('ldStage').textContent = st;
+  if (Ld.t - Ld.tipT > 4) { Ld.tipT = Ld.t; $('ldTip').textContent = TIPS[Math.floor(Math.random() * TIPS.length)]; }
+  // пролёт камеры над картой
+  const a = Ld.t * 0.12 + 0.6, cam = g.camera;
+  cam.position.set(Ld.cx + Math.cos(a) * Ld.R, 38 - Ld.t * 1.2, Ld.cz + Math.sin(a) * Ld.R);
+  cam.lookAt(Ld.cx, 0, Ld.cz);
+  if (g.dome) g.dome.position.copy(cam.position);
+  renderer.render(g.scene, cam);
+  $('ldBg').style.opacity = Math.max(0, 1 - Ld.t / 1.2);
+  if (Ld.t >= Ld.dur) finishLoad();
+}
+function finishLoad() {
+  LOADING = null;
+  $('load').classList.add('hidden'); $('hud').classList.remove('hidden');
+  $('touch').classList.toggle('hidden', !touch);
+  $('fps').classList.toggle('hidden', !save.settings.fps);
+  $('feed').innerHTML = '';
+  controls.reset(); controls.enabled = true; controls.touchSens = save.settings.touchSens;
+  if (!touch) { controls.lock(); if (!controls.locked) game.centerMsg('Кликните, чтобы начать', 2.5); }
+  checkRotate();
+  last = performance.now();
 }
 function quitGame() {
   if (window.__updateReady) { location.reload(); return; }
@@ -949,6 +1042,7 @@ function frame(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   if (window.__stop) return;
   if (END) { renderEnd(dt); return; }
+  if (LOADING) { renderLoading(dt); return; }
   if (!game) { if (!$('menu').classList.contains('hidden')) renderMenu3d(dt); return; }
   const paused = !$('pause').classList.contains('hidden');
   if (!paused) game.update(dt);

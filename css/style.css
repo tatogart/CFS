@@ -416,3 +416,43 @@ body.touch #banner { top: 14%; padding: 8px 12px; } body.touch #banner b { font-
 
 .arNext { height: 14px; vertical-align: middle; filter: brightness(1.6); }
 #alive .arLv { color: #ffd860; font-weight: 800; }
+
+/* ===== поиск матча / принятие / загрузка ===== */
+#mmBar { position: fixed; z-index: 35; top: calc(8px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 16px; background: linear-gradient(180deg, #2f8a3a, #20682a); border-radius: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.5); font-family: "Barlow Condensed", system-ui, sans-serif; font-size: 18px; letter-spacing: 2px; }
+#mmBar.hidden { display: none; }
+#mmBar button { background: rgba(0,0,0,.25); border: 0; border-radius: 3px; width: 30px; height: 30px; }
+.mmDot { width: 10px; height: 10px; border-radius: 50%; background: #b8ffbf; animation: pcPulse 1s infinite; }
+#accept { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; background: rgba(4,6,9,.7); backdrop-filter: blur(3px); font-family: "Barlow Condensed", system-ui, sans-serif; }
+#accept.hidden { display: none; }
+.accBox { width: min(460px, 92vw); padding: 18px 20px 14px; background: linear-gradient(180deg, #1b2330, #0e131a); border: 1px solid rgba(255,255,255,.1); border-radius: 6px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.6); animation: accIn .35s ease-out; }
+@keyframes accIn { from { transform: scale(.85); opacity: 0; } }
+.accTitle { font-size: 30px; font-weight: 800; letter-spacing: 3px; }
+.accMode { color: #9fb0c2; font-size: 15px; letter-spacing: 1px; margin: 2px 0 12px; text-transform: uppercase; }
+.accBtn { width: 100%; padding: 14px 0; border: 0; border-radius: 4px; background: linear-gradient(180deg, #5cc05a, #2f8a3a); color: #fff; font-family: inherit; box-shadow: 0 0 30px rgba(80,200,90,.35); animation: accGlow 1.2s infinite alternate; }
+.accBtn span { font-size: 36px; font-weight: 800; letter-spacing: 6px; }
+.accBtn:disabled { animation: none; filter: saturate(.4) brightness(.8); }
+@keyframes accGlow { to { box-shadow: 0 0 46px rgba(110,240,120,.6); } }
+.accSlots { display: flex; justify-content: center; gap: 6px; margin: 14px 0 4px; }
+.accSlots i { width: 28px; height: 28px; border-radius: 3px; background: #2a3442; border: 1px solid rgba(255,255,255,.12); transition: background .2s; }
+.accSlots i.ok { background: #4cd07a; box-shadow: 0 0 10px rgba(76,208,122,.6); }
+.accCount { color: #9fb0c2; font-size: 14px; }
+.accTimer { height: 4px; background: rgba(255,255,255,.08); margin-top: 10px; border-radius: 2px; overflow: hidden; } .accTimer i { display: block; height: 100%; width: 100%; background: #4cd07a; }
+#load { position: fixed; inset: 0; z-index: 44; color: #fff; font-family: "Barlow Condensed", system-ui, sans-serif; pointer-events: none; overflow: hidden; }
+#load.hidden { display: none; }
+#ldBg { position: absolute; inset: -20px; background-size: cover; background-position: center; filter: blur(10px) brightness(.5); background-color: #0b0f15; }
+.ldShade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(5,7,10,.85), rgba(5,7,10,.2) 45%, rgba(5,7,10,.2) 60%, rgba(5,7,10,.8)), linear-gradient(0deg, rgba(5,7,10,.95), transparent 35%); }
+.ldHead { position: absolute; left: calc(5% + env(safe-area-inset-left)); top: calc(8% + env(safe-area-inset-top)); text-shadow: 0 3px 12px rgba(0,0,0,.7); }
+.ldMode { font-size: 16px; letter-spacing: 4px; text-transform: uppercase; color: #ffd860; }
+.ldHead h1 { margin: 0; font-size: clamp(48px, 10vw, 110px); font-weight: 800; letter-spacing: 3px; line-height: .95; text-transform: uppercase; }
+.ldDesc { font-size: 17px; color: #c4cfdb; max-width: 46vw; }
+.ldRoster { position: absolute; right: calc(4% + env(safe-area-inset-right)); top: calc(8% + env(safe-area-inset-top)); display: flex; gap: 14px; }
+.ldCol { width: min(180px, 20vw); background: rgba(8,11,16,.6); border-top: 3px solid #9aa6b6; padding: 6px 8px; border-radius: 3px; }
+.ldCol.t { border-top-color: #e8a640; } .ldCol.ct { border-top-color: #5aa0ff; }
+.ldCol h5 { margin: 0 0 4px; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: #9fb0c2; }
+.ldP { display: flex; align-items: center; gap: 6px; font-size: 16px; padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ldP.me { color: #ffd860; font-weight: 800; }
+.ldFoot { position: absolute; left: calc(5% + env(safe-area-inset-left)); right: calc(5% + env(safe-area-inset-right)); bottom: calc(6% + env(safe-area-inset-bottom)); }
+.ldTip { font-size: 17px; color: #d6dee8; margin-bottom: 12px; max-width: 70%; } .ldTip b { color: #ffd860; letter-spacing: 2px; margin-right: 10px; }
+.ldRow { display: flex; justify-content: space-between; font-size: 15px; letter-spacing: 1px; color: #aab6c4; text-transform: uppercase; margin-bottom: 5px; }
+.ldProg { height: 6px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; } .ldProg i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #3a8cff, #7cf0ff); box-shadow: 0 0 12px #3a8cff; transition: width .15s; }
+@media (max-height: 460px) { .ldHead h1 { font-size: 54px; } .ldP { font-size: 13px; } .ldCol h5 { font-size: 11px; } .ldTip { font-size: 14px; margin-bottom: 6px; } .ldDesc { font-size: 14px; } }

@@ -155,6 +155,7 @@ export class Game {
     for (const a of this.actors) {
       const pistolRound = first || (this.round === half + 1);
       if (!a.alive || pistolRound) this.resetLoadout(a, pistolRound);
+      for (const sl of [1, 2]) { const w = a.weapons[sl]; if (w && WEAPONS[w.id] && WEAPONS[w.id].mag) { w.mag = WEAPONS[w.id].mag; w.reserve = WEAPONS[w.id].reserve; } }
       a.alive = true; a.hp = 100; a.blind = 0; a.plantT = 0; a.defuseT = 0; a.scope = 0; a.roundKills = 0; a.reloadT = 0; a.switchT = 0;
       a.vel.set(0, 0, 0); a.pos.copy(this.spawnPos(a.team, counts[a.team]++)); a.crouchK = 0;
       a.model.revive(); a.model.root.visible = a.bot;
@@ -217,7 +218,7 @@ export class Game {
     else if (slot === 5) { if (!a.hasBomb) return; inst = { id: 'c4', c4: true }; }
     else { inst = a.weapons[slot]; if (!inst) return; }
     if (a.slot !== slot) a.last = a.slot;
-    a.slot = slot; a.cur = inst; a.reloadT = 0; a.scope = 0; a.switchT = instant ? 0 : 0.45; a.recoilIdx = 0;
+    a.slot = slot; a.cur = inst; a.reloadT = 0; a.scope = 0; a.rescope = 0; this.inspectT = 0; a.switchT = instant ? 0 : 0.45; a.recoilIdx = 0;
     if (!instant && this.isView(a)) play('draw');
     const modelId = inst.nade || inst.c4 ? inst.id : (inst.model || inst.id);
     a.model.setWeapon(modelId, inst.skin);
@@ -315,7 +316,7 @@ export class Game {
     a.punch.y += def.recoil * (ri < 6 ? (Math.random() - 0.5) * 0.4 : Math.sin(ri * 0.55) * 0.9);
     a.punch.p = Math.min(a.punch.p, 0.22);
     a.recoilIdx += 1;
-    if (def.scope && a.scope) { a.scope = 0; a.rescope = def.rate * 0.95; }
+    if (def.scope && a.scope) { a.prevScope = a.scope; a.scope = 0; a.rescope = def.rate * 0.95; }
     // звук и вспышка
     const snd = soundFor(inst.id);
     if (this.isView(a)) { play(snd, 0, 0, a === this.player ? 1 : 0.8); this.vmKick = 1; this.flash.visible = !def.silenced; this.flashT = 0.05; this.flash.material.rotation = Math.random() * 6; }
@@ -716,6 +717,8 @@ export class Game {
       const def = p.cur && WEAPONS[p.cur.id];
       if (def && def.scope && p.switchT <= 0 && p.reloadT <= 0) p.scope = (p.scope + 1) % 3;
     }
+    if (c.edge('inspect') && !p.scope && p.reloadT <= 0) this.inspectT = 3.2;
+    if (p.in.fire || p.reloadT > 0) this.inspectT = 0;
     if (c.edge('bomb')) this.selectSlot(p, 5);
     if (c.edge('drop') && p.hasBomb) {
       p.hasBomb = false; const d = this.aimDir(p); this.dropBomb(new THREE.Vector3(p.pos.x + d.x * 1.5, 0, p.pos.z + d.z * 1.5));
@@ -802,7 +805,7 @@ export class Game {
   _weapons(a, dt) {
     if (!a.alive) return;
     a.fireCd -= dt; a.switchT = Math.max(0, a.switchT - dt); a.blind = Math.max(0, a.blind - dt);
-    if (a.rescope > 0) { a.rescope -= dt; if (a.rescope <= 0 && a === this.player) a.scope = 0; }
+    if (a.rescope > 0) { a.rescope -= dt; if (a.rescope <= 0 && a.cur && WEAPONS[a.cur.id] && WEAPONS[a.cur.id].scope && a.reloadT <= 0 && (a.cur.mag > 0)) a.scope = a.prevScope || 1; }
     const def = a.cur && WEAPONS[a.cur.id];
     if (a.reloadT > 0) {
       a.reloadT -= dt;
@@ -962,6 +965,16 @@ export class Game {
       const knifeT = view.cur && (view.cur.id === 'knife') ? this.vmKick : 0;
       this.vmGun.position.set(b.x + Math.sin(this.bobT) * 0.012 * bob, b.y - Math.abs(Math.cos(this.bobT)) * 0.012 * bob - reload * 0.12 - this.vmDraw * 0.25 - view.crouchK * 0.01, b.z + this.vmKick * 0.05 * (knifeT ? -1.5 : 1));
       this.vmGun.rotation.set(this.vmKick * 0.08 + reload * 0.7 - this.vmDraw * 0.6 - knifeT * 0.6, 0.05 + knifeT * 0.8, -reload * 0.3 + knifeT * 0.5);
+      // осмотр: поворачиваем оружие к себе, крутим и возвращаем
+      if (this.inspectT > 0 && view === p) {
+        this.inspectT = Math.max(0, this.inspectT - dt);
+        const u = 1 - this.inspectT / 3.2, e = Math.sin(Math.min(1, u * 4) * Math.PI / 2) * Math.sin(Math.min(1, (1 - u) * 4) * Math.PI / 2);
+        const ph = u < 0.5 ? 0 : (u - 0.5) * 2;
+        this.vmGun.rotation.y += e * (0.9 + Math.sin(ph * Math.PI) * 0.7);
+        this.vmGun.rotation.z += e * (0.5 - Math.sin(ph * Math.PI) * 1.1);
+        this.vmGun.rotation.x += e * 0.15;
+        this.vmGun.position.x -= e * 0.07; this.vmGun.position.y += e * 0.04; this.vmGun.position.z += e * 0.03;
+      }
       this.vmGun.updateMatrixWorld();
       if (this.flashT > 0) { this.flashT -= dt; const m = this.vmMuzzle.clone().applyMatrix4(this.vmGun.matrixWorld); this.flash.position.copy(m); } else this.flash.visible = false;
     }

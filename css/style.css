@@ -285,3 +285,5 @@ body.touch .bitem { padding: 4px; font-size: 11px; }
   .cs2 .tabs button { font-size: 15px; padding: 9px 10px; }
   .agentTag b { font-size: 22px; }
 }
+
+.tb.insp { right: calc(248px + var(--safe-r)); font-size: 14px; }

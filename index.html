@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>CFS Strike</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<!-- ===== Меню ===== -->
+<div id="menu" class="screen">
+  <header class="topbar">
+    <div class="logo">CFS<span>STRIKE</span></div>
+    <div class="coins" id="coins">0</div>
+  </header>
+  <nav class="tabs" id="tabs">
+    <button data-tab="play" class="on">Играть</button>
+    <button data-tab="cases">Кейсы</button>
+    <button data-tab="inv">Инвентарь</button>
+    <button data-tab="agents">Агенты</button>
+    <button data-tab="settings">Настройки</button>
+  </nav>
+  <main class="pages">
+    <section id="tab-play" class="page on">
+      <h2>Карта</h2>
+      <div class="maps" id="maps"></div>
+      <h2>Боты</h2>
+      <div class="pills" id="diffs"></div>
+      <p class="hint" id="diffDesc"></p>
+      <div class="row">
+        <div><h3>Сторона</h3><div class="pills" id="sides"></div></div>
+        <div><h3>Команды</h3><div class="pills" id="sizes"></div></div>
+        <div><h3>Матч</h3><div class="pills" id="lengths"></div></div>
+      </div>
+      <button class="big go" id="start">В бой</button>
+      <p class="hint">ПК: WASD, мышь, R — перезарядка, E — заложить/разминировать, B — закупка, 1-5 — оружие, Tab — счёт, Shift — шаг, Ctrl — присесть.</p>
+    </section>
+    <section id="tab-cases" class="page">
+      <div class="grid cases" id="caseList"></div>
+    </section>
+    <section id="tab-inv" class="page">
+      <div class="invtop"><span id="invCount"></span><select id="invSort"><option value="new">Сначала новые</option><option value="rar">По редкости</option><option value="w">По оружию</option></select></div>
+      <div class="grid items" id="invList"></div>
+    </section>
+    <section id="tab-agents" class="page">
+      <div class="agentsWrap">
+        <canvas id="agentView"></canvas>
+        <div>
+          <h3>Террористы</h3><div class="agentList" id="agentsT"></div>
+          <h3>Спецназ</h3><div class="agentList" id="agentsCT"></div>
+        </div>
+      </div>
+    </section>
+    <section id="tab-settings" class="page">
+      <div class="set" id="settingsBox"></div>
+      <div class="stats" id="statsBox"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== Кейс ===== -->
+<div id="caseScreen" class="screen hidden">
+  <header class="topbar"><button class="back" id="caseBack">‹ Назад</button><div class="title" id="caseTitle"></div><div class="coins" id="coins2"></div></header>
+  <div class="roller"><div class="strip" id="strip"></div><div class="needle"></div></div>
+  <div class="caseActions"><img id="caseImg" alt=""><button class="big go" id="openBtn">Открыть</button></div>
+  <h3 class="center">Содержимое кейса</h3>
+  <div class="grid items small" id="caseItems"></div>
+</div>
+<div id="drop" class="modal hidden">
+  <div class="dropCard" id="dropCard">
+    <div class="rar" id="dropRar"></div>
+    <img id="dropImg" alt="">
+    <div class="dname" id="dropName"></div>
+    <div class="btns"><button class="big go" id="dropKeep">Забрать</button><button class="big" id="dropSell"></button></div>
+  </div>
+</div>
+
+<!-- ===== HUD ===== -->
+<div id="hud" class="hidden">
+  <div id="cross"><i></i><i></i><i></i><i></i><b></b></div>
+  <div id="scope" class="hidden"></div>
+  <div id="flashOv"></div><div id="smokeOv"></div><div id="hurtOv"></div>
+  <canvas id="mini" width="170" height="170"></canvas>
+  <div id="topScore"><span class="t" id="scT">0</span><span id="timer">1:55</span><span class="ct" id="scCT">0</span><div id="alive"></div></div>
+  <div id="feed"></div>
+  <div id="center"></div>
+  <div id="hint"></div>
+  <div id="prog" class="hidden"><div id="progBar"></div><span id="progTxt"></span></div>
+  <div id="hp"><span class="ic">✚</span><b id="hpV">100</b><span class="ic sh">⛉</span><b id="arV">0</b></div>
+  <div id="money">$800</div>
+  <div id="ammo"><b id="mag">12</b><span id="res">/24</span><img id="wIcon" alt=""></div>
+  <div id="slots"></div>
+  <div id="hitm"></div>
+  <div id="spect" class="hidden"></div>
+  <div id="fps" class="hidden"></div>
+  <div id="board" class="hidden"></div>
+  <!-- сенсорное управление -->
+  <div id="touch" class="hidden">
+    <div id="joy"><div id="knob"></div></div>
+    <button class="tb fire" data-act="fire">✸</button>
+    <button class="tb fireL" data-act="fire">✸</button>
+    <button class="tb aim" data-act="aim">◎</button>
+    <button class="tb jump" data-act="jump">⤒</button>
+    <button class="tb crouch" data-act="crouch">⤓</button>
+    <button class="tb reload" data-act="reload">⟳</button>
+    <button class="tb use" data-act="use">E</button>
+    <button class="tb nade" data-act="nade">◍</button>
+    <button class="tb swap" data-act="swap">⇄</button>
+    <button class="tb mini buy" data-act="buy">$</button>
+    <button class="tb mini score" data-act="score">☰</button>
+    <button class="tb mini pause" data-act="pause">❚❚</button>
+  </div>
+</div>
+
+<!-- ===== Закупка ===== -->
+<div id="buy" class="modal hidden">
+  <div class="panel buyPanel">
+    <header><b>Закупка</b><span id="buyMoney"></span><button class="x" id="buyClose">✕</button></header>
+    <div id="buyBody"></div>
+  </div>
+</div>
+
+<!-- ===== Пауза ===== -->
+<div id="pause" class="modal hidden">
+  <div class="panel small">
+    <h2>Пауза</h2>
+    <button class="big go" id="resume">Продолжить</button>
+    <label class="slider">Чувствительность <input type="range" id="pSens" min="0.2" max="3" step="0.05"></label>
+    <button class="big" id="quit">Выйти в меню</button>
+  </div>
+</div>
+
+<!-- ===== Конец матча ===== -->
+<div id="over" class="modal hidden">
+  <div class="panel">
+    <h2 id="overTitle"></h2>
+    <div id="overBody"></div>
+    <button class="big go" id="overOk">В меню</button>
+  </div>
+</div>
+
+<div id="rotate" class="hidden"><div>⟳</div>Поверните телефон горизонтально</div>
+<div id="loading" class="hidden">Загрузка карты…</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

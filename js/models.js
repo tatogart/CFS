@@ -1,0 +1,257 @@
+// 3D-модели: агенты (человечки с IK-руками), оружие
+import * as THREE from '../vendor/three.module.min.js';
+import { patternCanvas, DEFAULT_PAT } from './art.js';
+import { skinById, WEAPONS } from './data.js';
+
+const matCache = new Map();
+export function mat(color, opts = {}) {
+  const key = color + JSON.stringify(opts);
+  if (!matCache.has(key)) matCache.set(key, new THREE.MeshLambertMaterial({ color, ...opts }));
+  return matCache.get(key);
+}
+const texCache = new Map();
+export function skinMaterial(skinId, fallback) {
+  const key = skinId || ('def:' + fallback);
+  if (texCache.has(key)) return texCache.get(key);
+  const pat = skinId && skinById[skinId] ? skinById[skinId].pat : DEFAULT_PAT[fallback] || DEFAULT_PAT.rifle;
+  const tex = new THREE.CanvasTexture(patternCanvas(pat, 256, 128));
+  tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const m = new THREE.MeshLambertMaterial({ map: tex });
+  texCache.set(key, m); return m;
+}
+
+const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+const geoCache = new Map();
+const G = (key, fn) => { if (!geoCache.has(key)) geoCache.set(key, fn()); return geoCache.get(key); };
+
+// ---------- ОРУЖИЕ ----------
+// Ствол смотрит в -Z, начало координат — рукоять (место правой руки).
+// Возвращает группу и точку для левой руки (foregrip) и дульного среза (muzzle)
+const W3D = {
+  ak47: { parts: [[0, 0.03, -0.12, 0.05, 0.075, 0.36, 'b'], [0, 0.02, 0.2, 0.045, 0.07, 0.26, 'w'], [0, 0.035, -0.4, 0.05, 0.06, 0.2, 'w'], [0, 0.04, -0.66, 0.018, 0.018, 0.34, 'd'], [0, 0.085, -0.38, 0.016, 0.016, 0.22, 'd'], [0, 0.085, -0.72, 0.01, 0.04, 0.01, 'd'], [0, -0.06, -0.12, 0.035, 0.14, 0.07, 'b', -0.35], [0, -0.05, 0.01, 0.035, 0.1, 0.045, 'd', 0.25]], fore: [0, -0.01, -0.4], muzzle: [0, 0.04, -0.84] },
+  galil: { parts: [[0, 0.03, -0.12, 0.05, 0.075, 0.36, 'b'], [0, 0.02, 0.19, 0.03, 0.05, 0.24, 'd'], [0, 0.035, -0.42, 0.05, 0.06, 0.22, 'b'], [0, 0.04, -0.68, 0.018, 0.018, 0.32, 'd'], [0, -0.06, -0.12, 0.035, 0.15, 0.07, 'b', -0.3], [0, -0.05, 0.01, 0.035, 0.1, 0.045, 'd', 0.25]], fore: [0, -0.01, -0.42], muzzle: [0, 0.04, -0.85] },
+  m4a4: { parts: [[0, 0.03, -0.1, 0.05, 0.08, 0.34, 'b'], [0, 0.02, 0.22, 0.045, 0.08, 0.2, 'b'], [0, 0.03, 0.08, 0.025, 0.025, 0.12, 'd'], [0, 0.085, -0.1, 0.03, 0.02, 0.3, 'd'], [0, 0.035, -0.38, 0.055, 0.06, 0.24, 'b'], [0, 0.035, -0.64, 0.018, 0.018, 0.3, 'd'], [0, 0.085, -0.5, 0.012, 0.05, 0.012, 'd'], [0, -0.07, -0.1, 0.035, 0.15, 0.06, 'b', -0.12], [0, -0.05, 0.01, 0.035, 0.1, 0.045, 'd', 0.25]], fore: [0, -0.01, -0.38], muzzle: [0, 0.035, -0.8] },
+  famas: { parts: [[0, 0.03, -0.1, 0.055, 0.09, 0.62, 'b'], [0, 0.1, -0.12, 0.02, 0.02, 0.44, 'd'], [0, 0.08, 0.06, 0.02, 0.04, 0.02, 'd'], [0, 0.08, -0.3, 0.02, 0.04, 0.02, 'd'], [0, 0.03, -0.52, 0.018, 0.018, 0.22, 'd'], [0, -0.05, 0.12, 0.035, 0.1, 0.06, 'b'], [0, -0.05, 0.0, 0.035, 0.1, 0.045, 'd', 0.2]], fore: [0, -0.01, -0.3], muzzle: [0, 0.03, -0.64] },
+  awp: { parts: [[0, 0.03, -0.08, 0.055, 0.08, 0.36, 'b'], [0, 0.02, 0.26, 0.05, 0.1, 0.3, 'b'], [0, 0.04, -0.66, 0.02, 0.02, 0.62, 'd'], [0, 0.11, -0.1, 0.035, 0.035, 0.3, 'd', 0, 'cyl'], [0, 0.11, -0.28, 0.05, 0.05, 0.06, 'd', 0, 'cyl'], [0, 0.11, 0.06, 0.045, 0.045, 0.05, 'd', 0, 'cyl'], [0, -0.04, -0.08, 0.04, 0.09, 0.08, 'b'], [0, -0.05, 0.03, 0.035, 0.1, 0.045, 'd', 0.25]], fore: [0, -0.01, -0.36], muzzle: [0, 0.04, -0.98] },
+  mp9: { parts: [[0, 0.03, -0.06, 0.05, 0.08, 0.3, 'b'], [0, 0.03, -0.26, 0.022, 0.022, 0.14, 'd'], [0, -0.04, -0.17, 0.025, 0.08, 0.025, 'd'], [0, -0.08, -0.02, 0.03, 0.15, 0.045, 'b'], [0, 0.05, 0.16, 0.02, 0.02, 0.16, 'd']], fore: [0, -0.06, -0.17], muzzle: [0, 0.03, -0.34] },
+  mac10: { parts: [[0, 0.03, -0.05, 0.055, 0.09, 0.26, 'b'], [0, 0.03, -0.24, 0.022, 0.022, 0.14, 'd'], [0, -0.08, 0.0, 0.035, 0.16, 0.05, 'b']], fore: [0, 0.0, -0.2], muzzle: [0, 0.03, -0.32] },
+  glock: { parts: [[0, 0.06, -0.06, 0.03, 0.04, 0.19, 'b'], [0, 0.03, -0.06, 0.028, 0.025, 0.17, 'd'], [0, -0.03, 0, 0.03, 0.11, 0.05, 'b', 0.25]], fore: [0, -0.03, 0.02], muzzle: [0, 0.06, -0.16] },
+  usp: { parts: [[0, 0.06, -0.06, 0.03, 0.04, 0.19, 'b'], [0, 0.06, -0.24, 0.032, 0.032, 0.17, 'd', 0, 'cyl'], [0, 0.03, -0.06, 0.028, 0.025, 0.17, 'd'], [0, -0.03, 0, 0.03, 0.11, 0.05, 'b', 0.25]], fore: [0, -0.03, 0.02], muzzle: [0, 0.06, -0.33] },
+  deagle: { parts: [[0, 0.065, -0.07, 0.035, 0.05, 0.24, 'b'], [0, 0.03, -0.07, 0.032, 0.03, 0.2, 'd'], [0, -0.035, 0, 0.034, 0.12, 0.055, 'b', 0.25]], fore: [0, -0.03, 0.02], muzzle: [0, 0.065, -0.2] },
+  knife: { parts: [[0, 0.0, 0.03, 0.03, 0.03, 0.11, 'd'], [0, 0.0, -0.03, 0.05, 0.04, 0.012, 'd'], [0, 0.005, -0.12, 0.006, 0.035, 0.17, 'b']], fore: [0, -0.05, 0.1], muzzle: [0, 0, -0.2] },
+  he: { parts: [[0, 0.03, -0.03, 0.07, 0.07, 0.07, 'b', 0, 'sph']], fore: [0, -0.05, 0.1], muzzle: [0, 0, -0.05] },
+  flash: { parts: [[0, 0.03, -0.03, 0.05, 0.11, 0.05, 'b', 0, 'cylv']], fore: [0, -0.05, 0.1], muzzle: [0, 0, -0.05] },
+  smoke: { parts: [[0, 0.03, -0.03, 0.055, 0.11, 0.055, 'b', 0, 'cylv']], fore: [0, -0.05, 0.1], muzzle: [0, 0, -0.05] },
+  molotov: { parts: [[0, 0.02, -0.03, 0.06, 0.1, 0.06, 'b', 0, 'cylv'], [0, 0.1, -0.03, 0.025, 0.07, 0.025, 'b', 0, 'cylv']], fore: [0, -0.05, 0.1], muzzle: [0, 0, -0.05] },
+  c4: { parts: [[0, 0.02, -0.05, 0.12, 0.06, 0.18, 'b']], fore: [0, -0.03, -0.1], muzzle: [0, 0, -0.1] },
+};
+W3D.karambit = W3D.knife; W3D.butterfly = W3D.knife; W3D.bayonet = W3D.knife;
+const NADE_COLORS = { he: '#3d5a2a', flash: '#9aa0a6', smoke: '#5d6b74', molotov: '#4a7a3a', c4: '#6b5a3a' };
+
+export function buildWeapon(id, skinId) {
+  const def = W3D[id] || W3D.knife;
+  const grp = new THREE.Group();
+  const isKnife = id === 'knife' || id === 'karambit' || id === 'butterfly' || id === 'bayonet';
+  const bodyMat = NADE_COLORS[id] ? mat(NADE_COLORS[id]) : skinMaterial(skinId, isKnife ? 'knife' : 'rifle');
+  const woodMat = skinId ? bodyMat : (id === 'ak47' ? skinMaterial(null, 'wood') : bodyMat);
+  const dark = mat('#1d1f22');
+  for (const p of def.parts) {
+    const [x, y, z, w, h, d, k, rot = 0, shape] = p;
+    let geo;
+    if (shape === 'cyl') { geo = G('cyl' + w + d, () => new THREE.CylinderGeometry(w / 2, w / 2, d, 10).rotateX(Math.PI / 2)); }
+    else if (shape === 'cylv') { geo = G('cylv' + w + h, () => new THREE.CylinderGeometry(w / 2, w / 2, h, 10)); }
+    else if (shape === 'sph') { geo = G('sph' + w, () => new THREE.SphereGeometry(w / 2, 10, 8)); }
+    else geo = G(`b${w}_${h}_${d}`, () => box(w, h, d));
+    const m = new THREE.Mesh(geo, k === 'd' ? dark : k === 'w' ? woodMat : bodyMat);
+    m.position.set(x, y, z); m.rotation.x = rot; grp.add(m);
+  }
+  if (id === 'karambit') { grp.children[2].rotation.x = -0.6; grp.children[2].position.y = 0.04; }
+  grp.userData.fore = new THREE.Vector3(...def.fore);
+  grp.userData.muzzle = new THREE.Vector3(...def.muzzle);
+  return grp;
+}
+
+// ---------- АГЕНТЫ ----------
+const UPPER = 0.29, LOWER = 0.28, THIGH = 0.44, SHIN = 0.44;
+function capsule(r, len, m) {
+  const g = G(`cap${r}_${len}`, () => new THREE.CapsuleGeometry(r, len, 4, 8));
+  return new THREE.Mesh(g, m);
+}
+function addHeadgear(head, kind, c) {
+  const S = (r, col, sx = 1, sy = 1, sz = 1, part = 1) => { const m = new THREE.Mesh(G(`hs${r}${part}`, () => new THREE.SphereGeometry(r, 14, 10, 0, Math.PI * 2, 0, Math.PI * part)), mat(col)); m.scale.set(sx, sy, sz); head.add(m); return m; };
+  const B = (w, h, d, col, x, y, z) => { const m = new THREE.Mesh(G(`b${w}_${h}_${d}`, () => box(w, h, d)), mat(col)); m.position.set(x, y, z); head.add(m); return m; };
+  const eyes = () => { B(0.03, 0.018, 0.01, '#111', -0.04, 0.02, -0.108); B(0.03, 0.018, 0.01, '#111', 0.04, 0.02, -0.108); };
+  switch (kind) {
+    case 'balaclava': S(0.122, c.head, 0.95, 1.08, 1); B(0.12, 0.035, 0.02, c.skin, 0, 0.02, -0.11); eyes(); break;
+    case 'bandana': eyes(); S(0.124, c.head, 0.96, 1.0, 1, 0.42); B(0.2, 0.09, 0.05, c.head, 0, -0.06, -0.09); break;
+    case 'cap': eyes(); S(0.125, c.head, 0.97, 1, 1, 0.45); B(0.16, 0.012, 0.1, c.head, 0, 0.03, -0.14); B(0.13, 0.04, 0.02, '#2a1a10', 0, -0.07, -0.105); break;
+    case 'beanie': eyes(); S(0.126, c.head, 0.97, 1.12, 1, 0.5); B(0.2, 0.03, 0.2, c.accent, 0, 0.045, 0).visible = false; break;
+    case 'gasmask': {
+      S(0.122, c.head, 0.96, 1.06, 1);
+      const mk = new THREE.Mesh(G('gm', () => new THREE.CylinderGeometry(0.05, 0.065, 0.08, 10).rotateX(Math.PI / 2)), mat('#222'));
+      mk.position.set(0, -0.05, -0.12); head.add(mk);
+      for (const sx of [-1, 1]) {
+        const f = new THREE.Mesh(G('gf', () => new THREE.CylinderGeometry(0.03, 0.03, 0.05, 10)), mat(c.accent));
+        f.position.set(sx * 0.07, -0.07, -0.1); f.rotation.z = sx * 1.1; head.add(f);
+        const l = new THREE.Mesh(G('gl', () => new THREE.CylinderGeometry(0.03, 0.03, 0.02, 12).rotateX(Math.PI / 2)), mat('#4a6070', { emissive: '#0a1218' }));
+        l.position.set(sx * 0.045, 0.025, -0.115); head.add(l);
+      }
+      break;
+    }
+    case 'helmet': eyes(); S(0.142, c.head, 1, 0.92, 1.05, 0.5).position.y = 0.02; B(0.18, 0.01, 0.03, '#111', 0, 0.06, -0.135); B(0.13, 0.04, 0.02, '#111', 0, -0.06, -0.105); break;
+    case 'visor': S(0.142, c.head, 1, 0.92, 1.05, 0.5).position.y = 0.02; B(0.2, 0.11, 0.015, '#1b2a3a', 0, -0.01, -0.135).material = mat('#203245', { transparent: true, opacity: 0.85 }); break;
+    case 'goggles': S(0.142, c.head, 1, 0.92, 1.05, 0.5).position.y = 0.02; B(0.17, 0.045, 0.03, '#111', 0, 0.03, -0.12); B(0.05, 0.03, 0.01, '#3a7aa0', -0.04, 0.03, -0.136); B(0.05, 0.03, 0.01, '#3a7aa0', 0.04, 0.03, -0.136); for (const sx of [-1, 1]) B(0.03, 0.07, 0.06, c.accent, sx * 0.13, -0.01, 0); break;
+    default: eyes();
+  }
+}
+
+export class AgentModel {
+  constructor(agent, weaponId = 'ak47', skinId = null) {
+    const c = agent.c;
+    this.c = c;
+    const root = this.root = new THREE.Group();
+    const hips = this.hips = new THREE.Group(); hips.position.y = 0.95; root.add(hips);
+    const pants = mat(c.pants), shirt = mat(c.shirt), vest = mat(c.vest), skinM = mat(c.skin), glove = mat(c.glove), boots = mat(c.boots);
+    const pelvis = new THREE.Mesh(G('pelvis', () => box(0.34, 0.18, 0.22)), pants); pelvis.position.y = 0.0; hips.add(pelvis);
+    const belt = new THREE.Mesh(G('belt', () => box(0.35, 0.04, 0.23)), mat('#1a1a1a')); belt.position.y = 0.08; hips.add(belt);
+    // торс
+    const torso = this.torso = new THREE.Group(); torso.position.y = 0.08; hips.add(torso);
+    const chest = new THREE.Mesh(G('chest', () => new THREE.CylinderGeometry(0.2, 0.17, 0.5, 10).scale(1, 1, 0.62)), shirt); chest.position.y = 0.27; torso.add(chest);
+    const vestM = new THREE.Mesh(G('vest', () => box(0.4, 0.38, 0.27)), vest); vestM.position.set(0, 0.29, 0); torso.add(vestM);
+    for (let i = -1; i <= 1; i++) { const p = new THREE.Mesh(G('pouch', () => box(0.09, 0.1, 0.05)), mat(c.vest)); p.position.set(i * 0.11, 0.18, -0.155); torso.add(p); const t = new THREE.Mesh(G('ptop', () => box(0.092, 0.025, 0.052)), mat(c.accent)); t.position.set(i * 0.11, 0.235, -0.156); torso.add(t); }
+    const shoulderPad = G('spad', () => new THREE.SphereGeometry(0.075, 10, 8));
+    for (const sx of [-1, 1]) { const s = new THREE.Mesh(shoulderPad, shirt); s.position.set(sx * 0.21, 0.47, 0); s.scale.set(1, 0.85, 1); torso.add(s); }
+    const neck = new THREE.Mesh(G('neck', () => new THREE.CylinderGeometry(0.055, 0.06, 0.1, 8)), skinM); neck.position.y = 0.56; torso.add(neck);
+    const head = this.head = new THREE.Group(); head.position.y = 0.69; torso.add(head);
+    const headM = new THREE.Mesh(G('head', () => new THREE.SphereGeometry(0.115, 16, 12)), skinM); headM.scale.set(0.92, 1.06, 1); head.add(headM);
+    const nose = new THREE.Mesh(G('nose', () => box(0.025, 0.035, 0.03)), skinM); nose.position.set(0, -0.005, -0.112); head.add(nose);
+    addHeadgear(head, agent.head, c);
+    // руки (IK): сегменты в пространстве торса
+    this.arms = [];
+    for (const sx of [-1, 1]) {
+      const up = capsule(0.052, UPPER - 0.1, shirt), lo = capsule(0.046, LOWER - 0.09, shirt);
+      const hand = new THREE.Mesh(G('hand', () => box(0.07, 0.085, 0.09)), glove);
+      const elbow = new THREE.Mesh(G('elb', () => new THREE.SphereGeometry(0.05, 8, 6)), shirt);
+      torso.add(up, lo, hand, elbow);
+      this.arms.push({ sx, up, lo, hand, elbow, shoulder: new THREE.Vector3(sx * 0.22, 0.45, 0) });
+    }
+    // ноги (FK)
+    this.legs = [];
+    for (const sx of [-1, 1]) {
+      const hip = new THREE.Group(); hip.position.set(sx * 0.1, -0.03, 0); hips.add(hip);
+      const thigh = capsule(0.075, THIGH - 0.15, pants); thigh.position.y = -THIGH / 2; hip.add(thigh);
+      const knee = new THREE.Group(); knee.position.y = -THIGH; hip.add(knee);
+      const pad = new THREE.Mesh(G('kpad', () => box(0.1, 0.1, 0.05)), mat(c.vest)); pad.position.set(0, 0, -0.06); knee.add(pad);
+      const shin = capsule(0.062, SHIN - 0.12, pants); shin.position.y = -SHIN / 2; knee.add(shin);
+      const boot = new THREE.Mesh(G('boot', () => box(0.11, 0.09, 0.25)), boots); boot.position.set(0, -SHIN - 0.02, -0.04); knee.add(boot);
+      this.legs.push({ hip, knee });
+    }
+    // оружие в руках
+    this.gunHolder = new THREE.Group(); this.gunHolder.position.set(0.12, 0.33, -0.3); torso.add(this.gunHolder);
+    this.setWeapon(weaponId, skinId);
+    this.phase = 0; this.dead = false; this.deathT = 0;
+    root.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
+    this._v = new THREE.Vector3(); this._q = new THREE.Quaternion();
+  }
+  setWeapon(id, skinId) {
+    if (this.gunId === id && this.gunSkin === skinId) return;
+    this.gunId = id; this.gunSkin = skinId;
+    if (this.gun) this.gunHolder.remove(this.gun);
+    this.gun = buildWeapon(id, skinId); this.gun.scale.setScalar(1.05);
+    this.gunHolder.add(this.gun);
+    const t = WEAPONS[id] ? WEAPONS[id].type : 'nade';
+    this.oneHand = t === 'knife' || t === 'nade' || !WEAPONS[id];
+    this.pistol = t === 'pistol';
+    this.gun.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  }
+  // сегмент между двумя точками
+  _seg(mesh, a, b) {
+    mesh.position.copy(a).add(b).multiplyScalar(0.5);
+    this._v.copy(b).sub(a).normalize();
+    mesh.quaternion.setFromUnitVectors(UPV, this._v);
+  }
+  _solveArm(arm, target) {
+    const s = arm.shoulder, d = tmp1.copy(target).sub(s);
+    let len = d.length(); const maxL = UPPER + LOWER - 0.005;
+    if (len > maxL) { d.multiplyScalar(maxL / len); len = maxL; target = tmp2.copy(s).add(d); }
+    const a = (UPPER * UPPER - LOWER * LOWER + len * len) / (2 * len);
+    const h = Math.sqrt(Math.max(0, UPPER * UPPER - a * a));
+    const dir = d.normalize();
+    const pole = tmp3.set(arm.sx * 0.8, -1, 0.2).normalize();
+    pole.sub(tmp4.copy(dir).multiplyScalar(pole.dot(dir))).normalize();
+    const elbow = tmp4.copy(s).addScaledVector(dir, a).addScaledVector(pole, h);
+    this._seg(arm.up, s, elbow); this._seg(arm.lo, elbow, target);
+    arm.elbow.position.copy(elbow);
+    arm.hand.position.copy(target); arm.hand.quaternion.copy(arm.lo.quaternion);
+  }
+  // st: {speed, crouch, pitch, dt, airborne, firing}
+  update(st) {
+    const dt = st.dt;
+    if (this.dead) {
+      this.deathT = Math.min(1, this.deathT + dt * 2.6);
+      const e = 1 - Math.pow(1 - this.deathT, 3);
+      this.hips.rotation.x = e * this.fallDir * 1.45;
+      this.hips.position.y = 0.95 - e * 0.78;
+      this.legs.forEach((l, i) => { l.hip.rotation.x = e * 0.3 * this.fallDir; l.knee.rotation.x = -e * 0.4; });
+      this.torso.rotation.x = 0;
+      return;
+    }
+    const sp = Math.min(1, st.speed / 5.5);
+    this.phase += dt * (3 + st.speed * 1.5);
+    const crouch = st.crouch ? 1 : 0;
+    this.crouchK = (this.crouchK || 0) + (crouch - (this.crouchK || 0)) * Math.min(1, dt * 10);
+    const ck = this.crouchK;
+    const sw = Math.sin(this.phase) * 0.62 * sp * (1 - ck * 0.5);
+    this.hips.position.y = 0.95 - ck * 0.36 + Math.abs(Math.cos(this.phase)) * 0.03 * sp;
+    for (let i = 0; i < 2; i++) {
+      const l = this.legs[i], s = i ? -sw : sw;
+      l.hip.rotation.x = ck * 1.25 + s;
+      const bend = Math.max(0, Math.sin(this.phase + (i ? Math.PI : 0) + 0.9)) * 0.9 * sp;
+      l.knee.rotation.x = -(ck * 1.9 + bend);
+    }
+    if (st.airborne) { this.legs[0].hip.rotation.x = 0.6; this.legs[1].hip.rotation.x = 0.2; this.legs[0].knee.rotation.x = -1.0; this.legs[1].knee.rotation.x = -0.6; }
+    this.torso.rotation.x = -ck * 0.15;
+    this.torso.rotation.y = Math.sin(this.phase) * 0.06 * sp;
+    // прицеливание: наклоняем держатель оружия и голову
+    const p = THREE.MathUtils.clamp(st.pitch, -1.2, 1.2);
+    this.head.rotation.x = p * 0.6;
+    const kick = st.firing ? 0.03 : 0;
+    this.gunHolder.rotation.x = p;
+    if (this.oneHand) this.gunHolder.position.set(0.16, 0.3, -0.26 + kick);
+    else if (this.pistol) this.gunHolder.position.set(0.02, 0.4, -0.42 + kick);
+    else this.gunHolder.position.set(0.11, 0.38, -0.26 + kick);
+    this.gunHolder.updateMatrix();
+    // правая рука — на рукоять, левая — на цевьё
+    const grip = tmp5.set(0, -0.02, 0).applyMatrix4(this.gunHolder.matrix);
+    this._solveArm(this.arms[1], grip);
+    if (this.oneHand) {
+      const free = tmp6.set(-0.2, 0.18 + Math.sin(this.phase) * 0.04 * sp, -0.12);
+      this._solveArm(this.arms[0], free);
+    } else {
+      const fore = tmp6.copy(this.gun.userData.fore).multiplyScalar(1.05).applyMatrix4(this.gunHolder.matrix);
+      if (this.pistol) fore.x -= 0.03;
+      this._solveArm(this.arms[0], fore);
+    }
+  }
+  kill(dir = 1) { this.dead = true; this.deathT = 0; this.fallDir = dir; }
+  revive() { this.dead = false; this.hips.rotation.set(0, 0, 0); this.hips.position.y = 0.95; this.crouchK = 0; }
+}
+const UPV = new THREE.Vector3(0, 1, 0);
+const tmp1 = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Vector3(), tmp4 = new THREE.Vector3(), tmp5 = new THREE.Vector3(), tmp6 = new THREE.Vector3();
+
+// Руки от первого лица
+export function buildViewArms(agent) {
+  const c = agent.c, grp = new THREE.Group();
+  const sleeve = mat(c.shirt), glove = mat(c.glove);
+  const mkArm = sx => {
+    const g = new THREE.Group();
+    const fore = new THREE.Mesh(G('vfore', () => new THREE.CylinderGeometry(0.035, 0.042, 0.34, 10).rotateX(Math.PI / 2)), sleeve);
+    fore.position.z = 0.17; g.add(fore);
+    const cuff = new THREE.Mesh(G('vcuff', () => new THREE.CylinderGeometry(0.044, 0.044, 0.04, 10).rotateX(Math.PI / 2)), mat(c.accent)); cuff.position.z = 0.02; g.add(cuff);
+    const hand = new THREE.Mesh(G('vhand', () => box(0.06, 0.07, 0.09)), glove); hand.position.z = -0.03; g.add(hand);
+    return g;
+  };
+  grp.userData.right = mkArm(1); grp.userData.left = mkArm(-1);
+  grp.add(grp.userData.right, grp.userData.left);
+  return grp;
+}

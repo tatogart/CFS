@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793131168';
-import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793131168';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793131168';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793131168';
-import { AgentModel } from './models.js?v=1793131168';
-import { Controls, isTouch } from './controls.js?v=1793131168';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793131168';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793131168';
-import { styleOf } from './decor.js?v=1793131168';
-import { Game } from './game.js?v=1793131168';
+import { MAPS, CELL } from './maps.js?v=1793131253';
+import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793131253';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793131253';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793131253';
+import { AgentModel } from './models.js?v=1793131253';
+import { Controls, isTouch } from './controls.js?v=1793131253';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793131253';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793131253';
+import { styleOf } from './decor.js?v=1793131253';
+import { Game } from './game.js?v=1793131253';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -707,8 +707,10 @@ function updateHud(g, dt) {
 function renderBoard(g) {
   if (g.ar) { const lv = a => a.arLvl || 0; $('board').innerHTML = `<h4>${esc(g.o.map.name)} · гонка вооружений · T ${g.score.T} : ${g.score.CT} CT</h4><table><tr><th>Игрок</th><th>Ур.</th><th>У</th><th>С</th></tr>${g.actors.slice().sort((a, b) => lv(b) - lv(a) || b.kills - a.kills).map(a => `<tr class="${a.alive ? '' : 'dead'} ${a === g.player ? 'me' : ''}" style="color:${a.team === 'T' ? '#e8b04a' : '#6aa8ff'}"><td>${esc(a.name)}</td><td>${lv(a) + 1} <img class="arNext" src="${weaponIconURL(AR_LADDER[Math.min(lv(a), AR_LADDER.length - 1)], null, 96, 36)}" alt=""></td><td>${a.kills}</td><td>${a.deaths}</td></tr>`).join('')}</table>`; return; }
   if (g.dm) { $('board').innerHTML = `<h4>${esc(g.o.map.name)} · бой насмерть</h4><table><tr><th>Игрок</th><th>У</th><th>С</th></tr>${g.actors.slice().sort((a, b) => b.kills - a.kills).map(a => `<tr class="${a.alive ? '' : 'dead'} ${a === g.player ? 'me' : ''}"><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td></tr>`).join('')}</table>`; return; }
-  const rows = team => g.actors.filter(a => a.team === team).sort((a, b) => b.kills - a.kills).map(a => `<tr class="${team === 'T' ? 't' : 'ct'} ${a.alive ? '' : 'dead'} ${a === g.player ? 'me' : ''}"><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td><td>$${a.money}</td></tr>`).join('');
-  $('board').innerHTML = `<h4>${esc(g.o.map.name)} · раунд ${g.round}</h4><table><tr><th>Террористы — ${g.score.T}</th><th>У</th><th>С</th><th>$</th></tr>${rows('T')}<tr><th>Спецназ — ${g.score.CT}</th><th></th><th></th><th></th></tr>${rows('CT')}</table>`;
+  const rounds = Math.max(1, g.round - (g.state === 'end' ? 0 : 1)), p = g.player;
+  const rows = team => g.actors.filter(a => a.team === team).sort((a, b) => b.kills - a.kills || (b.dmgTotal || 0) - (a.dmgTotal || 0)).map(a => `<tr class="${team === 'T' ? 't' : 'ct'} ${a.alive ? '' : 'dead'} ${a === p ? 'me' : ''}"><td>${a.bot ? '<span class="bt">BOT</span> ' : ''}${esc(a.name)}</td><td class="mny">${a.team === p.team ? '$' + a.money : ''}</td><td>${a.kills}</td><td>${a.assists || 0}</td><td>${a.deaths}</td><td>${a.mvps ? '★' + (a.mvps > 1 ? a.mvps : '') : ''}</td><td>${a.kills ? Math.round((a.hs || 0) / a.kills * 100) : 0}%</td><td>${Math.round((a.dmgTotal || 0) / rounds)}</td></tr>`).join('');
+  const head = (name, sc, cls) => `<tr class="bh ${cls}"><th>${name} <b>${sc}</b></th><th></th><th>У</th><th>П</th><th>С</th><th>★</th><th>ГОЛ</th><th>ADR</th></tr>`;
+  $('board').innerHTML = `<h4>${esc(g.o.map.name)} · ${esc((MODES.find(m => m[0] === g.mode) || [])[1] || '')} · раунд ${g.round}</h4><table>${head('Спецназ', g.score.CT, 'ct')}${rows('CT')}${head('Террористы', g.score.T, 't')}${rows('T')}</table>`;
 }
 function drawMini(g) {
   const cv = $('mini'), c = cv.getContext('2d'), W = cv.width, w = g.world, sc = W / (w.w * CELL);

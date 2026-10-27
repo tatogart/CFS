@@ -1,5 +1,5 @@
 // Процедурная графика: узоры скинов, миниатюры оружия, кейсов и карт
-import { skinById, WEAPONS, KNIVES, GLOVES } from './data.js?v=1793131168';
+import { skinById, WEAPONS, KNIVES, GLOVES } from './data.js?v=1793131253';
 
 export function rng(seed) {
   let a = seed >>> 0;

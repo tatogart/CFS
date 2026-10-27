@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793131168';
-import { World } from './world.js?v=1793131168';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793131168';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793131168';
-import { play, soundFor } from './sfx.js?v=1793131168';
-import { Bot, planRound } from './bots.js?v=1793131168';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793131168';
+import { CELL } from './maps.js?v=1793131253';
+import { World } from './world.js?v=1793131253';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793131253';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793131253';
+import { play, soundFor } from './sfx.js?v=1793131253';
+import { Bot, planRound } from './bots.js?v=1793131253';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793131253';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -234,7 +234,7 @@ export class Game {
       if (this.practice) { a.money = 16000; }
       if (a.target) { this.give(a, a.team === 'T' ? 'ak47' : 'm4a4'); this.selectSlot(a, 1, true); this.aimRespawn(a); }
       if (this.aimMode && a === this.player && !a.weapons[1]) { this.give(a, a.team === 'T' ? 'ak47' : 'm4a4'); this.selectSlot(a, 1, true); }
-      a.hasBomb = false; a.lastAttacker = null;
+      a.hasBomb = false; a.lastAttacker = null; a.dmgBy = null;
       if (this.dm) this.dmLoadout(a);
       if (!this.ar) this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
     }
@@ -512,6 +512,8 @@ export class Game {
       const e = this.dmgLog[key] || (this.dmgLog[key] = { who, mine, dmg: 0, hits: 0 });
       e.dmg += Math.min(Math.max(0, v.hp), dmg); e.hits++;
     }
+    // статистика матча: урон (для ADR) и кто помогал в убийстве
+    if (a && a !== v && this.isEnemy(a, v)) { const real = Math.min(Math.max(0, v.hp), dmg); a.dmgTotal = (a.dmgTotal || 0) + real; (v.dmgBy || (v.dmgBy = {}))[a.id] = (v.dmgBy[a.id] || 0) + real; }
     if (v.bot && v.hp > 25 && v.hp - dmg <= 25 && v.hp - dmg > 0) this.radio(v, 'hurt');
     v.hp -= dmg; v.lastHurt = this.time; v.lastAttacker = a;
     if (v.brain) v.brain.onHurt(a, dir);
@@ -530,6 +532,7 @@ export class Game {
     v.model.root.visible = true;
     if (v === this.player) { this.vm.visible = false; }
     if (a && a !== v) {
+      if (v.dmgBy) for (const id in v.dmgBy) { const h = this.actors[id]; if (h && h !== a && v.dmgBy[id] >= 41 && this.isEnemy(h, v)) h.assists = (h.assists || 0) + 1; }
       if (this.isEnemy(a, v)) { a.kills++; a.roundKills++; if (hs) a.hs = (a.hs || 0) + 1; a.money = Math.min(16000, a.money + (def.kill || 300)); if (this.ar) this.arKill(a, v, def); }
       if (a === this.player && this.ui.onKill) this.ui.onKill(hs);
       if (a === this.player && this.aimMode) { this.aimStats.kills++; if (hs) this.aimStats.hs++; }
@@ -898,7 +901,7 @@ export class Game {
     }
   }
   dmRespawn(a) {
-    a.respT = 0; a.alive = true; a.hp = 100; a.lastAttacker = null; a.blind = 0; a.vel.set(0, 0, 0); a.crouchK = 0; a.scope = 0; a.reloadT = 0;
+    a.respT = 0; a.alive = true; a.hp = 100; a.lastAttacker = null; a.dmgBy = null; a.blind = 0; a.vel.set(0, 0, 0); a.crouchK = 0; a.scope = 0; a.reloadT = 0;
     a.pos.copy(this.dmSpawnPos(a)); a.model.revive(); a.model.root.visible = a !== this.player;
     this.dmLoadout(a); if (!this.ar) this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
     if (a === this.player) { this.vm.visible = true; this.spect = null; this.dmgLog = {}; }

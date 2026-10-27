@@ -477,3 +477,9 @@ body.touch #chat { bottom: calc(150px + var(--safe-b)); left: calc(180px + var(-
 .dWear { display: block; font-size: 13px; color: #9fb0c2; font-weight: 500; margin-top: 4px; }
 #inspInfo { position: absolute; left: 50%; bottom: calc(14% + var(--safe-b)); transform: translateX(-50%); text-align: center; background: rgba(8,11,16,.7); padding: 6px 14px; border-radius: 3px; border-bottom: 2px solid var(--rc, #4b69ff); pointer-events: none; font-family: "Barlow Condensed", system-ui, sans-serif; transition: opacity .3s; }
 #inspInfo b { font-size: 20px; display: block; } #inspInfo small { color: #9fb0c2; font-size: 13px; letter-spacing: .5px; }
+
+#board tr.bh th { padding-top: 8px; font-size: 11px; color: #9fb0c2; letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,.1); }
+#board tr.bh th:first-child { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; } #board tr.bh.t th:first-child { color: var(--t); } #board tr.bh.ct th:first-child { color: var(--ct); }
+#board tr.bh b { font-size: 20px; margin-left: 6px; }
+#board .bt { font-size: 9px; background: rgba(255,255,255,.12); padding: 1px 4px; border-radius: 3px; color: #9fb0c2; vertical-align: middle; }
+#board td.mny { color: #7cd86a; }

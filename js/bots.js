@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793124081';
-import { WEAPONS } from './data.js?v=1793124081';
+import { CELL } from './maps.js?v=1793124825';
+import { WEAPONS } from './data.js?v=1793124825';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -27,7 +27,7 @@ export function solveThrow(world, from, to, fixedT) {
 // Тактика команд на раунд
 export function planRound(g) {
   const w = g.world, sites = ['A', 'B'];
-  const tSite = sites[Math.random() < 0.5 ? 0 : 1];
+  const tSite = g.oneSite || sites[Math.random() < 0.5 ? 0 : 1];
   const Ts = g.actors.filter(a => a.team === 'T' && a.bot), CTs = g.actors.filter(a => a.team === 'CT' && a.bot);
   const fast = g.diff.id === 'harmless' || g.diff.id === 'easy';
   g.plan = {
@@ -35,8 +35,8 @@ export function planRound(g) {
     CT: {},
   };
   // спецназ: делим по точкам
-  CTs.forEach((a, i) => { g.plan.CT[a.id] = i % 2 ? 'A' : 'B'; });
-  if (CTs.length >= 3 && Math.random() < 0.5) g.plan.CT[CTs[2].id] = 'A';
+  CTs.forEach((a, i) => { g.plan.CT[a.id] = g.oneSite || (i % 2 ? 'A' : 'B'); });
+  if (!g.oneSite && CTs.length >= 3 && Math.random() < 0.5) g.plan.CT[CTs[2].id] = 'A';
   g.intel = { T: null, CT: null };
 }
 
@@ -77,13 +77,14 @@ export class Bot {
 
   // ---------- раунд ----------
   onRoundStart() {
-    this.buy();
+    if (!this.g.dm) this.buy();
     const g = this.g, a = this.a;
     this.selectPrimary();
     this.path = null; this.pi = 0; this.goal = null; this.target = null; this.lastTarget = null;
     this.thinkT = Math.random() * 0.3; this.react = 0; this.err = { p: 0, y: 0 }; this.burst = 0; this.pauseT = 0;
     this.strafeT = 0; this.strafeDir = 1; this.stuckT = 0; this.lastPos = a.pos.clone(); this.nadeQueue = []; this.nadeT = 0; this.usedCTnades = new Set();
     this.mode = 'move'; this.look = null; this.holdT = 0; this.searchPos = null; this.headAim = Math.random() < this.d.head;
+    if (g.dm) { this.roam(); return; }
     const w = this.w;
     if (a.team === 'T') {
       const P = g.plan.T, site = P.lurker === a ? (P.site === 'A' ? 'B' : 'A') : P.site;
@@ -130,7 +131,7 @@ export class Bot {
     this.path = p ? this.w.path(this.a.pos, p, (i, j) => g.fires.some(f => Math.hypot((i + 0.5) * CELL - f.c.x, (j + 0.5) * CELL - f.c.z) < f.r + 1)) : null;
   }
   onHurt(att, dir) {
-    if (att && att !== this.a && att.team !== this.a.team) {
+    if (att && att !== this.a && this.g.isEnemy(att, this.a)) {
       this.aware = att; this.awareT = this.g.time;
       if (!this.target) { this.look = att.pos.clone(); }
     }
@@ -160,7 +161,7 @@ export class Bot {
   }
   think() {
     const g = this.g, a = this.a;
-    const enemies = g.actors.filter(e => e.alive && e.team !== a.team);
+    const enemies = g.actors.filter(e => e.alive && g.isEnemy(a, e));
     let best = null, bd = 1e9;
     for (const e of enemies) {
       if (!this.canSee(e)) continue;
@@ -191,10 +192,18 @@ export class Bot {
   }
 
   // ---------- тактика ----------
+  // бой насмерть: бродим по карте, идём на звуки
+  roam() {
+    const g = this.g, w = this.w;
+    if (this.heard && g.time - this.heardT < 3 && Math.random() < 0.6) { this.setGoal(this.heard); return; }
+    const cells = g._dmCells || [];
+    if (cells.length) { const [i, j] = cells[Math.floor(Math.random() * cells.length)]; this.setGoal(w.cellCenter(i, j)); }
+  }
   tactics(enemies) {
     const g = this.g, a = this.a, w = this.w, P = g.plan;
     const B = g.bomb;
     if (this.target) return;
+    if (g.dm) { if (!this.path || (this.heard && g.time - this.heardT < 0.3 && Math.random() < 0.3)) this.roam(); return; }
     // подобрать бомбу
     if (a.team === 'T' && B && B.dropped && !this.toBomb) {
       const near = g.actors.filter(x => x.alive && x.team === 'T' && x.bot).sort((p, q) => p.pos.distanceTo(B.pos) - q.pos.distanceTo(B.pos))[0];
@@ -219,7 +228,7 @@ export class Bot {
         this.setGoal(this.siteSpot(this.site));
       }
       // на точке с бомбой — закладываем
-      if (a.hasBomb && w.siteAt(a.pos.x, a.pos.z) && g.state === 'live') { this.planting = true; }
+      if (a.hasBomb && g.plantSite(a.pos.x, a.pos.z) && g.state === 'live') { this.planting = true; }
     }
     if (a.team === 'T' && this.mode === 'post' && !this.path && Math.random() < 0.02) this.setGoal(this.siteSpot(this.site));
     // спецназ: защита / ротация / ответная раскидка
@@ -366,7 +375,7 @@ export class Bot {
       return;
     }
     // ---- закладка / разминирование ----
-    if (this.planting && a.hasBomb && g.world.siteAt(a.pos.x, a.pos.z) && g.state === 'live') { inp.mx = inp.mz = 0; inp.use = true; inp.crouch = true; this.idleLook(dt); return; }
+    if (this.planting && a.hasBomb && g.plantSite(a.pos.x, a.pos.z) && g.state === 'live') { inp.mx = inp.mz = 0; inp.use = true; inp.crouch = true; this.idleLook(dt); return; }
     this.planting = false;
     if (this.defusing && g.bomb && g.bomb.planted && !g.bomb.done && a.pos.distanceTo(g.bomb.pos) < 1.5) { inp.mx = inp.mz = 0; inp.use = true; this.idleLook(dt); return; }
     this.defusing = false;

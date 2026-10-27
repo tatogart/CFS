@@ -349,3 +349,11 @@ body.touch #banner { top: 14%; padding: 8px 12px; } body.touch #banner b { font-
 #ytBox .ytHead button { background: none; border: 0; color: var(--dim); }
 #ytBox iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; }
 @media (max-width: 760px) { #ytBox { width: 200px; bottom: calc(80px + var(--safe-b)); } }
+
+.rankBox { text-align: center; margin-top: 10px; background: rgba(0,0,0,.25); border-radius: 10px; padding: 10px; }
+.rankMode { color: var(--dim); font-size: 13px; }
+.rankRow { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 6px 0; }
+.rankRow img { width: 140px; } .rankRow span { font-size: 24px; color: var(--dim); }
+.rankBox b.up { color: #6fd36a; } .rankBox b.down { color: #ff6a5a; }
+.ranksH { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; text-align: center; }
+.ranksH img { width: 100%; max-width: 130px; } .ranksH small { display: block; color: var(--dim); font-size: 11px; } .ranksH b { font-size: 11px; display: block; }

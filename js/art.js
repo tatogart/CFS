@@ -1,5 +1,5 @@
 // Процедурная графика: узоры скинов, миниатюры оружия, кейсов и карт
-import { skinById, WEAPONS, KNIVES, GLOVES } from './data.js?v=1793124081';
+import { skinById, WEAPONS, KNIVES, GLOVES } from './data.js?v=1793124825';
 
 export function rng(seed) {
   let a = seed >>> 0;
@@ -494,5 +494,50 @@ export function drawGraffiti(cv, g0) {
 export function graffitiURL(g0, size = 128) {
   const key = 'gr|' + g0.id + size;
   if (!iconCache.has(key)) iconCache.set(key, drawGraffiti(mk(size, size), g0).toDataURL());
+  return iconCache.get(key);
+}
+
+// ---- звания (как в CS:GO) ----
+export const RANKS = ['Silver I', 'Silver II', 'Silver III', 'Silver IV', 'Silver Elite', 'Silver Elite Master',
+  'Gold Nova I', 'Gold Nova II', 'Gold Nova III', 'Gold Nova Master', 'Master Guardian I', 'Master Guardian II',
+  'Master Guardian Elite', 'Distinguished Master Guardian', 'Legendary Eagle', 'Legendary Eagle Master', 'Supreme Master First Class', 'The Global Elite'];
+export function drawRank(cv, idx) {
+  const g = cv.getContext('2d'), W = cv.width, H = cv.height, s = W / 200;
+  g.clearRect(0, 0, W, H); g.save(); g.scale(s, s);
+  if (idx < 0) { // без звания
+    g.fillStyle = '#2a313b'; rr(g, 20, 20, 160, 60, 10); g.fill(); g.strokeStyle = '#5a6470'; g.lineWidth = 3; g.stroke();
+    g.fillStyle = '#9aa6b2'; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 100, 51); g.restore(); return cv;
+  }
+  const grp = idx < 6 ? 0 : idx < 10 ? 1 : idx < 14 ? 2 : idx < 16 ? 3 : idx < 17 ? 4 : 5;
+  const C = [['#dfe6ec', '#8b98a5', '#3a4652'], ['#ffe08a', '#d4a020', '#5a3a08'], ['#b8dcff', '#3f86d9', '#0e2a52'], ['#e7c8ff', '#9a5ad9', '#2a0e52'], ['#ffd0a0', '#e07a20', '#4a1e05'], ['#ffd0d0', '#e02a2a', '#4a0505']][grp];
+  // плашка
+  const bg = g.createLinearGradient(0, 15, 0, 85); bg.addColorStop(0, '#2b3440'); bg.addColorStop(1, '#10151b');
+  g.fillStyle = bg; rr(g, 12, 15, 176, 70, 12); g.fill();
+  g.strokeStyle = C[1]; g.lineWidth = 4; rr(g, 12, 15, 176, 70, 12); g.stroke();
+  const metal = g.createLinearGradient(0, 20, 0, 80); metal.addColorStop(0, C[0]); metal.addColorStop(0.55, C[1]); metal.addColorStop(1, C[2]);
+  g.fillStyle = metal; g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 2;
+  const chevron = (x, y, w, h) => { g.beginPath(); g.moveTo(x - w, y - h); g.lineTo(x, y); g.lineTo(x + w, y - h); g.lineTo(x + w, y - h + 9); g.lineTo(x, y + 9); g.lineTo(x - w, y - h + 9); g.closePath(); g.fill(); g.stroke(); };
+  const star = (x, y, r) => { g.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr2 = k % 2 ? r * 0.45 : r; g.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); } g.closePath(); g.fill(); g.stroke(); };
+  const wings = () => { for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(100 + sx * 20, 50); for (let k = 0; k < 4; k++) { g.lineTo(100 + sx * (45 + k * 14), 30 + k * 5); g.lineTo(100 + sx * (38 + k * 14), 42 + k * 6); } g.lineTo(100 + sx * 22, 64); g.closePath(); g.fill(); g.stroke(); } };
+  if (grp === 0) {
+    const n = Math.min(idx + 1, 4);
+    if (idx < 4) for (let k = 0; k < n; k++) chevron(100, 40 + k * 10 - (n - 1) * 5, 34, 14);
+    else { for (let k = 0; k < 4; k++) chevron(100, 30 + k * 9, 34, 14); if (idx === 5) { star(52, 50, 12); star(148, 50, 12); } else star(100, 72, 9); }
+  } else if (grp === 1) {
+    const n = idx - 6 + 1; for (let k = 0; k < Math.min(n, 4); k++) star(100 + (k - (Math.min(n, 4) - 1) / 2) * 34, 50, 15);
+  } else if (grp === 2) {
+    g.beginPath(); g.arc(100, 50, 26, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = C[2]; g.beginPath(); g.moveTo(84, 50); g.lineTo(96, 62); g.lineTo(118, 38); g.lineWidth = 5; g.strokeStyle = C[0]; g.stroke(); g.fillStyle = metal; g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 2;
+    const n = idx - 10; for (let k = 0; k < n; k++) star(40 + k * 0 + (k % 2 ? 120 : 0), 50, 10);
+    if (idx === 13) { star(100, 26, 9); }
+  } else if (grp === 3) { wings(); star(100, 50, 16); if (idx === 15) star(100, 76, 8); }
+  else if (grp === 4) { wings(); g.beginPath(); g.arc(100, 50, 18, 0, 7); g.fill(); g.stroke(); star(100, 50, 10); }
+  else { wings(); g.beginPath(); g.moveTo(100, 22); g.lineTo(122, 50); g.lineTo(100, 78); g.lineTo(78, 50); g.closePath(); g.fill(); g.stroke(); star(100, 50, 11); }
+  g.restore();
+  return cv;
+}
+export function rankURL(idx, w = 120) {
+  const key = 'rank|' + idx + '|' + w;
+  if (!iconCache.has(key)) iconCache.set(key, drawRank(mk(w, w / 2), idx).toDataURL());
   return iconCache.get(key);
 }

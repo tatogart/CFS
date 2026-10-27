@@ -1,14 +1,14 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793124081';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793124081';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793124081';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793124081';
-import { AgentModel } from './models.js?v=1793124081';
-import { Controls, isTouch } from './controls.js?v=1793124081';
-import { initAudio, play, setVolume } from './sfx.js?v=1793124081';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd } from './music.js?v=1793124081';
-import { Game } from './game.js?v=1793124081';
+import { MAPS, CELL } from './maps.js?v=1793124825';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793124825';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793124825';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793124825';
+import { AgentModel } from './models.js?v=1793124825';
+import { Controls, isTouch } from './controls.js?v=1793124825';
+import { initAudio, play, setVolume } from './sfx.js?v=1793124825';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd } from './music.js?v=1793124825';
+import { Game } from './game.js?v=1793124825';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -23,13 +23,13 @@ setMusicVolume(save.settings.music ?? 0.5); setKit(save.musicKit || 'cfs');
 
 // ---------- рендер ----------
 const canvas = $('view');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: !touch, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
 function quality() { const q = save.settings.quality; return q === 'auto' ? (touch ? 1 : 2) : +q; }
 function applyQuality() {
   const q = quality();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, q === 0 ? 1 : q === 1 ? 1.25 : 1.75));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, q === 0 ? 1 : q === 1 ? 1.6 : 2));
   renderer.shadowMap.enabled = q >= 1; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setSize(innerWidth, innerHeight, false);
 }
@@ -63,7 +63,23 @@ function pills(box, items, cur, onPick) {
     box.appendChild(b);
   }
 }
+const MODES = [
+  ['casual', 'Обычный', 'Свои настройки: размер команд, длина матча, сторона.'],
+  ['comp', 'Соревновательный', '5×5, до 13 побед, смена сторон после 12 раундов. Даёт звание.'],
+  ['wing', 'Напарники', '2×2 на одной точке (B), до 9 побед, раунд 1:30. Своё звание.'],
+  ['dm', 'Бой насмерть', 'Каждый сам за себя, 10 игроков, мгновенное возрождение, любое оружие бесплатно. 5 минут или до 30 убийств.'],
+];
+// ---------- звания ----------
+const BOT_ELO = { harmless: 300, easy: 700, medium: 1200, hard: 1700, esports: 2300, none: 0 };
+const rankOf = r => (r && r.wins >= 2) ? Math.max(0, Math.min(17, Math.floor((r.elo - 250) / 125))) : -1;
+function rankData(m) { save.ranks = save.ranks || {}; return save.ranks[m] || (save.ranks[m] = { elo: 600, wins: 0, losses: 0, games: 0 }); }
 function renderPlay() {
+  pills($('modes'), MODES.map(m => [m[0], m[1]]), save.last.mode || 'casual', v => { save.last.mode = v; renderPlay(); });
+  const md = save.last.mode || 'casual';
+  $('modeDesc').textContent = MODES.find(m => m[0] === md)[2];
+  $('rowSide').classList.toggle('hidden', md === 'dm');
+  $('rowSize').classList.toggle('hidden', md !== 'casual');
+  $("rowLen").classList.toggle('hidden', md !== 'casual');
   const mb = $('maps'); mb.innerHTML = '';
   for (const m of MAPS) {
     const b = el('button', 'map' + (save.last.map === m.id ? ' on' : ''));
@@ -199,12 +215,11 @@ async function renderKits() {
   const c = el('div', 'kit custom' + (cur === 'custom' ? ' on' : ''), `<div class="kArt" style="--kc:#3cf06a"><span>★</span></div>
     <input class="kTitle" maxlength="24" value="${esc(save.customKitName || 'Мой кит')}" title="Название кита">
     <div class="kAuth">Свои треки (mp3, m4a, ogg) — хранятся только на этом устройстве</div>
-    <div class="kRow"><button class="kPreset">Назвать «FROZY»</button><a class="kLink" href="https://www.youtube.com/@frozy808" target="_blank" rel="noopener">Канал FROZY ↗</a></div>
+    <div class="kRow"><a class="kLink" href="https://www.youtube.com/@frozy808" target="_blank" rel="noopener">Канал FROZY ↗</a></div>
     <label class="kSlot"><span>YouTube в меню</span><input class="kYt" placeholder="ссылка на трек с YouTube" value="${esc(save.ytMenu ? 'https://youtu.be/' + save.ytMenu : '')}"></label>
     ${slots.map(([s, lb], i) => `<label class="kSlot"><span>${lb}</span><em>${recs[i] ? esc(recs[i].name) : 'нет файла'}</em><input type="file" accept="audio/*" data-slot="${s}">${recs[i] ? `<button data-del="${s}">✕</button>` : ''}</label>`).join('')}
     <div class="kBtns"><button class="pv">▶ Слушать</button><button class="eq">${cur === 'custom' ? '✔ Надет' : 'Надеть'}</button></div>`);
   c.querySelector('.kTitle').oninput = e => { save.customKitName = e.target.value.trim() || 'Мой кит'; persist(); };
-  c.querySelector('.kPreset').onclick = () => { save.customKitName = 'FROZY'; persist(); renderKits(); };
   c.querySelector('.kYt').onchange = e => { save.ytMenu = ytId(e.target.value); persist(); if (e.target.value && !save.ytMenu) alert('Не получилось распознать ссылку YouTube'); renderKits(); updYt(); };
   c.querySelectorAll('input[type=file]').forEach(inp => inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { await saveTrack(inp.dataset.slot, f); } catch (e) { alert('Не удалось сохранить файл: ' + e.message); } renderKits(); });
   c.querySelectorAll('[data-del]').forEach(b => b.onclick = async e => { e.preventDefault(); await deleteTrack(b.dataset.del); renderKits(); });
@@ -322,8 +337,8 @@ function renderHome() {
   const pr = $('promo'); pr.className = 'hcard promo';
   pr.innerHTML = `<img src="${caseIconURL(cs)}" alt=""><div><h4>Магазин</h4><b>${esc(cs.name)}</b><span>◈ ${cs.price}</span></div>`;
   pr.onclick = () => { showTab('cases'); openCaseScreen(cs); };
-  const st = save.stats, lm = save.lastMatch;
-  $('lastBox').innerHTML = `<h4>Ваша статистика</h4><div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div></div>` +
+  const st = save.stats, lm = save.lastMatch, rc = rankData('comp'), rw = rankData('wing');
+  $('lastBox').innerHTML = `<h4>Звания</h4><div class="ranksH"><div><img src="${rankURL(rankOf(rc), 140)}" alt=""><small>Соревновательный</small><b>${rankOf(rc) < 0 ? 'Без звания' : RANKS[rankOf(rc)]}</b></div><div><img src="${rankURL(rankOf(rw), 140)}" alt=""><small>Напарники</small><b>${rankOf(rw) < 0 ? 'Без звания' : RANKS[rankOf(rw)]}</b></div></div><h4 style="margin-top:10px">Ваша статистика</h4><div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div></div>` +
     (lm ? `<h4 style="margin-top:10px">Последний матч</h4><div style="font-size:14px">${esc(lm.map)} · <b style="color:${lm.won ? '#6fd36a' : '#ff6a5a'}">${lm.score}</b> · ${lm.k}/${lm.d}</div>` : '');
 }
 $('sideSw').onclick = e => { const b = e.target.closest('button'); if (!b) return; M.side = save.menuSide = b.dataset.side; persist(); setMenuAgent(save.agent[M.side]); renderHome(); play('tick'); };
@@ -483,15 +498,20 @@ function updateHud(g, dt) {
   if (wi && hud.wiKey !== wi + cur.skin) { hud.wiKey = wi + cur.skin; $('wIcon').src = cur.c4 ? '' : weaponIconURL(wi, cur.skin, 96, 36); }
   buildSlots(g);
   // таймер/счёт
-  set('scT', g.score.T); set('scCT', g.score.CT);
+  set('scT', g.dm ? p.kills : g.score.T); set('scCT', g.dm ? '' : g.score.CT);
   const B = g.bomb;
   let tt = g.state === 'freeze' ? g.stateT : g.state === 'end' ? g.stateT : g.roundTime;
   if (B && B.planted && !B.done) tt = B.timer;
-  if (g.aimMode) { const A = g.aimStats, mins = Math.max(1 / 60, (g.time - (A.t0 || g.time)) / 60); set('timer', `🎯 ${A.kills} · HS ${A.kills ? Math.round(A.hs / A.kills * 100) : 0}% · точн. ${A.shots ? Math.round(A.hits / A.shots * 100) : 0}% · ${A.t0 ? Math.round(A.kills / mins) : 0}/мин`); }
+  if (g.dm) {
+    const t = Math.max(0, g.dmTime), order = g.actors.slice().sort((a, b) => b.kills - a.kills), place = order.indexOf(p) + 1;
+    set('timer', `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`);
+    const k = place + '|' + order[0].kills + '|' + p.kills;
+    if (hud.aliveKey !== k) { hud.aliveKey = k; $('alive').innerHTML = `место ${place}/${order.length} · лидер: ${esc(order[0].name)} ${order[0].kills}/${g.dmLimit}`; }
+  } else if (g.aimMode) { const A = g.aimStats, mins = Math.max(1 / 60, (g.time - (A.t0 || g.time)) / 60); set('timer', `🎯 ${A.kills} · HS ${A.kills ? Math.round(A.hs / A.kills * 100) : 0}% · точн. ${A.shots ? Math.round(A.hits / A.shots * 100) : 0}% · ${A.t0 ? Math.round(A.kills / mins) : 0}/мин`); }
   else if (g.practice) set('timer', 'ТРЕНИРОВКА');
   else set('timer', `${Math.floor(Math.max(0, tt) / 60)}:${String(Math.floor(Math.max(0, tt) % 60)).padStart(2, '0')}`);
   $('timer').classList.toggle('bomb', !!(B && B.planted && !B.done));
-  if (!g.practice) {
+  if (!g.practice && !g.dm) {
     const aT = g.actors.filter(a => a.team === 'T'), aC = g.actors.filter(a => a.team === 'CT');
     const dots = (l, c) => l.map(a => `<span class="${c}">${a.alive ? '●' : '○'}</span>`).join('');
     const ak = aT.map(a => a.alive ? 1 : 0).join('') + aC.map(a => a.alive ? 1 : 0).join('');
@@ -551,6 +571,7 @@ function updateHud(g, dt) {
   if (g.settings.fps) { fpsAcc += dt; fpsN++; fpsT += dt; if (fpsT > 0.5) { set('fps', Math.round(fpsN / fpsAcc) + ' FPS'); fpsAcc = fpsN = fpsT = 0; } }
 }
 function renderBoard(g) {
+  if (g.dm) { $('board').innerHTML = `<h4>${esc(g.o.map.name)} · бой насмерть</h4><table><tr><th>Игрок</th><th>У</th><th>С</th></tr>${g.actors.slice().sort((a, b) => b.kills - a.kills).map(a => `<tr class="${a.alive ? '' : 'dead'} ${a === g.player ? 'me' : ''}"><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td></tr>`).join('')}</table>`; return; }
   const rows = team => g.actors.filter(a => a.team === team).sort((a, b) => b.kills - a.kills).map(a => `<tr class="${team === 'T' ? 't' : 'ct'} ${a.alive ? '' : 'dead'} ${a === g.player ? 'me' : ''}"><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td><td>$${a.money}</td></tr>`).join('');
   $('board').innerHTML = `<h4>${esc(g.o.map.name)} · раунд ${g.round}</h4><table><tr><th>Террористы — ${g.score.T}</th><th>У</th><th>С</th><th>$</th></tr>${rows('T')}<tr><th>Спецназ — ${g.score.CT}</th><th></th><th></th><th></th></tr>${rows('CT')}</table>`;
 }
@@ -563,7 +584,7 @@ function drawMini(g) {
   for (const a of g.actors) {
     if (a === p) continue;
     if (!a.alive) { if (a.team === p.team) { c.fillStyle = '#888'; c.fillText('×', a.pos.x * sc - 3, a.pos.z * sc + 3); } continue; }
-    if (a.team === p.team) dot(a, a.team === 'T' ? '#e8b04a' : '#6aa8ff');
+    if (!g.dm && a.team === p.team) dot(a, a.team === 'T' ? '#e8b04a' : '#6aa8ff');
     else if (g.admin.radar || g.time - (a.lastFired || -9) < 1.5 || (g.intel && g.intel[p.team] && g.intel[p.team].pos === a.pos)) dot(a, '#ff3a3a');
   }
   for (const s of g.smokes) { c.fillStyle = 'rgba(220,220,220,0.6)'; c.beginPath(); c.arc(s.c.x * sc, s.c.z * sc, s.r * sc, 0, 7); c.fill(); }
@@ -615,15 +636,40 @@ $('overOk').onclick = () => { $('over').classList.add('hidden'); quitGame(); };
 
 function endMatch(g) {
   controls.unlock();
+  if (g.dm) return endDM(g);
   const p = g.player, won = g.score[p.team] > g.score[p.team === 'T' ? 'CT' : 'T'], draw = g.score.T === g.score.CT;
   const reward = Math.round((p.kills * 15 + g.score[p.team] * 30 + (won ? 250 : 50)) * g.diff.reward);
+  let rankHtml = '';
+  if (g.mode === 'comp' || g.mode === 'wing') {
+    // рейтинг Эло против уровня ботов: на слабых ботах высоко не подняться
+    const r = rankData(g.mode), before = rankOf(r), opp = BOT_ELO[g.diff.id] || 1000;
+    const exp = 1 / (1 + Math.pow(10, (opp - r.elo) / 400)), res = draw ? 0.5 : won ? 1 : 0;
+    const my = g.score[p.team], th = g.score[p.team === 'T' ? 'CT' : 'T'], margin = 1 + Math.min(0.5, Math.abs(my - th) / 26);
+    const kd = Math.max(-6, Math.min(6, (p.kills - p.deaths) * 0.6));
+    const delta = Math.round(40 * margin * (res - exp) + kd);
+    r.elo = Math.max(0, r.elo + delta); r.games++; if (won) r.wins++; else if (!draw) r.losses++;
+    const after = rankOf(r);
+    const mname = g.mode === 'comp' ? 'Соревновательный' : 'Напарники';
+    const nm = i => i < 0 ? `Без звания (побед до звания: ${Math.max(0, 2 - r.wins)})` : RANKS[i];
+    rankHtml = `<div class="rankBox"><div class="rankMode">${mname} · рейтинг ${r.elo} (${delta >= 0 ? '+' : ''}${delta})</div><div class="rankRow"><img src="${rankURL(before, 160)}" alt=""><span>→</span><img src="${rankURL(after, 160)}" alt=""></div><b class="${after > before ? 'up' : after < before ? 'down' : ''}">${after > before ? '▲ Повышение: ' : after < before ? '▼ Понижение: ' : ''}${esc(nm(after))}</b></div>`;
+  }
   save.lastMatch = { map: g.o.map.name, score: `${g.score[p.team]}:${g.score[p.team === 'T' ? 'CT' : 'T']}`, won, k: p.kills, d: p.deaths };
   save.coins += reward; save.stats.matches++; if (won) save.stats.wins++; save.stats.kills += p.kills; save.stats.deaths += p.deaths; persist();
   $('overTitle').textContent = draw ? 'Ничья' : won ? 'Победа!' : 'Поражение';
   const rows = g.actors.slice().sort((a, b) => b.kills - a.kills).map(a => `<tr style="color:${a.team === 'T' ? '#e8b04a' : '#6aa8ff'}${a === p ? ';font-weight:800' : ''}"><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td></tr>`).join('');
-  $('overBody').innerHTML = `<p class="center" style="font-size:22px">T ${g.score.T} : ${g.score.CT} CT</p><table><tr><th>Игрок</th><th>Убийства</th><th>Смерти</th></tr>${rows}</table><div class="reward">+ ◈ ${reward} монет</div>`;
+  $('overBody').innerHTML = `<p class="center" style="font-size:22px">T ${g.score.T} : ${g.score.CT} CT</p><table><tr><th>Игрок</th><th>Убийства</th><th>Смерти</th></tr>${rows}</table><div class="reward">+ ◈ ${reward} монет</div>${rankHtml}`;
   $('over').classList.remove('hidden');
   play(won ? 'win' : 'lose');
+}
+function endDM(g) {
+  const p = g.player, order = g.actors.slice().sort((a, b) => b.kills - a.kills), place = order.indexOf(p) + 1;
+  const reward = Math.round((p.kills * 8 + Math.max(0, 6 - place) * 40) * g.diff.reward);
+  save.coins += reward; save.stats.kills += p.kills; save.stats.deaths += p.deaths; save.stats.matches++; if (place === 1) save.stats.wins++;
+  save.lastMatch = { map: g.o.map.name, score: `#${place}`, won: place === 1, k: p.kills, d: p.deaths }; persist();
+  $('overTitle').textContent = place === 1 ? 'Первое место!' : `Место ${place} из ${order.length}`;
+  $('overBody').innerHTML = `<table><tr><th>#</th><th>Игрок</th><th>Убийства</th><th>Смерти</th></tr>${order.map((a, i) => `<tr style="${a === p ? 'font-weight:800;color:#ffe08a' : ''}"><td>${i + 1}</td><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td></tr>`).join('')}</table><div class="reward">+ ◈ ${reward} монет</div>`;
+  $('over').classList.remove('hidden');
+  play(place <= 3 ? 'win' : 'lose');
 }
 
 // ---------- запуск матча ----------
@@ -632,11 +678,16 @@ function startGame() {
   let map = MAPS.find(m => m.id === save.last.map) || MAPS[0];
   const diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
   const side = save.last.side === 'auto' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
-  const size = +save.last.size, winTo = +save.last.winTo;
+  const mode = save.last.mode || 'casual';
+  let size = +save.last.size, winTo = +save.last.winTo;
+  if (mode === 'comp') { size = 5; winTo = 13; }
+  if (mode === 'wing') { size = 2; winTo = 9; }
+  if (mode !== 'casual' && map.aim) map = MAPS[0];
+  if (mode !== 'casual' && diff.id === 'none') { alert('Для этого режима выберите уровень ботов'); return; }
   $('loading').classList.remove('hidden');
   setTimeout(() => {
     try {
-      game = new Game(renderer, { map, diff, side, size, winTo, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
+      game = new Game(renderer, { map, diff, side, size, winTo, mode, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
     } catch (e) { $('loading').classList.add('hidden'); alert('Ошибка запуска: ' + e.message); console.error(e); return; }
     $('menu').classList.add('hidden'); $('hud').classList.remove('hidden'); $('loading').classList.add('hidden');
     $('touch').classList.toggle('hidden', !touch);
@@ -650,6 +701,7 @@ function startGame() {
   }, 30);
 }
 function quitGame() {
+  if (window.__updateReady) { location.reload(); return; }
   if (game) { game.dispose(); game = null; }
   controls.enabled = false; controls.unlock(); controls.reset();
   $('hud').classList.add('hidden'); $('menu').classList.remove('hidden'); $('rotate').classList.add('hidden');
@@ -679,7 +731,18 @@ requestAnimationFrame(frame);
 let installEvt = null;
 const standalone = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone;
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  // автообновление: при появлении интернета и раз в 15 минут проверяем новую версию;
+  // новая версия применяется в меню (перезагрузкой), а не посреди матча
+  const hadController = !!navigator.serviceWorker.controller;
+  let swReg = null, reloading = false;
+  const check = () => { if (swReg && navigator.onLine) swReg.update().catch(() => {}); };
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(r => { swReg = r; check(); }).catch(() => {}));
+  addEventListener('online', () => { check(); if (!game) updYt(); });
+  setInterval(check, 15 * 60 * 1000);
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    if (!game) { reloading = true; location.reload(); } else window.__updateReady = true;
+  });
 }
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; renderInstall(); });
 addEventListener('appinstalled', () => { installEvt = null; renderInstall(); });

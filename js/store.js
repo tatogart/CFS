@@ -1,5 +1,5 @@
 // Сохранение: монеты, инвентарь, экипировка, настройки
-import { SKINS, CASES, RARITY, skinById } from './data.js?v=1793117349';
+import { SKINS, CASES, RARITY, skinById, GLOVES } from './data.js?v=1793117891';
 
 const KEY = 'cfs_save_v1';
 const defaults = () => ({
@@ -31,7 +31,7 @@ export function sellItem(uid) {
   for (const k in save.equip) if (save.equip[k] === uid) delete save.equip[k];
   save.inv.splice(i, 1); save.coins += val; persist(); return val;
 }
-const slotOf = sk => (sk.rarity === 'gold' ? 'knife' : sk.weapon);
+const slotOf = sk => (GLOVES[sk.weapon] ? 'gloves' : sk.rarity === 'gold' ? 'knife' : sk.weapon);
 export function equipItem(uid) {
   const it = save.inv.find(x => x.uid === uid); if (!it) return;
   const slot = slotOf(skinById[it.skin]);
@@ -45,7 +45,7 @@ export function loadout() {
   for (const [slot, uid] of Object.entries(save.equip)) {
     const it = save.inv.find(x => x.uid === uid); if (!it) continue;
     const sk = skinById[it.skin];
-    if (slot === 'knife') out.knife = { model: sk.weapon, skin: sk.id }; else out[slot] = sk.id;
+    if (slot === 'knife') out.knife = { model: sk.weapon, skin: sk.id }; else if (slot === 'gloves') out.gloves = sk.id; else out[slot] = sk.id;
   }
   return out;
 }

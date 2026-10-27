@@ -92,14 +92,70 @@ export const SKINS = [
   S('kn_bay_crimson', 'bayonet', 'Кровавая паутина', 'gold', 'web', ['#9a0f12', '#1a0303']),
   S('kn_bay_neon', 'bayonet', 'Неон', 'gold', 'neon', ['#0b0618', '#ff2bd6', '#2bf3ff', '#fff']),
   S('kn_kar_jungle', 'karambit', 'Джунгли', 'gold', 'camo', ['#4b5e2c', '#26301a', '#7b8d4a', '#141a0d']),
+  // новые ножи
+  S('kn_kar_case', 'karambit', 'Закалка', 'gold', 'case', ['#3a5f9e', '#c9a13b', '#6f7a86']),
+  S('kn_kar_gamma', 'karambit', 'Гамма-доплер', 'gold', 'marble', ['#062a12', '#1fd36a', '#0a6a3a']),
+  S('kn_bay_slaughter', 'bayonet', 'Бойня', 'gold', 'slaughter', ['#d8d0cc', '#a3131c', '#5e0a0f']),
+  S('kn_bfly_damascus', 'butterfly', 'Дамасская сталь', 'gold', 'damascus', ['#8f969d', '#c9ced3', '#5b6168']),
+  S('kn_flip_fade', 'flip', 'Градиент', 'gold', 'fade', ['#ffd000', '#ff3cc8', '#3c64ff']),
+  S('kn_flip_night', 'flip', 'Ночь', 'gold', 'carbon', ['#16181c', '#30343a', '#22252a']),
+  S('kn_flip_doppler', 'flip', 'Доплер', 'gold', 'marble', ['#1a0a2a', '#ff3ca0', '#3a1aff']),
+  S('kn_gut_tiger', 'gut', 'Зуб тигра', 'gold', 'tiger', ['#ffb000', '#2a1600']),
+  S('kn_gut_case', 'gut', 'Закалка', 'gold', 'case', ['#3a5f9e', '#c9a13b', '#6f7a86']),
+  S('kn_hunt_web', 'huntsman', 'Кровавая паутина', 'gold', 'web', ['#9a0f12', '#1a0303']),
+  S('kn_hunt_slaughter', 'huntsman', 'Бойня', 'gold', 'slaughter', ['#d8d0cc', '#a3131c', '#5e0a0f']),
+  S('kn_falc_marble', 'falchion', 'Мраморный градиент', 'gold', 'fade', ['#ffe600', '#ff1f1f', '#2a3cff']),
+  S('kn_falc_uv', 'falchion', 'Ультрафиолет', 'gold', 'fade', ['#2a0f3f', '#5a2a7a', '#1a0a26']),
+  S('kn_talon_doppler', 'talon', 'Доплер', 'gold', 'marble', ['#1a0a2a', '#d23cff', '#2a8aff']),
+  S('kn_talon_case', 'talon', 'Закалка', 'gold', 'case', ['#3a5f9e', '#c9a13b', '#6f7a86']),
+  // перчатки
+  S('gl_sport_vice', 'sport', 'Порок', 'gold', 'stripes', ['#ff3fb4', '#2bd6ff']),
+  S('gl_sport_pandora', 'sport', 'Шкатулка Пандоры', 'gold', 'digital', ['#5a2a8a', '#2a0f4a', '#c86aff', '#1a0a2a']),
+  S('gl_sport_hedge', 'sport', 'Лабиринт', 'gold', 'hex', ['#2f5a2a', '#c9e05a', '#1a3a14']),
+  S('gl_driver_king', 'driver', 'Королевская змея', 'gold', 'hex', ['#c9a13b', '#3a2a0a', '#e8d27a']),
+  S('gl_driver_crimson', 'driver', 'Багровое плетение', 'gold', 'web', ['#7a0f12', '#1a0303']),
+  S('gl_wraps_slaughter', 'wraps', 'Бойня', 'gold', 'slaughter', ['#d8d0cc', '#a3131c', '#5e0a0f']),
+  S('gl_wraps_leather', 'wraps', 'Кожа', 'gold', 'camo', ['#8a6a44', '#5e4428', '#a8865a', '#3a2a18']),
+  S('gl_moto_spearmint', 'moto', 'Мята', 'gold', 'stripes', ['#e8f2ee', '#3ac8a0']),
+  S('gl_moto_boom', 'moto', 'Бум!', 'gold', 'splat', ['#1a1a1a', '#ffd23a', '#ff3a3a']),
+  S('gl_spec_fade', 'specialist', 'Градиент', 'gold', 'fade', ['#ffd000', '#ff3cc8', '#3c64ff']),
+  S('gl_spec_crimson', 'specialist', 'Кимоно', 'gold', 'tiger', ['#c21f2a', '#1a0505']),
+  // новые скины оружия
+  S('ak_vulcan', 'ak47', 'Вулкан', 'covert', 'asiimov', ['#f2f2f2', '#2a7aff', '#111111']),
+  S('ak_fire_serp', 'ak47', 'Огненный змей', 'covert', 'fire', ['#14200e', '#ff7a1a', '#ffe14a']),
+  S('ak_case', 'ak47', 'Закалка', 'classified', 'case', ['#3a5f9e', '#c9a13b', '#6f7a86']),
+  S('m4_poseidon', 'm4a4', 'Посейдон', 'covert', 'marble', ['#0a2a4a', '#2bd6ff', '#e8f6ff']),
+  S('m4_desolate', 'm4a4', 'Запустение', 'classified', 'splat', ['#2a2a2a', '#ff6a1a', '#d8d0cc']),
+  S('awp_dragon', 'awp', 'Драконья история', 'covert', 'fire', ['#2a0a05', '#e01818', '#ffd23a']),
+  S('awp_hyper', 'awp', 'Гипербист', 'classified', 'neon', ['#1a0a26', '#ff3fb4', '#3cf06a', '#ffe600']),
+  S('deagle_blaze2', 'deagle', 'Кобальтовое пламя', 'classified', 'fire', ['#06142a', '#2a7aff', '#bfe0ff']),
+  S('deagle_printstream', 'deagle', 'Принтстрим', 'covert', 'asiimov', ['#f4f4f4', '#d8d8d8', '#111111']),
+  S('usp_orion', 'usp', 'Орион', 'classified', 'lightning', ['#0b1033', '#7ae0ff', '#ffffff']),
+  S('glock_water', 'glock', 'Стихия воды', 'restricted', 'marble', ['#0a3a6a', '#2bd6ff', '#ffffff']),
+  S('mp9_hydra', 'mp9', 'Гидра', 'classified', 'hex', ['#1d3b16', '#9be22d', '#0f1f0b']),
+  S('mac_neon2', 'mac10', 'Неоновый гонщик', 'covert', 'neon', ['#0d0d1a', '#ff2bd6', '#2bf3ff', '#ffe600']),
+  S('famas_roll', 'famas', 'Роллкейдж', 'restricted', 'carbon', ['#16181c', '#ff6a1a', '#22252a']),
+  S('galil_cerb', 'galil', 'Цербер', 'classified', 'damascus', ['#5a1f12', '#e8b04a', '#2a0a05']),
 ];
 export const KNIVES = {
   karambit: { name: '★ Керамбит' },
   butterfly: { name: '★ Нож-бабочка' },
   bayonet: { name: '★ Штык-нож M9' },
+  flip: { name: '★ Складной нож' },
+  gut: { name: '★ Нож с лезвием-крюком' },
+  huntsman: { name: '★ Охотничий нож' },
+  falchion: { name: '★ Фальшион' },
+  talon: { name: '★ Нож «Коготь»' },
+};
+export const GLOVES = {
+  sport: { name: '★ Спортивные перчатки' },
+  driver: { name: '★ Водительские перчатки' },
+  wraps: { name: '★ Обмотки рук' },
+  moto: { name: '★ Мотоперчатки' },
+  specialist: { name: '★ Перчатки специалиста' },
 };
 export const skinById = Object.fromEntries(SKINS.map(s => [s.id, s]));
-export const weaponName = w => (WEAPONS[w] && WEAPONS[w].name) || (KNIVES[w] && KNIVES[w].name) || w;
+export const weaponName = w => (WEAPONS[w] && WEAPONS[w].name) || (KNIVES[w] && KNIVES[w].name) || (GLOVES[w] && GLOVES[w].name) || w;
 
 export const CASES = [
   { id: 'dust', name: 'Кейс «Пустынный шторм»', price: 250, col: ['#c9893a', '#6b3f12'], emblem: 'sun',
@@ -110,6 +166,12 @@ export const CASES = [
     items: ['ak_jungle', 'm4_howl', 'awp_asiimov', 'galil_viper', 'glock_fade', 'mac_croc', 'usp_kill', 'deagle_predator', 'mp9_viper', 'kn_bay_crimson', 'kn_bfly_tiger'] },
   { id: 'ice', name: 'Кейс «Ледяной»', price: 300, col: ['#3b8fd9', '#0b2244'], emblem: 'flake',
     items: ['ak_ice', 'm4_frost', 'awp_lightning', 'glock_arctic', 'usp_frozen', 'famas_ice', 'deagle_cobalt', 'mac_blizzard', 'galil_glacier', 'kn_bfly_ice', 'kn_kar_doppler'] },
+  { id: 'gloves', name: 'Кейс «Перчатки»', price: 600, col: ['#7a7f87', '#1d2128'], emblem: 'glove',
+    items: ['glock_water', 'famas_roll', 'mp9_hydra', 'usp_orion', 'm4_desolate', 'ak_case', 'deagle_printstream', 'gl_sport_vice', 'gl_sport_pandora', 'gl_sport_hedge', 'gl_driver_king', 'gl_driver_crimson', 'gl_wraps_slaughter', 'gl_wraps_leather', 'gl_moto_spearmint', 'gl_moto_boom', 'gl_spec_fade', 'gl_spec_crimson'] },
+  { id: 'blades', name: 'Кейс «Клинки»', price: 500, col: ['#b02a2a', '#2a0a0a'], emblem: 'blade',
+    items: ['famas_roll', 'glock_water', 'galil_cerb', 'deagle_blaze2', 'awp_hyper', 'mac_neon2', 'ak_vulcan', 'awp_dragon', 'kn_flip_fade', 'kn_flip_night', 'kn_flip_doppler', 'kn_gut_tiger', 'kn_gut_case', 'kn_hunt_web', 'kn_hunt_slaughter', 'kn_falc_marble', 'kn_falc_uv', 'kn_talon_doppler', 'kn_talon_case', 'kn_kar_case', 'kn_kar_gamma', 'kn_bay_slaughter', 'kn_bfly_damascus'] },
+  { id: 'serpent', name: 'Кейс «Змей»', price: 450, col: ['#2a8a3a', '#0a2a10'], emblem: 'claw',
+    items: ['glock_water', 'famas_roll', 'mp9_hydra', 'usp_orion', 'galil_cerb', 'm4_desolate', 'ak_case', 'awp_hyper', 'ak_fire_serp', 'm4_poseidon', 'deagle_printstream', 'kn_kar_gamma', 'kn_flip_doppler', 'kn_gut_tiger', 'gl_driver_king', 'gl_sport_hedge'] },
 ];
 
 // Агенты: head — головной убор

@@ -1,13 +1,13 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793117349';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, skinById, weaponName, agentById } from './data.js?v=1793117349';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793117349';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793117349';
-import { AgentModel } from './models.js?v=1793117349';
-import { Controls, isTouch } from './controls.js?v=1793117349';
-import { initAudio, play, setVolume } from './sfx.js?v=1793117349';
-import { Game } from './game.js?v=1793117349';
+import { MAPS, CELL } from './maps.js?v=1793117891';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793117891';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793117891';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793117891';
+import { AgentModel } from './models.js?v=1793117891';
+import { Controls, isTouch } from './controls.js?v=1793117891';
+import { initAudio, play, setVolume } from './sfx.js?v=1793117891';
+import { Game } from './game.js?v=1793117891';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -220,7 +220,7 @@ function setMenuAgent(id) {
   if (M.id === id && M.model) return;
   if (M.model) M.scene.remove(M.model.root);
   const ag = agentById[id], lo = loadout(), gun = ag.team === 'T' ? 'ak47' : 'm4a4';
-  M.model = new AgentModel(ag, gun, lo[gun] || null); M.id = id;
+  M.model = new AgentModel(ag, gun, lo[gun] || null); M.id = id; if (lo.gloves) M.model.setGloves(lo.gloves);
   M.scene.add(M.model.root);
 }
 for (const st of ['stage', 'stage2']) {
@@ -307,7 +307,7 @@ function renderAdmin() {
   btn(r, 'Установить', () => { const v = parseInt(inp.value, 10); if (v >= 0) save.coins = v; });
   r = group(`Инвентарь: ${save.inv.length} предм.`);
   btn(r, 'Выдать все скины', () => { for (const sk of SKINS) addItem(sk.id); });
-  btn(r, 'Выдать все ножи', () => { for (const sk of SKINS) if (sk.rarity === 'gold') addItem(sk.id); });
+  btn(r, 'Выдать все ножи и перчатки', () => { for (const sk of SKINS) if (sk.rarity === 'gold') addItem(sk.id); });
   btn(r, 'Очистить', () => { if (confirm('Удалить весь инвентарь?')) { save.inv = []; save.equip = {}; } });
   const sel = el('select'); for (const sk of SKINS) { const o = el('option', '', `${weaponName(sk.weapon)} | ${sk.name}`); o.value = sk.id; sel.appendChild(o); }
   r.appendChild(sel); btn(r, 'Выдать', () => addItem(sel.value));
@@ -355,7 +355,7 @@ const hud = {
   flashed(d) { this.flashT = Math.max(this.flashT || 0, d); this.flashMax = Math.max(this.flashT, 0.5); if (d > 1) play('ring', 0, 0, Math.min(1, d / 3)); },
   feed(a, v, wid, hs, player) {
     const f = $('feed');
-    const icon = (WEAPONS[wid] || NADES[wid] || ['karambit', 'butterfly', 'bayonet'].includes(wid)) ? `<img src="${weaponIconURL(wid, null, 96, 36)}" alt="">` : (wid === 'fall' ? '⬇' : '☠');
+    const icon = (WEAPONS[wid] || NADES[wid] || KNIVES[wid]) ? `<img src="${weaponIconURL(wid, null, 96, 36)}" alt="">` : (wid === 'fall' ? '⬇' : '☠');
     const nm = x => x ? `<span class="${x.team === 'T' ? 't' : 'ct'}">${esc(x.name)}</span>` : '';
     const d = el('div', (a === player || v === player) ? 'me' : '', `${a && a !== v ? nm(a) : ''}${icon}${hs ? '<span class="hs">◉</span>' : ''}${nm(v)}`);
     f.prepend(d); while (f.children.length > 5) f.lastChild.remove();

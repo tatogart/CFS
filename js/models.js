@@ -1,7 +1,7 @@
 // 3D-модели: агенты (человечки с IK-руками), оружие
 import * as THREE from '../vendor/three.module.min.js';
-import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793117349';
-import { skinById, WEAPONS } from './data.js?v=1793117349';
+import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793117891';
+import { skinById, WEAPONS, KNIVES } from './data.js?v=1793117891';
 
 const matCache = new Map();
 export function mat(color, opts = {}) {
@@ -45,13 +45,13 @@ const W3D = {
   molotov: { parts: [[0, 0.02, -0.03, 0.06, 0.1, 0.06, 'b', 0, 'cylv'], [0, 0.1, -0.03, 0.025, 0.07, 0.025, 'b', 0, 'cylv']], fore: [0, -0.05, 0.1], muzzle: [0, 0, -0.05] },
   c4: { parts: [[0, 0.02, -0.05, 0.12, 0.06, 0.18, 'b']], fore: [0, -0.03, -0.1], muzzle: [0, 0, -0.1] },
 };
-W3D.karambit = W3D.knife; W3D.butterfly = W3D.knife; W3D.bayonet = W3D.knife;
+for (const k of ['karambit', 'butterfly', 'bayonet', 'flip', 'gut', 'huntsman', 'falchion', 'talon']) W3D[k] = W3D.knife;
 const NADE_COLORS = { he: '#3d5a2a', flash: '#9aa0a6', smoke: '#5d6b74', molotov: '#4a7a3a', c4: '#6b5a3a' };
 
 export function buildWeapon(id, skinId) {
   const def = W3D[id] || W3D.knife;
   const grp = new THREE.Group();
-  const isKnife = id === 'knife' || id === 'karambit' || id === 'butterfly' || id === 'bayonet';
+  const isKnife = id === 'knife' || !!KNIVES[id];
   const bodyMat = NADE_COLORS[id] ? mat(NADE_COLORS[id]) : skinMaterial(skinId, isKnife ? 'knife' : 'rifle');
   const woodMat = skinId ? bodyMat : (id === 'ak47' ? skinMaterial(null, 'wood') : bodyMat);
   const dark = mat('#1d1f22');
@@ -88,10 +88,11 @@ function buildKnife(id, blade, dark, grp, def) {
   const grip = mat('#2a2b2e'), metal = mat('#8d939a');
   const add = (geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); grp.add(o); return o; };
   const rod = (w, h, d) => G(`b${w}_${h}_${d}`, () => box(w, h, d));
-  if (id === 'karambit') {
+  if (id === 'karambit' || id === 'talon') {
     // изогнутый коготь
-    const outer = arc(0.0, -0.075, 0.08, 90, -28, 14), inner = arc(0.0, -0.075, 0.055, -12, 95, 12);
-    add(bladeGeo('kar', [[-0.012, 0.004], ...outer, ...inner, [-0.012, -0.02]], 0.004), blade);
+    const big = id === 'talon' ? 1.2 : 1;
+    const outer = arc(0.0, -0.075 * big, 0.08 * big, 90, -28, 14), inner = arc(0.0, -0.075 * big, 0.055 * big, -12, 95, 12);
+    add(bladeGeo(id, [[-0.012, 0.004], ...outer, ...inner, [-0.012, -0.02]], 0.004), blade);
     add(rod(0.022, 0.03, 0.1), grip, 0, -0.006, 0.055);
     for (const z of [0.02, 0.05, 0.08]) add(rod(0.024, 0.032, 0.006), dark, 0, -0.006, z);
     const ring = add(G('karring', () => new THREE.TorusGeometry(0.02, 0.006, 8, 18).rotateY(Math.PI / 2)), metal, 0, -0.008, 0.125);
@@ -105,11 +106,18 @@ function buildKnife(id, blade, dark, grp, def) {
       h.userData.handle = sx; }
     add(G('bpin', () => new THREE.CylinderGeometry(0.004, 0.004, 0.026, 8).rotateZ(Math.PI / 2)), metal, 0, 0, 0.003);
   } else {
-    // штык-нож / обычный нож
-    const big = id === 'bayonet';
+    // штык-нож, складной, крюк, охотничий, фальшион, обычный нож
+    const big = id === 'bayonet' || id === 'huntsman';
     const L = big ? 0.17 : 0.13, H = big ? 0.016 : 0.014;
-    add(bladeGeo(id, [[0, -H], [L * 0.82, -H], [L, -0.002], [L * 0.86, H * 0.45], [L * 0.6, H], [0, H]], 0.0045), blade);
-    add(rod(0.006, 0.004, L * 0.6), dark, 0, H * 0.35, -L * 0.35);
+    const shapes = {
+      flip: [[0, -0.012], [0.11, -0.012], [0.145, -0.002], [0.12, 0.01], [0, 0.012]],
+      gut: [[0, -0.013], [0.11, -0.013], [0.15, 0.0], [0.125, 0.012], [0.1, 0.012], [0.09, 0.003], [0.076, 0.012], [0, 0.013]],
+      huntsman: [[0, -0.017], [0.13, -0.017], [0.18, 0], [0.14, 0.016], [0, 0.016]],
+      falchion: [[0, -0.012], [0.1, -0.014], [0.15, -0.006], [0.172, 0.014], [0.14, 0.008], [0.1, 0.012], [0, 0.012]],
+    };
+    add(bladeGeo(id, shapes[id] || [[0, -H], [L * 0.82, -H], [L, -0.002], [L * 0.86, H * 0.45], [L * 0.6, H], [0, H]], 0.0045), blade);
+    if (id === 'huntsman') for (let k = 0; k < 6; k++) add(rod(0.005, 0.005, 0.006), dark, 0, 0.018, -0.03 - k * 0.012);
+    if (id !== 'flip') add(rod(0.006, 0.004, L * 0.6), dark, 0, H * 0.35, -L * 0.35);
     add(rod(0.016, 0.06, 0.012), metal, 0, -0.004, 0.004);
     add(G('kgrip' + big, () => new THREE.CylinderGeometry(0.015, 0.017, 0.11, 10).rotateX(Math.PI / 2)), grip, 0, -0.004, 0.065);
     for (const z of [0.03, 0.06, 0.09]) add(G('kring', () => new THREE.CylinderGeometry(0.0175, 0.0175, 0.006, 10).rotateX(Math.PI / 2)), dark, 0, -0.004, z);
@@ -204,6 +212,10 @@ export class AgentModel {
     root.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
     this._v = new THREE.Vector3(); this._q = new THREE.Quaternion();
   }
+  setGloves(skinId) {
+    const m = skinId ? skinMaterial(skinId) : mat(this.c.glove);
+    for (const a of this.arms) a.hand.material = m;
+  }
   setWeapon(id, skinId) {
     if (this.gunId === id && this.gunSkin === skinId) return;
     this.gunId = id; this.gunSkin = skinId;
@@ -291,15 +303,20 @@ const UPV = new THREE.Vector3(0, 1, 0);
 const tmp1 = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Vector3(), tmp4 = new THREE.Vector3(), tmp5 = new THREE.Vector3(), tmp6 = new THREE.Vector3();
 
 // Руки от первого лица
-export function buildViewArms(agent) {
+export function buildViewArms(agent, gloveSkin) {
   const c = agent.c, grp = new THREE.Group();
-  const sleeve = mat(c.shirt), glove = mat(c.glove);
+  const sleeve = mat(c.shirt), glove = gloveSkin ? skinMaterial(gloveSkin) : mat(c.glove), strap = gloveSkin ? mat('#1a1b1e') : mat(c.glove);
   const mkArm = sx => {
     const g = new THREE.Group();
     const fore = new THREE.Mesh(G('vfore', () => new THREE.CylinderGeometry(0.035, 0.042, 0.34, 10).rotateX(Math.PI / 2)), sleeve);
     fore.position.z = 0.17; g.add(fore);
     const cuff = new THREE.Mesh(G('vcuff', () => new THREE.CylinderGeometry(0.044, 0.044, 0.04, 10).rotateX(Math.PI / 2)), mat(c.accent)); cuff.position.z = 0.02; g.add(cuff);
-    const hand = new THREE.Mesh(G('vhand', () => box(0.06, 0.07, 0.09)), glove); hand.position.z = -0.03; g.add(hand);
+    // кисть: ладонь, согнутые пальцы и большой палец
+    const hand = new THREE.Group(); hand.position.z = -0.03; g.add(hand);
+    const palm = new THREE.Mesh(G('vpalm', () => box(0.064, 0.05, 0.08)), glove); hand.add(palm);
+    for (let f = 0; f < 4; f++) { const fi = new THREE.Mesh(G('vfing', () => box(0.0145, 0.018, 0.05)), glove); fi.position.set(-0.024 + f * 0.016, -0.03, -0.035); fi.rotation.x = 1.1; hand.add(fi); }
+    const th = new THREE.Mesh(G('vthumb', () => box(0.016, 0.018, 0.045)), glove); th.position.set(-sx * 0.036, 0.0, -0.03); th.rotation.set(0.4, sx * 0.5, 0); hand.add(th);
+    const band = new THREE.Mesh(G('vband', () => box(0.07, 0.056, 0.016)), strap); band.position.z = 0.04; hand.add(band);
     return g;
   };
   grp.userData.right = mkArm(1); grp.userData.left = mkArm(-1);

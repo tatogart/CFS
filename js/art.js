@@ -1,5 +1,5 @@
 // Процедурная графика: узоры скинов, миниатюры оружия, кейсов и карт
-import { skinById, WEAPONS, KNIVES } from './data.js?v=1793117349';
+import { skinById, WEAPONS, KNIVES, GLOVES } from './data.js?v=1793117891';
 
 export function rng(seed) {
   let a = seed >>> 0;
@@ -138,6 +138,26 @@ export function patternCanvas(pat, w = 256, h = 128) {
       for (let r = 10; r < w; r += 14) { g.beginPath(); for (let a = 0; a <= 16; a++) { const an = a / 16 * 6.283, rr = r * (a % 2 ? 0.92 : 1); g.lineTo(cx + Math.cos(an) * rr, cy + Math.sin(an) * rr); } g.stroke(); }
       break;
     }
+    case 'case': {
+      // закалка: синие и золотые разводы на стали
+      const img = g.createImageData(w, h), d = img.data, cols = c.map(hexRgb), ph = R() * 10;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = Math.sin(x * 0.05 + Math.sin(y * 0.09 + ph) * 3) * 0.5 + Math.sin((x - y) * 0.031 + ph) * 0.5;
+        const k = v > 0.25 ? 0 : v < -0.35 ? 1 : 2, a = cols[k], o = (y * w + x) * 4, n = (R() - 0.5) * 18;
+        d[o] = a[0] + n; d[o + 1] = a[1] + n; d[o + 2] = a[2] + n; d[o + 3] = 255;
+      }
+      g.putImageData(img, 0, 0); break;
+    }
+    case 'damascus': {
+      fillAll(c[0]); g.lineWidth = 2;
+      for (let y = -20; y < h + 20; y += 5) { g.strokeStyle = (y / 5) % 2 ? c[1] : c[2]; g.beginPath(); for (let x = 0; x <= w; x += 6) g.lineTo(x, y + Math.sin(x * 0.06 + y * 0.2) * 7 + Math.sin(x * 0.17) * 2); g.stroke(); }
+      break;
+    }
+    case 'slaughter': {
+      fillAll(c[1]);
+      for (let n = 0; n < 26; n++) { g.fillStyle = n % 3 ? c[0] : c[2]; g.beginPath(); const x = R() * w, y = R() * h; for (let a = 0; a < 9; a++) { const ang = a / 9 * 6.283, rr = 6 + R() * 18; g.lineTo(x + Math.cos(ang) * rr * 1.3, y + Math.sin(ang) * rr); } g.fill(); }
+      break;
+    }
     default: fillAll(c[0] || '#555');
   }
   // лёгкий шум износа
@@ -254,6 +274,30 @@ const SHAPES = {
     { k: 'd', p: [14, 52, 116, 52, 116, 60, 14, 64] },
     { k: 'h', r: [30, 38, 60, 3] }, { k: 'h', r: [30, 56, 60, 3] },
   ],
+  flip: [
+    { k: 'b', p: [110, 40, 214, 38, 246, 46, 214, 56, 110, 56] },
+    { k: 'd', p: [16, 42, 112, 38, 112, 58, 22, 60, 10, 52] }, { k: 'h', c: [100, 48, 4] },
+  ],
+  gut: [
+    { k: 'b', p: [108, 40, 210, 40, 248, 50, 214, 56, 190, 52, 182, 58, 170, 52, 108, 56] },
+    { k: 'd', r: [98, 30, 10, 36] }, { k: 'd', p: [16, 40, 98, 38, 98, 58, 16, 58, 10, 49] },
+  ],
+  huntsman: [
+    { k: 'b', p: [112, 36, 196, 36, 252, 50, 214, 60, 112, 60] }, { k: 'd', r: [130, 38, 50, 4] },
+    { k: 'd', r: [100, 26, 12, 44] }, { k: 'd', p: [14, 40, 100, 38, 100, 58, 14, 60, 8, 50] },
+  ],
+  falchion: [
+    { k: 'b', p: [110, 46, 190, 40, 232, 30, 250, 34, 226, 54, 110, 58] },
+    { k: 'd', r: [100, 34, 10, 30] }, { k: 'd', p: [16, 40, 100, 40, 100, 58, 20, 62, 8, 50] },
+  ],
+  talon: [
+    { k: 'b', p: [112, 52, 150, 42, 190, 26, 226, 20, 248, 30, 252, 50, 236, 42, 210, 36, 186, 44, 160, 60, 128, 68] },
+    { k: 'd', p: [40, 52, 116, 46, 124, 66, 46, 74] }, { k: 'd', c: [30, 64, 14] }, { k: 'h', c: [30, 64, 7] },
+  ],
+  glove: [
+    { k: 'b', p: [70, 38, 92, 22, 104, 22, 98, 40, 118, 16, 130, 18, 122, 42, 140, 16, 152, 20, 142, 44, 160, 26, 170, 30, 156, 54, 172, 46, 182, 52, 164, 72, 150, 86, 96, 86, 74, 70] },
+    { k: 'd', p: [92, 84, 152, 84, 150, 94, 94, 94] },
+  ],
   he: [{ k: 'b', c: [128, 56, 30] }, { k: 'd', r: [118, 14, 20, 14] }, { k: 'd', p: [138, 18, 168, 30, 166, 36, 138, 26] }],
   flash: [{ k: 'b', r: [104, 26, 48, 62] }, { k: 'd', r: [112, 12, 32, 14] }, { k: 'd', p: [144, 16, 170, 28, 168, 34, 144, 24] }],
   smoke: [{ k: 'b', r: [102, 28, 52, 62] }, { k: 'd', r: [102, 52, 52, 8] }, { k: 'd', r: [112, 14, 32, 14] }, { k: 'd', p: [144, 18, 170, 30, 168, 36, 144, 26] }],
@@ -275,13 +319,14 @@ function pathShape(g, s, sx, sy) {
 export function drawWeapon(cv, weapon, skinId, opts = {}) {
   const g = cv.getContext('2d'), W = cv.width, H = cv.height;
   g.clearRect(0, 0, W, H);
-  const shapes = SHAPES[weapon] || SHAPES.knife;
+  const shapes = GLOVES[weapon] ? SHAPES.glove : (SHAPES[weapon] || SHAPES.knife);
   const sx = W / 256, sy = H / 96;
   const skin = skinId ? skinById[skinId] : null;
   let pat;
   if (skin) pat = patternCanvas(skin.pat);
   else if (NADE_COL[weapon]) pat = patternCanvas({ t: 'solid', c: [NADE_COL[weapon]] });
   else if (KNIVES[weapon] || weapon === 'knife') pat = patternCanvas(DEFAULT_PAT.knife);
+  else if (GLOVES[weapon]) pat = patternCanvas({ t: 'solid', c: ['#3a3d42'] });
   else pat = patternCanvas(DEFAULT_PAT.rifle);
   const woodPat = (!skin && weapon === 'ak47') ? patternCanvas(DEFAULT_PAT.wood) : pat;
   g.save();
@@ -328,6 +373,10 @@ function emblem(g, type, cx, cy, s, col) {
     g.beginPath(); g.moveTo(s * 0.15, -s); g.lineTo(-s * 0.5, s * 0.1); g.lineTo(-s * 0.05, s * 0.1); g.lineTo(-s * 0.2, s); g.lineTo(s * 0.5, -s * 0.15); g.lineTo(s * 0.05, -s * 0.15); g.closePath(); g.fill();
   } else if (type === 'claw') {
     for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(k * s * 0.38 - s * 0.2, -s * 0.8); g.quadraticCurveTo(k * s * 0.38 + s * 0.3, 0, k * s * 0.38 - s * 0.05, s * 0.85); g.quadraticCurveTo(k * s * 0.38 + s * 0.1, 0, k * s * 0.38 - s * 0.2, -s * 0.8); g.fill(); }
+  } else if (type === 'glove') {
+    g.beginPath(); g.moveTo(-s * 0.5, s * 0.8); g.lineTo(-s * 0.55, -s * 0.1); g.lineTo(-s * 0.7, -s * 0.45); g.lineTo(-s * 0.45, -s * 0.5); g.lineTo(-s * 0.3, -s * 0.2); g.lineTo(-s * 0.3, -s * 0.85); g.lineTo(-s * 0.1, -s * 0.85); g.lineTo(-s * 0.05, -s * 0.3); g.lineTo(0, -s * 0.95); g.lineTo(s * 0.2, -s * 0.95); g.lineTo(s * 0.2, -s * 0.3); g.lineTo(s * 0.3, -s * 0.85); g.lineTo(s * 0.5, -s * 0.8); g.lineTo(s * 0.45, -s * 0.2); g.lineTo(s * 0.6, -s * 0.6); g.lineTo(s * 0.75, -s * 0.5); g.lineTo(s * 0.5, s * 0.8); g.closePath(); g.fill();
+  } else if (type === 'blade') {
+    g.rotate(-0.6); g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.22, -s * 0.2); g.lineTo(s * 0.1, s * 0.25); g.lineTo(-s * 0.1, s * 0.25); g.lineTo(-s * 0.15, -s * 0.3); g.closePath(); g.fill(); g.fillRect(-s * 0.35, s * 0.25, s * 0.7, s * 0.1); g.fillRect(-s * 0.08, s * 0.35, s * 0.16, s * 0.55);
   } else if (type === 'flake') {
     for (let a = 0; a < 6; a++) { g.save(); g.rotate(a / 6 * 6.283); g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -s * 0.9); g.moveTo(0, -s * 0.5); g.lineTo(s * 0.22, -s * 0.72); g.moveTo(0, -s * 0.5); g.lineTo(-s * 0.22, -s * 0.72); g.stroke(); g.restore(); }
   }

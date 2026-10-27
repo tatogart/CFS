@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793117349';
-import { World } from './world.js?v=1793117349';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793117349';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793117349';
-import { play, soundFor } from './sfx.js?v=1793117349';
-import { Bot, planRound } from './bots.js?v=1793117349';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793117349';
+import { CELL } from './maps.js?v=1793117891';
+import { World } from './world.js?v=1793117891';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793117891';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793117891';
+import { play, soundFor } from './sfx.js?v=1793117891';
+import { Bot, planRound } from './bots.js?v=1793117891';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793117891';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -65,7 +65,7 @@ export class Game {
     this.scene.fog = new THREE.Fog(new THREE.Color(th.fog).lerp(new THREE.Color('#9aa3ab'), 0.45), 25, th.void ? 240 : 115);
     this.world = new World(opts.map, this.quality);
     this.scene.add(this.world.group);
-    const hemi = new THREE.HemisphereLight('#c9d4de', '#4a4136', 0.95); this.scene.add(hemi);
+    const hemi = new THREE.HemisphereLight('#c9d4de', '#5a5044', 1.2); this.scene.add(hemi);
     const sun = this.sun = new THREE.DirectionalLight('#ffe6c4', 2.9);
     // небо: купол с градиентом и солнцем
     {
@@ -86,7 +86,7 @@ export class Game {
       sun.castShadow = true; const s = sun.shadow; s.mapSize.set(this.quality >= 2 ? 2048 : 1024, this.quality >= 2 ? 2048 : 1024); const ext = Math.max(cx, cz) + 4;
       s.camera.left = -ext; s.camera.right = ext; s.camera.top = ext; s.camera.bottom = -ext; s.camera.near = 10; s.camera.far = 160; s.bias = -0.0006;
     }
-    this.scene.add(new THREE.AmbientLight('#b8c2cc', 0.18));
+    this.scene.add(new THREE.AmbientLight('#b8c2cc', 0.3));
     this.camera = new THREE.PerspectiveCamera(this.settings.fov, innerWidth / innerHeight, 0.05, 600);
     this.baseFov = this.settings.fov;
     // вьюмодель
@@ -132,6 +132,7 @@ export class Game {
     };
     const p = this.player = mkActor('Вы', side, false, this.o.agents[side]);
     p.skins = { ...lo };
+    if (p.skins.gloves) p.model.setGloves(p.skins.gloves);
     const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5);
     const enemy = side === 'T' ? 'CT' : 'T';
     const teamAgents = t => AGENTS.filter(a => a.team === t);
@@ -144,7 +145,10 @@ export class Game {
     this._buildViewmodel();
   }
   _botSkins(b) {
-    if (Math.random() < 0.5) for (const s of SKINS) if (!KNIVES[s.weapon] && Math.random() < 0.12) b.skins[s.weapon] = s.id;
+    if (Math.random() < 0.5) for (const s of SKINS) if (WEAPONS[s.weapon] && Math.random() < 0.12) b.skins[s.weapon] = s.id;
+    const gold = SKINS.filter(s => s.rarity === 'gold');
+    if (Math.random() < 0.3) { const k = gold.filter(s => KNIVES[s.weapon]); const sk = k[Math.floor(Math.random() * k.length)]; b.skins.knife = { model: sk.weapon, skin: sk.id }; }
+    if (Math.random() < 0.3) { const gl = gold.filter(s => !KNIVES[s.weapon]); b.skins.gloves = gl[Math.floor(Math.random() * gl.length)].id; b.model.setGloves(b.skins.gloves); }
   }
   give(a, id) {
     const def = WEAPONS[id];
@@ -207,7 +211,7 @@ export class Game {
   }
   _swapSides() {
     for (const a of this.actors) { a.team = a.team === 'T' ? 'CT' : 'T'; a.money = 800; a.kills = a.kills; const ag = a.bot ? AGENTS.filter(x => x.team === a.team)[a.id % 5] : agentById[this.o.agents[a.team]];
-      this.scene.remove(a.model.root); a.agent = ag; a.model = new AgentModel(ag, 'knife'); this.scene.add(a.model.root); this.resetLoadout(a, true); }
+      this.scene.remove(a.model.root); a.agent = ag; a.model = new AgentModel(ag, 'knife'); if (a.skins.gloves) a.model.setGloves(a.skins.gloves); this.scene.add(a.model.root); this.resetLoadout(a, true); }
     this.score = { T: this.score.CT, CT: this.score.T }; this.lossStreak = { T: 0, CT: 0 };
     this.playerSide = this.player.team;
     this._buildViewmodel();
@@ -286,10 +290,10 @@ export class Game {
   _buildViewmodel(a = this.viewing || this.player) {
     if (!a || !a.cur) return;
     const inst = a.cur, id = inst.nade || inst.c4 ? inst.id : (inst.model || inst.id);
-    this.vmKey = a.id + '|' + a.agent.id + '|' + id + '|' + inst.skin;
+    this.vmKey = a.id + '|' + a.agent.id + '|' + id + '|' + inst.skin + '|' + (a.skins.gloves || '');
     this.vm.clear();
     const gun = buildWeapon(id, inst.skin);
-    const arms = buildViewArms(a.agent);
+    const arms = buildViewArms(a.agent, a.skins.gloves);
     const g = new THREE.Group(); g.add(gun);
     const R = arms.userData.right, L = arms.userData.left;
     R.position.set(0.01, -0.05, 0.05); R.rotation.set(0.75, 0.25, 0); g.add(R);
@@ -297,11 +301,11 @@ export class Game {
     if (inst.id === 'knife') {
       // нож крутится вокруг своей точки (у керамбита — кольцо), руки остаются на месте
       const base = new THREE.Group(); base.scale.setScalar(1.8); base.rotation.set(0.3, 0, -0.15);
-      const piv = inst.model === 'karambit' ? new THREE.Vector3(0, -0.008, 0.125) : new THREE.Vector3(0, -0.004, 0.04);
+      const piv = inst.model === 'karambit' || inst.model === 'talon' ? new THREE.Vector3(0, -0.008, 0.125) : new THREE.Vector3(0, -0.004, 0.04);
       const spin = new THREE.Group(); spin.position.copy(piv); base.add(spin);
       g.remove(gun); gun.position.copy(piv).negate(); spin.add(gun); g.add(base);
       this.vmSpin = spin; this.vmKnife = gun;
-      R.position.set(0.0, -0.06, inst.model === 'karambit' ? 0.2 : 0.17); R.rotation.set(0.9, 0.2, 0);
+      R.position.set(0.0, -0.06, inst.model === 'karambit' || inst.model === 'talon' ? 0.2 : 0.17); R.rotation.set(0.9, 0.2, 0);
     }
     const fore = gun.userData.fore;
     if (inst.nade || inst.c4 || WEAPONS[id] && WEAPONS[id].type === 'knife' || KNIVES[id] || id === 'knife') { L.position.set(-0.36, -0.2, 0.12); L.rotation.set(0.6, -0.4, 0); }
@@ -1072,7 +1076,7 @@ export class Game {
     // вьюмодель
     if (view.cur) {
       const inst = view.cur, id = inst.nade || inst.c4 ? inst.id : (inst.model || inst.id);
-      if (this.vmKey !== view.id + '|' + view.agent.id + '|' + id + '|' + inst.skin) this._buildViewmodel(view);
+      if (this.vmKey !== view.id + '|' + view.agent.id + '|' + id + '|' + inst.skin + '|' + (view.skins.gloves || '')) this._buildViewmodel(view);
     }
     this.vm.visible = view.alive && !view.scope;
     if (this.vmGun) {
@@ -1100,7 +1104,7 @@ export class Game {
         if (isKnife) {
           // рука слегка поворачивает нож к себе, сам нож крутится в пальцах
           this.vmGun.rotation.y += e * 0.35; this.vmGun.position.x -= e * 0.03; this.vmGun.position.y += e * 0.02;
-          if (km === 'karambit') ks.rotation.x -= spin * Math.PI * 4;
+          if (km === 'karambit' || km === 'talon') ks.rotation.x -= spin * Math.PI * 4;
           else if (km === 'butterfly') {
             ks.rotation.z += spin * Math.PI * 4;
             kn.children.forEach(h => { if (h.userData.handle) h.rotation.x = Math.abs(Math.sin(spin * Math.PI * 3)) * Math.PI * 0.95 * h.userData.handle; });

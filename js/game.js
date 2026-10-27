@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793130863';
-import { World } from './world.js?v=1793130863';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793130863';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793130863';
-import { play, soundFor } from './sfx.js?v=1793130863';
-import { Bot, planRound } from './bots.js?v=1793130863';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793130863';
+import { CELL } from './maps.js?v=1793130934';
+import { World } from './world.js?v=1793130934';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793130934';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793130934';
+import { play, soundFor } from './sfx.js?v=1793130934';
+import { Bot, planRound } from './bots.js?v=1793130934';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793130934';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -107,7 +107,7 @@ export class Game {
     this.flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: softSprite(), color: '#ffcc66', blending: THREE.AdditiveBlending, depthTest: false, transparent: true }));
     this.flash.scale.setScalar(0.22); this.flash.visible = false; this.vmScene.add(this.flash);
 
-    this.actors = []; this.nades = []; this.smokes = []; this.fires = []; this.fx = []; this.decals = [];
+    this.dmgLog = {}; this.radioT = {}; this.actors = []; this.nades = []; this.smokes = []; this.fires = []; this.fx = []; this.decals = [];
     this.time = 0; this.score = { T: 0, CT: 0 }; this.round = 0; this.lossStreak = { T: 0, CT: 0 };
     this.feed = []; this.bomb = null; this.state = 'freeze'; this.stateT = 0;
     this.playerSide = opts.side;
@@ -211,7 +211,7 @@ export class Game {
     const half = this.o.winTo - 1;
     if (!first && !this.practice && this.round === half + 1) this._swapSides();
     this.state = this.practice ? 'live' : 'freeze'; this.stateT = this.practice ? 1e9 : FREEZE;
-    this.roundTime = this.roundLen; this.bomb = null; this.defuser = null;
+    this.roundTime = this.roundLen; this.bomb = null; this.defuser = null; this.dmgLog = {};
     if (this.dm) { this.state = 'live'; this.stateT = 1e9; }
     for (const n of this.nades) n.mesh && this.scene.remove(n.mesh); this.nades = [];
     for (const s of this.smokes) this.scene.remove(s.grp); this.smokes = [];
@@ -243,6 +243,7 @@ export class Game {
       if (ts.length) { const c = ts[Math.floor(Math.random() * ts.length)]; c.hasBomb = true; }
       planRound(this);
       for (const a of this.actors) if (a.brain) a.brain.onRoundStart();
+      setTimeout(() => { if (!this.over) this.radio(null, 'plan'); }, 1500 + Math.random() * 2500);
     }
     this.ui.roundStart && this.ui.roundStart(this);
     this.ev({ e: 'round', r: this.round });
@@ -277,6 +278,7 @@ export class Game {
     if (mvp) mvp.mvps = (mvp.mvps || 0) + 1;
     const why = reason === 'bomb' ? 'Бомба взорвана' : reason === 'defuse' ? 'Бомба обезврежена' : reason === 'time' ? 'Время вышло' : 'Противник уничтожен';
     this.ui.roundBanner ? this.ui.roundBanner(winner, why, mvp, this) : this.centerMsg(winner, 3);
+    if (Math.random() < 0.6) setTimeout(() => this.radio(null, winner === this.player.team ? 'win' : 'lose'), 1200);
     this.ev({ e: 'end', w: winner, why, mvp: mvp ? mvp.id : -1 });
     play(winner === this.player.team ? 'win' : 'lose');
     this.ui.onRoundEnd && this.ui.onRoundEnd(this, winner);
@@ -504,6 +506,13 @@ export class Game {
     const pen = def.pen || 1;
     if (v.armor > 0 && zone !== 'legs' && (zone !== 'head' || v.helmet)) { const ad = dmg * (1 - pen) * 0.5; v.armor = Math.max(0, v.armor - ad); dmg *= pen; }
     dmg = Math.round(dmg);
+    // отчёт об уроне (как в консоли CS): кому нанёс и от кого получил
+    if (a && a !== v && (a === this.player || v === this.player)) {
+      const mine = a === this.player, who = mine ? v : a, key = (mine ? 'g' : 't') + who.id;
+      const e = this.dmgLog[key] || (this.dmgLog[key] = { who, mine, dmg: 0, hits: 0 });
+      e.dmg += Math.min(Math.max(0, v.hp), dmg); e.hits++;
+    }
+    if (v.bot && v.hp > 25 && v.hp - dmg <= 25 && v.hp - dmg > 0) this.radio(v, 'hurt');
     v.hp -= dmg; v.lastHurt = this.time; v.lastAttacker = a;
     if (v.brain) v.brain.onHurt(a, dir);
     if (a && a.remote) this.net.send(a.nid, { t: 'ev', e: 'hit', hs: zone === 'head' ? 1 : 0 });
@@ -525,6 +534,8 @@ export class Game {
       if (a === this.player && this.ui.onKill) this.ui.onKill(hs);
       if (a === this.player && this.aimMode) { this.aimStats.kills++; if (hs) this.aimStats.hs++; }
     }
+    if (v === this.player && this.ui.damageReport && !this.aimMode) this.ui.damageReport(this.dmgLog, a, def);
+    if (!this.dm || this.ar) { if (v.team === this.player.team && v !== this.player) this.radio(null, 'down', { v, a, def }); else if (a === this.player && this.isEnemy(a, v) && Math.random() < 0.25) this.radio(null, 'nice'); }
     // бомба выпадает
     if (v.hasBomb) { v.hasBomb = false; this.dropBomb(v.pos); }
     const wid = def ? (def === WEAPONS.knife && a && a.cur && a.cur.model ? a.cur.model : Object.keys(WEAPONS).find(k => WEAPONS[k] === def) || def.icon) : 'skull';
@@ -774,6 +785,7 @@ export class Game {
     a.hasBomb = false;
     const site = this.world.siteAt(a.pos.x, a.pos.z) === 1 ? 'A' : 'B';
     this.bomb = { planted: true, pos: a.pos.clone(), timer: BOMB_TIME, site, beep: 0, planter: a };
+    if (a.bot) this.radio(a, 'planted', { site });
     this.ui.announce && this.ui.announce('Bomb has been planted');
     this._c4Mesh(this.bomb.pos);
     this.state = 'planted';
@@ -806,6 +818,36 @@ export class Game {
       for (const v of this.actors) if (v.alive) { const dist = v.pos.distanceTo(B.pos); if (dist < 20) { const dmg = 500 * (1 - dist / 20); this.damage(v, null, dmg, 'chest', 1, { pen: 1 }, null); } }
       if (this.state !== 'end') this.endRound('T', 'bomb');
     }
+  }
+
+  // ---------- радио: реплики ботов-союзников в чате команды ----------
+  radio(who, kind, x = {}) {
+    if (!this.ui.chat || this.practice || (this.dm && !this.ar)) return;
+    const team = who ? who.team : this.player.team;
+    if (team !== this.player.team) return;
+    if (this.time < (this.radioT[kind] || 0)) return;
+    const mates = this.actors.filter(b => b.bot && b.alive && b.team === team);
+    const sp = who && who.bot ? who : mates[Math.floor(Math.random() * mates.length)];
+    if (!sp || (!sp.alive && kind !== 'down')) return;
+    const r = a => a[Math.floor(Math.random() * a.length)];
+    let t = '';
+    if (kind === 'plan') {
+      if (this.dm) t = r(['Погнали!', 'Держимся вместе', 'Удачи всем']);
+      else if (team === 'T') { const s = this.plan.T.site; t = r([`Идём на ${s}`, `Го ${s}!`, `Раш ${s}, без остановок`, `Берём ${s}, кидайте раскидку`, `Сначала медленно, потом ${s}`]); }
+      else t = r(['Я держу A', 'Я на B', 'Играю от мида', 'Если что — ротейт', 'Дайте инфу, я помогу']);
+    } else if (kind === 'down') {
+      const kn = x.a && x.a !== x.v ? x.a.name : '', wn = x.def && x.def.name ? x.def.name : '';
+      t = r([`Минус ${x.v.name}`, kn ? `${x.v.name} убит, ${kn} с ${wn}` : `Потеряли ${x.v.name}`, kn ? `Осторожно, там ${kn}` : 'Минус один']);
+      if (wn === 'AWP') t = `Осторожно, у них AWP!`;
+    } else if (kind === 'nice') t = r(['Красава!', 'Хорош!', 'Ничего себе', 'Отличный выстрел', 'nice']);
+    else if (kind === 'planted') t = `Бомба на ${x.site}! Защищаем`;
+    else if (kind === 'hurt') t = r(['Мне нужна помощь!', 'Я на лоу', 'Почти убит, отхожу']);
+    else if (kind === 'spot') t = x.site ? r([`Враг на ${x.site}!`, `Вижу их у ${x.site}`, `Контакт на ${x.site}`]) : r(['Контакт!', 'Вижу врага', 'Он тут!']);
+    else if (kind === 'win') t = r(['gg', 'Изи', 'Так держать', 'Отличный раунд']);
+    else if (kind === 'lose') t = r(['Ничего, следующий наш', 'Эх', 'Соберёмся', 'Надо было ротейтнуть']);
+    if (!t) return;
+    this.radioT[kind] = this.time + (kind === 'down' ? 2 : kind === 'spot' ? 9 : 4);
+    this.ui.chat(sp, t);
   }
 
   // ---------- режимы ----------
@@ -859,7 +901,7 @@ export class Game {
     a.respT = 0; a.alive = true; a.hp = 100; a.blind = 0; a.vel.set(0, 0, 0); a.crouchK = 0; a.scope = 0; a.reloadT = 0;
     a.pos.copy(this.dmSpawnPos(a)); a.model.revive(); a.model.root.visible = a !== this.player;
     this.dmLoadout(a); if (!this.ar) this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
-    if (a === this.player) { this.vm.visible = true; this.spect = null; }
+    if (a === this.player) { this.vm.visible = true; this.spect = null; this.dmgLog = {}; }
     if (a.brain) a.brain.onRoundStart();
   }
 

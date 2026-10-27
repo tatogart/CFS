@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793130863';
-import { WEAPONS } from './data.js?v=1793130863';
+import { CELL } from './maps.js?v=1793130934';
+import { WEAPONS } from './data.js?v=1793130934';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -180,6 +180,7 @@ export class Bot {
         this.target = best;
       }
       this.seenPos = best.pos.clone(); this.seenT = g.time;
+      if (!g.intel[a.team] || g.time - g.intel[a.team].t > 6) { const st = g.world.siteAt(best.pos.x, best.pos.z); g.radio(a, 'spot', { site: st === 1 ? 'A' : st === 2 ? 'B' : '' }); }
       g.intel[a.team] = { pos: best.pos.clone(), t: g.time };
     } else if (this.target) {
       this.lastTarget = this.target; this.lostT = g.time; this.target = null;

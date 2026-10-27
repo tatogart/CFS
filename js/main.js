@@ -1,14 +1,14 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793130863';
-import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793130863';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793130863';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793130863';
-import { AgentModel } from './models.js?v=1793130863';
-import { Controls, isTouch } from './controls.js?v=1793130863';
-import { initAudio, play, setVolume } from './sfx.js?v=1793130863';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793130863';
-import { Game } from './game.js?v=1793130863';
+import { MAPS, CELL } from './maps.js?v=1793130934';
+import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793130934';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793130934';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793130934';
+import { AgentModel } from './models.js?v=1793130934';
+import { Controls, isTouch } from './controls.js?v=1793130934';
+import { initAudio, play, setVolume } from './sfx.js?v=1793130934';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793130934';
+import { Game } from './game.js?v=1793130934';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -525,6 +525,19 @@ const CT_ICON = '<svg viewBox="0 0 64 64"><path d="M32 4 56 12v18c0 15-10 25-24 
 const T_ICON = '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="#7a5418" stroke="#ffd27a" stroke-width="3"/><path d="M32 12l5 13h14l-11 8 4 14-12-8-12 8 4-14-11-8h14z" fill="#ffd27a"/></svg>';
 const hud = {
   centerT: 0,
+  chat(a, text) {
+    const box = $('chat'), d = el('div', '', `<b class="${a.team === 'T' ? 't' : 'ct'}">${a.alive ? '' : '*УБИТ* '}${esc(a.name)}</b>: ${esc(text)}`);
+    box.appendChild(d); while (box.children.length > 5) box.firstChild.remove();
+    setTimeout(() => d.classList.add('fade'), 7000); setTimeout(() => d.remove(), 8000);
+  },
+  damageReport(log, killer, def) {
+    const rows = Object.values(log); const box = $('dmgRep');
+    const g2 = rows.filter(r => r.mine), t2 = rows.filter(r => !r.mine);
+    const line = r => `<div><span class="${r.who.team === 'T' ? 't' : 'ct'}">${esc(r.who.name)}</span><b>${r.dmg}</b><small>${r.hits} попад.</small></div>`;
+    box.innerHTML = `<h5>${killer && killer !== game.player ? `Убит игроком <span class="${killer.team === 'T' ? 't' : 'ct'}">${esc(killer.name)}</span>${def && def.name ? ' · ' + esc(def.name) : ''}${killer.alive ? ` · у него ${Math.max(0, Math.round(killer.hp))} HP` : ''}` : 'Вы погибли'}</h5>
+      <div class="drCols"><div><h6>Нанесено</h6>${g2.map(line).join('') || '<em>—</em>'}</div><div><h6>Получено</h6>${t2.map(line).join('') || '<em>—</em>'}</div></div>`;
+    box.classList.remove('hidden'); clearTimeout(this._drT); this._drT = setTimeout(() => box.classList.add('hidden'), 6000);
+  },
   center(t, dur, color) { const c = $('center'); c.textContent = t; c.style.color = color || '#fff'; c.style.opacity = 1; this.centerT = dur; },
   hitmark(hs) { const h = $('hitm'); h.className = hs ? 'hs' : ''; h.style.opacity = 1; this.hitT = 0.25; },
   hurt() { $('hurtOv').style.opacity = 1; this.hurtT = 0.3; },
@@ -1016,7 +1029,7 @@ function finishLoad() {
   $('load').classList.add('hidden'); $('hud').classList.remove('hidden');
   $('touch').classList.toggle('hidden', !touch);
   $('fps').classList.toggle('hidden', !save.settings.fps);
-  $('feed').innerHTML = '';
+  $('feed').innerHTML = ''; $('chat').innerHTML = ''; $('dmgRep').classList.add('hidden');
   controls.reset(); controls.enabled = true; controls.touchSens = save.settings.touchSens;
   if (!touch) { controls.lock(); if (!controls.locked) game.centerMsg('Кликните, чтобы начать', 2.5); }
   checkRotate();

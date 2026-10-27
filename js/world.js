@@ -1,7 +1,7 @@
 // Мир: сетка карты, геометрия, лучи, навигация
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL, setCell } from './maps.js?v=1793126924';
-import { rng, shade } from './art.js?v=1793126924';
+import { CELL, setCell } from './maps.js?v=1793129478';
+import { rng, shade } from './art.js?v=1793129478';
 
 const WALK = new Set(['.', 'w', 'T', 'K', 'A', 'B', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 
@@ -121,9 +121,12 @@ export class World {
     for (const s of ['A', 'B']) {
       let sx = 0, sz = 0; for (const [i, j] of this.sites[s]) { sx += i; sz += j; }
       const n = this.sites[s].length;
+      // у карт «Напарников» одна точка, у арен — ни одной
+      if (!n) { const o = this.sites[s === 'A' ? 'B' : 'A']; this.sites[s].center = null; this.sites[s].alias = o; continue; }
       const ci = Math.round(sx / n - 0.5 + 0.5), cj = Math.round(sz / n);
       this.sites[s].center = new THREE.Vector3((sx / n + 0.5) * CELL, this.FL[this.idx(Math.floor(sx / n), Math.floor(sz / n))] || 0, (sz / n + 0.5) * CELL);
     }
+    for (const s of ['A', 'B']) if (!this.sites[s].center) this.sites[s].center = this.sites[s].alias.center || new THREE.Vector3(this.w * CELL / 2, 0, this.h * CELL / 2);
     this.siteOf = new Uint8Array(this.w * this.h);
     const inRect = (s) => { let x0 = 1e9, x1 = -1, z0 = 1e9, z1 = -1; for (const [i, j] of this.sites[s]) { x0 = Math.min(x0, i); x1 = Math.max(x1, i); z0 = Math.min(z0, j); z1 = Math.max(z1, j); } return [x0, x1, z0, z1]; };
     for (const [s, v] of [['A', 1], ['B', 2]]) { const [x0, x1, z0, z1] = inRect(s); for (let j = z0; j <= z1; j++) for (let i = x0; i <= x1; i++) if (this.H[j * this.w + i] >= 0) this.siteOf[j * this.w + i] = v; }
@@ -224,6 +227,7 @@ export class World {
     addCells(c => c === 'R', () => ({ geo: new THREE.BoxGeometry(CELL, 3.4, CELL * 0.9), y: 1.7 + 0.0 }), new THREE.MeshLambertMaterial({ map: trainTex }));
     // буквы точек на полу
     for (const s of ['A', 'B']) {
+      if (!this.sites[s].length) continue;
       const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d');
       g.font = 'bold 110px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(190,20,20,0.75)'; g.fillText(s, 64, 70);
       const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;

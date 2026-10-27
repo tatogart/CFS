@@ -413,3 +413,6 @@ body.touch #banner { top: 14%; padding: 8px 12px; } body.touch #banner b { font-
 .rarT { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
 @media (max-width: 520px) { .pDrop { grid-template-columns: repeat(2, 1fr) !important; } }
 @media (max-height: 460px) { .pRank img { max-width: 90px; } .pTop .avatar { width: 56px !important; height: 56px !important; } }
+
+.arNext { height: 14px; vertical-align: middle; filter: brightness(1.6); }
+#alive .arLv { color: #ffd860; font-weight: 800; }

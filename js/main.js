@@ -1,14 +1,14 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793126924';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793126924';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793126924';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793126924';
-import { AgentModel } from './models.js?v=1793126924';
-import { Controls, isTouch } from './controls.js?v=1793126924';
-import { initAudio, play, setVolume } from './sfx.js?v=1793126924';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793126924';
-import { Game } from './game.js?v=1793126924';
+import { MAPS, CELL } from './maps.js?v=1793129478';
+import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793129478';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793129478';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793129478';
+import { AgentModel } from './models.js?v=1793129478';
+import { Controls, isTouch } from './controls.js?v=1793129478';
+import { initAudio, play, setVolume } from './sfx.js?v=1793129478';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793129478';
+import { Game } from './game.js?v=1793129478';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -68,7 +68,23 @@ const MODES = [
   ['comp', 'Соревновательный', '5×5, до 13 побед, смена сторон после 12 раундов. Даёт звание.'],
   ['wing', 'Напарники', '2×2 на одной точке (B), до 9 побед, раунд 1:30. Своё звание.'],
   ['dm', 'Бой насмерть', 'Каждый сам за себя, 10 игроков, мгновенное возрождение, любое оружие бесплатно. 5 минут или до 30 убийств.'],
+  ['ar', 'Гонка вооружений', '5×5 с возрождением. Каждое убийство — следующее оружие, 21 уровень. Побеждает команда того, кто первым убьёт золотым ножом.'],
 ];
+// у каждого режима свой набор карт
+const DEFUSE = MAPS.filter(m => !m.modes && !m.aim).map(m => m.id);
+const POOLS = {
+  casual: [...DEFUSE, 'aim'],
+  comp: DEFUSE,
+  wing: MAPS.filter(m => m.modes && m.modes.includes('wing')).map(m => m.id),
+  dm: [...MAPS.filter(m => m.modes && m.modes.includes('dm')).map(m => m.id), ...DEFUSE],
+  ar: MAPS.filter(m => m.modes && m.modes.includes('ar')).map(m => m.id),
+};
+const poolOf = md => POOLS[md] || POOLS.casual;
+function modeMap(md) {
+  save.lastMaps = save.lastMaps || {};
+  const pool = poolOf(md), id = save.lastMaps[md] || (pool.includes(save.last.map) ? save.last.map : pool[0]);
+  return MAPS.find(m => m.id === (pool.includes(id) ? id : pool[0]));
+}
 // ---------- звания ----------
 const BOT_ELO = { harmless: 300, easy: 700, medium: 1200, hard: 1700, esports: 2300, none: 0 };
 const rankOf = r => (r && r.wins >= 2) ? Math.max(0, Math.min(17, Math.floor((r.elo - 250) / 125))) : -1;
@@ -81,10 +97,12 @@ function renderPlay() {
   $('rowSize').classList.toggle('hidden', md !== 'casual');
   $("rowLen").classList.toggle('hidden', md !== 'casual');
   const mb = $('maps'); mb.innerHTML = '';
-  for (const m of MAPS) {
-    const b = el('button', 'map' + (save.last.map === m.id ? ' on' : ''));
+  const curMap = modeMap(md); save.last.map = curMap.id;
+  for (const id of poolOf(md)) {
+    const m = MAPS.find(x => x.id === id);
+    const b = el('button', 'map' + (curMap.id === m.id ? ' on' : ''));
     b.innerHTML = `<img src="${mapThumbURL(m)}" alt=""><div class="mn"><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></div>`;
-    b.onclick = () => { save.last.map = m.id; mb.querySelectorAll('.map').forEach(x => x.classList.remove('on')); b.classList.add('on'); persist(); play('tick'); };
+    b.onclick = () => { save.last.map = m.id; save.lastMaps[md] = m.id; mb.querySelectorAll('.map').forEach(x => x.classList.remove('on')); b.classList.add('on'); persist(); play('tick'); renderHome(); };
     mb.appendChild(b);
   }
   const showDesc = id => { const d = DIFFICULTIES.find(x => x.id === id); $('diffDesc').textContent = d.desc + (d.reward ? ` · награда ×${d.reward}` : ' · без награды'); };
@@ -408,8 +426,8 @@ function renderHome() {
   renderProfileChip();
   $('homeAgent').textContent = ag.name; $('homeSide').textContent = M.side === 'T' ? 'Террористы' : 'Спецназ';
   document.querySelectorAll('#sideSw button').forEach(b => b.classList.toggle('on', b.dataset.side === M.side));
-  const map = MAPS.find(m => m.id === save.last.map) || MAPS[0], diff = DIFFICULTIES.find(d => d.id === save.last.diff);
-  $('homePlayInfo').textContent = `${map.name} · ${diff ? diff.name : ''}`;
+  const map = modeMap(save.last.mode || 'casual'), diff = DIFFICULTIES.find(d => d.id === save.last.diff);
+  $('homePlayInfo').textContent = `${(MODES.find(m => m[0] === (save.last.mode || 'casual')) || [])[1]} · ${map.name} · ${diff ? diff.name : ''}`;
   const cs = CASES[(save.stats.opened + 1) % CASES.length];
   const pr = $('promo'); pr.className = 'hcard promo';
   pr.innerHTML = `<img src="${caseIconURL(cs)}" alt=""><div><h4>Магазин</h4><b>${esc(cs.name)}</b><span>◈ ${cs.price}</span></div>`;
@@ -575,7 +593,8 @@ function updateHud(g, dt) {
   if (wi && hud.wiKey !== wi + cur.skin) { hud.wiKey = wi + cur.skin; $('wIcon').src = cur.c4 ? '' : weaponIconURL(wi, cur.skin, 96, 36); }
   buildSlots(g);
   // таймер/счёт
-  set('scT', g.dm ? p.kills : g.score.T); set('scCT', g.dm ? '' : g.score.CT);
+  const ffa = g.dm && !g.ar;
+  set('scT', ffa ? p.kills : g.score.T); set('scCT', ffa ? '' : g.score.CT);
   const B = g.bomb;
   let tt = g.state === 'freeze' ? g.stateT : g.state === 'end' ? g.stateT : g.roundTime;
   if (B && B.planted && !B.done) tt = B.timer;
@@ -583,7 +602,11 @@ function updateHud(g, dt) {
     const t = Math.max(0, g.dmTime), order = g.actors.slice().sort((a, b) => b.kills - a.kills), place = order.indexOf(p) + 1;
     set('timer', `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`);
     const k = place + '|' + order[0].kills + '|' + p.kills;
-    if (hud.aliveKey !== k) { hud.aliveKey = k; $('alive').innerHTML = `место ${place}/${order.length} · лидер: ${esc(order[0].name)} ${order[0].kills}/${g.dmLimit}`; }
+    if (g.ar) {
+      const lv = a => a.arLvl || 0, lead = g.actors.reduce((m, a) => lv(a) > lv(m) ? a : m, g.actors[0]), nx = AR_LADDER[Math.min(lv(p) + 1, AR_LADDER.length - 1)];
+      const k2 = lv(p) + '|' + lv(lead) + lead.name;
+      if (hud.aliveKey !== k2) { hud.aliveKey = k2; $('alive').innerHTML = `<span class="arLv">Ур. ${lv(p) + 1}/${AR_LADDER.length}</span> далее <img class="arNext" src="${weaponIconURL(nx, null, 96, 36)}" alt=""> · лидер: <span class="${lead.team === 'T' ? 't' : 'ct'}">${esc(lead.name)}</span> ${lv(lead) + 1}`; }
+    } else if (hud.aliveKey !== k) { hud.aliveKey = k; $('alive').innerHTML = `место ${place}/${order.length} · лидер: ${esc(order[0].name)} ${order[0].kills}/${g.dmLimit}`; }
   } else if (g.aimMode) { const A = g.aimStats, mins = Math.max(1 / 60, (g.time - (A.t0 || g.time)) / 60); set('timer', `🎯 ${A.kills} · HS ${A.kills ? Math.round(A.hs / A.kills * 100) : 0}% · точн. ${A.shots ? Math.round(A.hits / A.shots * 100) : 0}% · ${A.t0 ? Math.round(A.kills / mins) : 0}/мин`); }
   else if (g.practice) set('timer', 'ТРЕНИРОВКА');
   else set('timer', `${Math.floor(Math.max(0, tt) / 60)}:${String(Math.floor(Math.max(0, tt) % 60)).padStart(2, '0')}`);
@@ -648,6 +671,7 @@ function updateHud(g, dt) {
   if (g.settings.fps) { fpsAcc += dt; fpsN++; fpsT += dt; if (fpsT > 0.5) { set('fps', Math.round(fpsN / fpsAcc) + ' FPS'); fpsAcc = fpsN = fpsT = 0; } }
 }
 function renderBoard(g) {
+  if (g.ar) { const lv = a => a.arLvl || 0; $('board').innerHTML = `<h4>${esc(g.o.map.name)} · гонка вооружений · T ${g.score.T} : ${g.score.CT} CT</h4><table><tr><th>Игрок</th><th>Ур.</th><th>У</th><th>С</th></tr>${g.actors.slice().sort((a, b) => lv(b) - lv(a) || b.kills - a.kills).map(a => `<tr class="${a.alive ? '' : 'dead'} ${a === g.player ? 'me' : ''}" style="color:${a.team === 'T' ? '#e8b04a' : '#6aa8ff'}"><td>${esc(a.name)}</td><td>${lv(a) + 1} <img class="arNext" src="${weaponIconURL(AR_LADDER[Math.min(lv(a), AR_LADDER.length - 1)], null, 96, 36)}" alt=""></td><td>${a.kills}</td><td>${a.deaths}</td></tr>`).join('')}</table>`; return; }
   if (g.dm) { $('board').innerHTML = `<h4>${esc(g.o.map.name)} · бой насмерть</h4><table><tr><th>Игрок</th><th>У</th><th>С</th></tr>${g.actors.slice().sort((a, b) => b.kills - a.kills).map(a => `<tr class="${a.alive ? '' : 'dead'} ${a === g.player ? 'me' : ''}"><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td></tr>`).join('')}</table>`; return; }
   const rows = team => g.actors.filter(a => a.team === team).sort((a, b) => b.kills - a.kills).map(a => `<tr class="${team === 'T' ? 't' : 'ct'} ${a.alive ? '' : 'dead'} ${a === g.player ? 'me' : ''}"><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td><td>$${a.money}</td></tr>`).join('');
   $('board').innerHTML = `<h4>${esc(g.o.map.name)} · раунд ${g.round}</h4><table><tr><th>Террористы — ${g.score.T}</th><th>У</th><th>С</th><th>$</th></tr>${rows('T')}<tr><th>Спецназ — ${g.score.CT}</th><th></th><th></th><th></th></tr>${rows('CT')}</table>`;
@@ -713,7 +737,8 @@ $('quit').onclick = () => { $('pause').classList.add('hidden'); quitGame(); };
 const XP_LVL = XP_PER_LVL;
 function endMatch(g) {
   controls.unlock();
-  const p = g.player, dm = g.dm;
+  const p = g.player, dm = g.dm && !g.ar;
+  if (g.ar && g.arWinner) { g.score[g.arWinner.team] = Math.max(g.score[g.arWinner.team], g.score[g.arWinner.team === 'T' ? 'CT' : 'T'] + 1); }
   const my = g.score[p.team], th = g.score[p.team === 'T' ? 'CT' : 'T'];
   const order = g.actors.slice().sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   const place = order.indexOf(p) + 1;
@@ -743,6 +768,7 @@ function endMatch(g) {
   const top = (f) => { let b = null; for (const a of pool) if (f(a) > 0 && (!b || f(a) > f(b))) b = a; return b; };
   const badges = new Map();
   const give = (a, t) => { if (a && !badges.has(a)) badges.set(a, t); };
+  if (g.arWinner && pool.includes(g.arWinner)) give(g.arWinner, 'Золотой нож');
   give(top(a => a.mvps || 0), 'MVP матча'); give(top(a => a.kills), 'Больше всех убийств'); give(top(a => a.hs || 0), 'Мастер хедшотов'); give(top(kd), 'Лучший K/D');
   const players = pool.map(a => {
     const w = a.weapons[1] || a.weapons[2];
@@ -878,14 +904,14 @@ function renderEnd(dt) {
 // ---------- запуск матча ----------
 function startGame() {
   initAudio(); const yb = $('ytBox'); yb.innerHTML = ''; yb.dataset.id = ''; yb.classList.add('hidden'); stopMusic(0.5);
-  let map = MAPS.find(m => m.id === save.last.map) || MAPS[0];
+  let map = modeMap(save.last.mode || 'casual');
   const diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
   const side = save.last.side === 'auto' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
   const mode = save.last.mode || 'casual';
   let size = +save.last.size, winTo = +save.last.winTo;
   if (mode === 'comp') { size = 5; winTo = 13; }
   if (mode === 'wing') { size = 2; winTo = 9; }
-  if (mode !== 'casual' && map.aim) map = MAPS[0];
+  if (mode === 'ar') { size = 5; }
   if (mode !== 'casual' && diff.id === 'none') { alert('Для этого режима выберите уровень ботов'); return; }
   $('loading').classList.remove('hidden');
   setTimeout(() => {

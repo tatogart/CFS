@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793126924';
-import { World } from './world.js?v=1793126924';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793126924';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793126924';
-import { play, soundFor } from './sfx.js?v=1793126924';
-import { Bot, planRound } from './bots.js?v=1793126924';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793126924';
+import { CELL } from './maps.js?v=1793129478';
+import { World } from './world.js?v=1793129478';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793129478';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793129478';
+import { play, soundFor } from './sfx.js?v=1793129478';
+import { Bot, planRound } from './bots.js?v=1793129478';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793129478';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -54,10 +54,11 @@ export class Game {
     this.r = renderer; this.o = opts; this.ui = ui; this.ctrl = opts.controls;
     this.aimMode = !!opts.map.aim;
     this.mode = opts.mode || 'casual';
-    this.dm = this.mode === 'dm' && !opts.map.aim;
-    this.oneSite = this.mode === 'wing' ? 'B' : null;
+    this.ar = this.mode === 'ar' && !opts.map.aim;
+    this.dm = (this.mode === 'dm' || this.ar) && !opts.map.aim;
+    this.oneSite = opts.map.oneSite || (this.mode === 'wing' ? 'B' : null);
     this.roundLen = this.mode === 'wing' ? 90 : ROUND_TIME;
-    this.dmTime = 300; this.dmLimit = 30;
+    this.dmTime = this.ar ? 480 : 300; this.dmLimit = this.ar ? AR_LADDER.length : 30;
     this.intel = { T: null, CT: null }; this.plan = { T: { site: 'A', execAt: 0, executing: true }, CT: {} };
     this.net = opts.net || null;
     this.isHost = !!(this.net && this.net.role === 'host'); this.isClient = !!(this.net && this.net.role === 'client');
@@ -177,7 +178,7 @@ export class Game {
   // имена союзников над головой (людей — жёлтым)
   _retag() {
     for (const a of this.actors) { if (a.tag) { this.scene.remove(a.tag); a.tag = null; } }
-    for (const a of this.actors) if (!this.dm && a !== this.player && a.team === this.player.team) { a.tag = textSprite(a.name, a.bot ? '#7ee08a' : '#ffd36a'); this.scene.add(a.tag); }
+    for (const a of this.actors) if ((!this.dm || this.ar) && a !== this.player && a.team === this.player.team) { a.tag = textSprite(a.name, a.bot ? '#7ee08a' : '#ffd36a'); this.scene.add(a.tag); }
   }
   _botSkins(b) {
     if (Math.random() < 0.5) for (const s of SKINS) if (WEAPONS[s.weapon] && Math.random() < 0.12) b.skins[s.weapon] = s.id;
@@ -235,7 +236,7 @@ export class Game {
       if (this.aimMode && a === this.player && !a.weapons[1]) { this.give(a, a.team === 'T' ? 'ak47' : 'm4a4'); this.selectSlot(a, 1, true); }
       a.hasBomb = false;
       if (this.dm) this.dmLoadout(a);
-      this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
+      if (!this.ar) this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
     }
     if (!this.practice && !this.dm) {
       const ts = this.actors.filter(a => a.team === 'T');
@@ -246,7 +247,7 @@ export class Game {
     this.ui.roundStart && this.ui.roundStart(this);
     this.ev({ e: 'round', r: this.round });
     if (this.dm) for (const a of this.actors) if (a.brain) a.brain.onRoundStart();
-    this.gmsg(this.dm ? `Бой насмерть: каждый сам за себя · до ${this.dmLimit} убийств · B — любое оружие` : this.aimMode ? 'Тренировка аима: стреляй по мишеням · B — другое оружие' : this.practice ? 'Тренировка: B — закупка, гранаты бесплатные' : (this.round === 1 ? 'Пистолетный раунд' : `Раунд ${this.round}`), 2.5);
+    this.gmsg(this.ar ? `Гонка вооружений: ${AR_LADDER.length} уровней · убийство — новое оружие · победа — убийство золотым ножом` : this.dm ? `Бой насмерть: каждый сам за себя · до ${this.dmLimit} убийств · B — любое оружие` : this.aimMode ? 'Тренировка аима: стреляй по мишеням · B — другое оружие' : this.practice ? 'Тренировка: B — закупка, гранаты бесплатные' : (this.round === 1 ? 'Пистолетный раунд' : `Раунд ${this.round}`), 2.5);
   }
   _swapSides() {
     for (const a of this.actors) { a.team = a.team === 'T' ? 'CT' : 'T'; a.money = 800; a.kills = a.kills; const ag = a.bot ? AGENTS.filter(x => x.team === a.team)[a.id % 5] : a.remote ? (agentById[a.agents && a.agents[a.team]] || AGENTS.find(x => x.team === a.team)) : agentById[this.o.agents[a.team]];
@@ -309,6 +310,7 @@ export class Game {
     let i = order.indexOf(a.slot); i = (i + dir + order.length) % order.length; this.selectSlot(a, order[i]);
   }
   canBuy(a) {
+    if (this.ar) return false;
     if (this.practice || this.dm) return true;
     if (!(this.state === 'freeze' || (this.state === 'live' && this.roundLen - this.roundTime < 20))) return false;
     return this.world.inSpawn(a.pos.x, a.pos.z, a.team);
@@ -519,7 +521,7 @@ export class Game {
     v.model.root.visible = true;
     if (v === this.player) { this.vm.visible = false; }
     if (a && a !== v) {
-      if (this.isEnemy(a, v)) { a.kills++; a.roundKills++; if (hs) a.hs = (a.hs || 0) + 1; a.money = Math.min(16000, a.money + (def.kill || 300)); }
+      if (this.isEnemy(a, v)) { a.kills++; a.roundKills++; if (hs) a.hs = (a.hs || 0) + 1; a.money = Math.min(16000, a.money + (def.kill || 300)); if (this.ar) this.arKill(a, v, def); }
       if (a === this.player && this.ui.onKill) this.ui.onKill(hs);
       if (a === this.player && this.aimMode) { this.aimStats.kills++; if (hs) this.aimStats.hs++; }
     }
@@ -807,7 +809,7 @@ export class Game {
   }
 
   // ---------- режимы ----------
-  isEnemy(a, b) { return this.dm ? a !== b : a.team !== b.team; }
+  isEnemy(a, b) { return this.dm && !this.ar ? a !== b : a.team !== b.team; }
   // где можно заложить бомбу (в «Напарниках» — только одна точка)
   plantSite(x, z) { const s = this.world.siteAt(x, z); if (!s) return 0; if (this.oneSite && s !== (this.oneSite === 'A' ? 1 : 2)) return 0; return s; }
   dmSpawnPos(a) {
@@ -823,8 +825,25 @@ export class Game {
     }
     return best || this.spawnPos(a.team, 0);
   }
+  // оружие текущего уровня гонки: всё остальное (кроме ножа) забираем
+  arArm(a) {
+    const id = AR_LADDER[Math.min(a.arLvl || 0, AR_LADDER.length - 1)];
+    a.weapons = { 1: null, 2: null, 3: null }; this.give(a, 'knife');
+    if (id !== 'knife') this.give(a, id);
+    a.reloadT = 0; a.scope = 0;
+    this.selectSlot(a, id === 'knife' ? 3 : WEAPONS[id].slot, true);
+  }
+  arKill(a, v, def) {
+    const last = AR_LADDER.length - 1;
+    if ((a.arLvl || 0) >= last) { this.arWinner = a; return; }
+    a.arLvl = (a.arLvl || 0) + 1; this.score[a.team]++;
+    // убийство ножом отнимает уровень у жертвы
+    if (def === WEAPONS.knife && (v.arLvl || 0) > 0) { v.arLvl--; if (v === this.player) this.centerMsg('Вас зарезали — уровень понижен', 1.5); }
+    if (a.alive) { this.arArm(a); if (a === this.player) { play('buy'); this.centerMsg(a.arLvl === last ? 'ЗОЛОТОЙ НОЖ!' : `Уровень ${a.arLvl + 1}: ${WEAPONS[AR_LADDER[a.arLvl]].name}`, 1.2); } }
+  }
   dmLoadout(a) {
     a.armor = 100; a.helmet = true; a.nades = [];
+    if (this.ar) { this.arArm(a); return; }
     if (!a.weapons[3]) this.give(a, 'knife');
     if (a.bot) {
       const L = ['ak47', 'm4a4', 'ak47', 'm4a1s', 'awp', 'galil', 'famas', 'mp9', 'mac10', 'sg553', 'aug', 'ump45', 'mp7', 'p90', 'xm1014', 'nova', 'negev', 'ssg08', 'scar20'];
@@ -839,7 +858,7 @@ export class Game {
   dmRespawn(a) {
     a.respT = 0; a.alive = true; a.hp = 100; a.blind = 0; a.vel.set(0, 0, 0); a.crouchK = 0; a.scope = 0; a.reloadT = 0;
     a.pos.copy(this.dmSpawnPos(a)); a.model.revive(); a.model.root.visible = a !== this.player;
-    this.dmLoadout(a); this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
+    this.dmLoadout(a); if (!this.ar) this.selectSlot(a, a.weapons[1] ? 1 : 2, true);
     if (a === this.player) { this.vm.visible = true; this.spect = null; }
     if (a.brain) a.brain.onRoundStart();
   }
@@ -1073,7 +1092,7 @@ export class Game {
   update(dt) {
     this.time += dt;
     // состояние раунда
-    if (!this.practice) {
+    if (!this.practice && !this.dm) {
       this.stateT -= dt;
       if (this.state === 'freeze' && this.stateT <= 0) { this.state = 'live'; this.gmsg('Вперёд!', 1); play('round'); this.ev({ e: 'snd', s: 'round' }); }
       else if (this.state === 'live') { this.roundTime -= dt; if (this.roundTime <= 0) this.endRound('CT', 'time'); }
@@ -1086,7 +1105,10 @@ export class Game {
     if (this.dm && !this.over) {
       this.dmTime -= dt;
       const lead = this.actors.reduce((m, a) => a.kills > m.kills ? a : m, this.actors[0]);
-      if (this.dmTime <= 0 || lead.kills >= this.dmLimit) { this.over = true; this.ui.matchOver(this); return; }
+      if (this.ar) {
+        if (this.dmTime <= 0 && !this.arWinner) this.arWinner = this.actors.reduce((m, a) => (a.arLvl || 0) > (m.arLvl || 0) ? a : m, this.actors[0]);
+        if (this.arWinner) { this.over = true; this.ui.matchOver(this); return; }
+      } else if (this.dmTime <= 0 || lead.kills >= this.dmLimit) { this.over = true; this.ui.matchOver(this); return; }
       for (const a of this.actors) if (!a.alive) { a.respT = (a.respT || 0) + dt; if (a.respT > 2.2) this.dmRespawn(a); }
       for (const a of this.actors) a.money = 16000;
     }

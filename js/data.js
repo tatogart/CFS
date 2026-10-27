@@ -255,3 +255,6 @@ export const GRAFFITI = [
   { id: 'hs', name: 'Хедшот', col: '#ff2a2a' },
   { id: 'nice', name: 'NICE', col: '#3cc8ff' },
 ];
+
+// «Гонка вооружений»: за каждое убийство — следующее оружие, последний уровень — нож
+export const AR_LADDER = ['m4a1s', 'ak47', 'aug', 'sg553', 'famas', 'galil', 'p90', 'mp7', 'ump45', 'mac10', 'xm1014', 'nova', 'negev', 'awp', 'ssg08', 'deagle', 'fiveseven', 'tec9', 'p250', 'glock', 'knife'];

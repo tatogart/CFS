@@ -1,14 +1,14 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793122188';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793122188';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793122188';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793122188';
-import { AgentModel } from './models.js?v=1793122188';
-import { Controls, isTouch } from './controls.js?v=1793122188';
-import { initAudio, play, setVolume } from './sfx.js?v=1793122188';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd } from './music.js?v=1793122188';
-import { Game } from './game.js?v=1793122188';
+import { MAPS, CELL } from './maps.js?v=1793124081';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793124081';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793124081';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793124081';
+import { AgentModel } from './models.js?v=1793124081';
+import { Controls, isTouch } from './controls.js?v=1793124081';
+import { initAudio, play, setVolume } from './sfx.js?v=1793124081';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd } from './music.js?v=1793124081';
+import { Game } from './game.js?v=1793124081';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -49,8 +49,9 @@ function showTab(tab) {
   if (tab === 'home') renderHome();
   play('tick');
 }
-onMusicEnd(() => { if (!game) playMusic('menu'); });
-$('menu').addEventListener('click', e => { initAudio(); if (!game && !musicMode()) playMusic('menu'); const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); });
+onMusicEnd(() => { if (!game && !ytActive()) playMusic('menu'); });
+const ytActive = () => save.musicKit === 'custom' && !!save.ytMenu && navigator.onLine && $('ytBox').dataset.id !== 'closed';
+$('menu').addEventListener('click', e => { initAudio(); if (!game && ytActive()) updYt(); else if (!game && !musicMode()) playMusic('menu'); const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); });
 function coins() { $('coins').textContent = save.coins.toLocaleString('ru'); $('coins2').textContent = save.coins.toLocaleString('ru'); if (curTab === 'home' && homeReady) renderHome(); }
 coins();
 
@@ -167,13 +168,29 @@ function showDrop(skinId) {
 // ---------- инвентарь ----------
 $('invSort').onchange = () => renderInv();
 // ---------- music kit ----------
+// YouTube-плеер в меню (официальный встраиваемый плеер, видимый; только с интернетом)
+function ytId(u) {
+  u = String(u || '').trim(); if (!u) return '';
+  const m = u.match(/(?:youtu\.be\/|v=|shorts\/|embed\/|live\/)([A-Za-z0-9_-]{11})/) || u.match(/^([A-Za-z0-9_-]{11})$/);
+  return m ? m[1] : '';
+}
+function updYt() {
+  const box = $('ytBox'), want = !game && save.musicKit === 'custom' && save.ytMenu && navigator.onLine;
+  if (!want) { if (box.dataset.id) { box.innerHTML = ''; box.dataset.id = ''; } box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  if (box.dataset.id === save.ytMenu) return;
+  box.dataset.id = save.ytMenu;
+  box.innerHTML = `<div class="ytHead">♫ ${esc(save.customKitName || 'Мой кит')}<button id="ytClose">✕</button></div><iframe src="https://www.youtube-nocookie.com/embed/${save.ytMenu}?autoplay=1&loop=1&playlist=${save.ytMenu}&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="YouTube"></iframe>`;
+  $('ytClose').onclick = () => { box.innerHTML = ''; box.dataset.id = 'closed'; box.classList.add('hidden'); };
+  stopMusic(0.5);
+}
 async function renderKits() {
   const box = $('kitList'); if (!box) return; box.innerHTML = '';
   const cur = save.musicKit || 'cfs';
   for (const k of KITS) {
     const c = el('div', 'kit' + (cur === k.id ? ' on' : ''), `<div class="kArt" style="--kc:${k.col}"><span>♫</span></div><div class="kName">${esc(k.name)}</div><div class="kAuth">${esc(k.author)} · ${k.bpm} BPM</div><div class="kBtns"><button class="pv">▶ Слушать</button><button class="eq">${cur === k.id ? '✔ Надет' : 'Надеть'}</button></div>`);
     c.querySelector('.pv').onclick = () => { initAudio(); playMusic('mvp', k.id); };
-    c.querySelector('.eq').onclick = () => { save.musicKit = k.id; setKit(k.id); persist(); renderKits(); playMusic('menu'); };
+    c.querySelector('.eq').onclick = () => { save.musicKit = k.id; setKit(k.id); persist(); renderKits(); updYt(); playMusic('menu'); };
     box.appendChild(c);
   }
   // свой кит: треки игрока
@@ -182,13 +199,17 @@ async function renderKits() {
   const c = el('div', 'kit custom' + (cur === 'custom' ? ' on' : ''), `<div class="kArt" style="--kc:#3cf06a"><span>★</span></div>
     <input class="kTitle" maxlength="24" value="${esc(save.customKitName || 'Мой кит')}" title="Название кита">
     <div class="kAuth">Свои треки (mp3, m4a, ogg) — хранятся только на этом устройстве</div>
+    <div class="kRow"><button class="kPreset">Назвать «FROZY»</button><a class="kLink" href="https://www.youtube.com/@frozy808" target="_blank" rel="noopener">Канал FROZY ↗</a></div>
+    <label class="kSlot"><span>YouTube в меню</span><input class="kYt" placeholder="ссылка на трек с YouTube" value="${esc(save.ytMenu ? 'https://youtu.be/' + save.ytMenu : '')}"></label>
     ${slots.map(([s, lb], i) => `<label class="kSlot"><span>${lb}</span><em>${recs[i] ? esc(recs[i].name) : 'нет файла'}</em><input type="file" accept="audio/*" data-slot="${s}">${recs[i] ? `<button data-del="${s}">✕</button>` : ''}</label>`).join('')}
     <div class="kBtns"><button class="pv">▶ Слушать</button><button class="eq">${cur === 'custom' ? '✔ Надет' : 'Надеть'}</button></div>`);
   c.querySelector('.kTitle').oninput = e => { save.customKitName = e.target.value.trim() || 'Мой кит'; persist(); };
+  c.querySelector('.kPreset').onclick = () => { save.customKitName = 'FROZY'; persist(); renderKits(); };
+  c.querySelector('.kYt').onchange = e => { save.ytMenu = ytId(e.target.value); persist(); if (e.target.value && !save.ytMenu) alert('Не получилось распознать ссылку YouTube'); renderKits(); updYt(); };
   c.querySelectorAll('input[type=file]').forEach(inp => inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { await saveTrack(inp.dataset.slot, f); } catch (e) { alert('Не удалось сохранить файл: ' + e.message); } renderKits(); });
   c.querySelectorAll('[data-del]').forEach(b => b.onclick = async e => { e.preventDefault(); await deleteTrack(b.dataset.del); renderKits(); });
   c.querySelector('.pv').onclick = () => { initAudio(); playMusic('mvp', 'custom'); };
-  c.querySelector('.eq').onclick = () => { if (!recs[0] && !recs[1] && !recs[2]) { alert('Сначала добавьте хотя бы один трек'); return; } save.musicKit = 'custom'; setKit('custom'); persist(); renderKits(); playMusic('menu'); };
+  c.querySelector('.eq').onclick = () => { if (!recs[0] && !recs[1] && !recs[2] && !save.ytMenu) { alert('Сначала добавьте трек или ссылку YouTube'); return; } save.musicKit = 'custom'; setKit('custom'); persist(); renderKits(); $('ytBox').dataset.id = ''; if (save.ytMenu) updYt(); else playMusic('menu'); };
   box.appendChild(c);
 }
 function renderGraffiti() {
@@ -607,7 +628,7 @@ function endMatch(g) {
 
 // ---------- запуск матча ----------
 function startGame() {
-  initAudio(); stopMusic(0.5);
+  initAudio(); const yb = $('ytBox'); yb.innerHTML = ''; yb.dataset.id = ''; yb.classList.add('hidden'); stopMusic(0.5);
   let map = MAPS.find(m => m.id === save.last.map) || MAPS[0];
   const diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
   const side = save.last.side === 'auto' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
@@ -635,7 +656,7 @@ function quitGame() {
   closeBuy();
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   coins(); renderInv(); renderHome();
-  playMusic('menu');
+  if (ytActive()) updYt(); else playMusic('menu');
 }
 function checkRotate() { $('rotate').classList.toggle('hidden', !(game && touch && innerHeight > innerWidth)); }
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight, false); if (game) game.resize(); checkRotate(); });

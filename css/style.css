@@ -339,3 +339,13 @@ body.touch #banner { top: 14%; padding: 8px 12px; } body.touch #banner b { font-
 .installBox { display: flex; flex-direction: column; gap: 4px; }
 .installBox b { font-size: 16px; } .installBox span { color: var(--dim); font-size: 13px; }
 .installBox .playBig { margin: 8px 0 0; min-width: 0; }
+
+.kRow { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+.kPreset { background: #10151b; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 12px; font-weight: 700; }
+.kLink { color: #ff5a5a; font-weight: 800; font-size: 12px; text-decoration: none; background: rgba(255,0,0,.1); border: 1px solid rgba(255,80,80,.4); border-radius: 6px; padding: 5px 8px; }
+.kYt { flex: 1; min-width: 0; background: #0b0f15; color: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+#ytBox { position: fixed; left: calc(12px + var(--safe-l)); bottom: calc(12px + var(--safe-b)); z-index: 20; width: 260px; background: rgba(10,14,20,.92); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+#ytBox .ytHead { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; font-size: 12px; font-weight: 800; color: var(--acc2); }
+#ytBox .ytHead button { background: none; border: 0; color: var(--dim); }
+#ytBox iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; }
+@media (max-width: 760px) { #ytBox { width: 200px; bottom: calc(80px + var(--safe-b)); } }

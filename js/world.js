@@ -1,7 +1,8 @@
 // Мир: сетка карты, геометрия, лучи, навигация
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL, setCell } from './maps.js?v=1793129857';
-import { rng, shade } from './art.js?v=1793129857';
+import { CELL, setCell } from './maps.js?v=1793130863';
+import { rng, shade } from './art.js?v=1793130863';
+import { decorate, roofStyle } from './decor.js?v=1793130863';
 
 const WALK = new Set(['.', 'w', 'T', 'K', 'A', 'B', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 
@@ -47,6 +48,7 @@ function texCanvas(kind, base, alt, seed) {
     case 'wood': for (let y = 0; y < S; y += 32) rect(0, y, S, 32, 2, R()); break;
     case 'metal': for (let x = 0; x < S; x += 32) rect(x, 0, 32, S, 1, R() * 0.3); break;
     case 'concrete': rect(0, 0, S, S, 1, 0.5); break;
+    case 'rooftiles': for (let y = 0, r = 0; y < S; y += 16, r++) for (let x = (r % 2) * 8; x < S + 16; x += 16) { for (let yy = 0; yy < 16; yy++) for (let xx = 0; xx < 16; xx++) { const X = (x + xx) % S, Y = y + yy, c = Math.abs(xx - 7.5) / 8; H[Y * S + X] = yy > 13 ? 0 : 1 - c * c * 0.7 - yy / 60; tint[Y * S + X] = (r * 13 + x) % 7 / 7; } } break;
   }
   const img = g.createImageData(S, S), d = img.data;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
@@ -151,6 +153,11 @@ export class World {
     const crateTex = texCanvas('wood', th.crate, shade(th.crate, -0.25), 3), bigTex = texCanvas('metal', shade(th.crate, -0.1), th.crate, 4), waterTex = texCanvas('water', '#2f6f96', '#3f8fb5', 5);
     const trainTex = texCanvas('metal', '#7a2f25', '#5a1f18', 6);
     const wallMat = new THREE.MeshLambertMaterial({ map: wallTex, vertexColors: true });
+    // крыши: черепица, мох или плоский бетон
+    const rs = roofStyle(this.map);
+    const roofTex = rs === 'tiles' ? texCanvas('rooftiles', '#b0583a', '#8a3f24', 8) : rs === 'moss' ? texCanvas('stone', '#66734f', '#4a5a3a', 8) : texCanvas('concrete', shade(th.wall, -0.28), shade(th.wall, -0.4), 8);
+    const roofMat = new THREE.MeshLambertMaterial({ map: roofTex, vertexColors: true });
+    const wallMats = [wallMat, wallMat, roofMat, wallMat, wallMat, wallMat];
     const geo = new THREE.BoxGeometry(CELL, 1, CELL);
     // UV по высоте: повтор текстуры
     const counts = { wall: 0 }, walls = [];
@@ -158,7 +165,7 @@ export class World {
       const hh = this.H[j * this.w + i]; if (this.cells[j][i] !== '#') continue;
       let exposed = false;
       for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k2 = this.idx(i + di, j + dj); if (k2 >= 0 && this.cells[j + dj][i + di] !== '#') exposed = true; }
-      if (exposed) walls.push([i, j, hh]);
+      walls.push([i, j, hh]);
     }
     // группируем по высоте для правильного тайлинга текстуры
     const byH = {};
@@ -169,7 +176,7 @@ export class World {
       const uv = g2.attributes.uv; const vrep = hh / CELL;
       for (let f = 0; f < uv.count; f++) { const face = Math.floor(f / 4); if (face !== 2 && face !== 3) uv.setY(f, uv.getY(f) * vrep); }
       aoColors(g2, -hh / 2, 2.6);
-      const m = new THREE.InstancedMesh(g2, wallMat, list.length);
+      const m = new THREE.InstancedMesh(g2, wallMats, list.length);
       const mtx = new THREE.Matrix4();
       list.forEach(([i, j], n) => { mtx.makeTranslation((i + 0.5) * CELL, hh / 2, (j + 0.5) * CELL); m.setMatrixAt(n, mtx); });
       m.receiveShadow = true; m.castShadow = q >= 1;
@@ -225,6 +232,7 @@ export class World {
     addCells(c => c === 'c', () => ({ geo: new THREE.BoxGeometry(CELL * 0.92, 1.0, CELL * 0.92), y: 0.5 }), new THREE.MeshLambertMaterial({ map: crateTex }));
     addCells(c => c === 'C', () => ({ geo: new THREE.BoxGeometry(CELL * 0.98, 2.0, CELL * 0.98), y: 1.0 }), new THREE.MeshLambertMaterial({ map: bigTex }));
     addCells(c => c === 'R', () => ({ geo: new THREE.BoxGeometry(CELL, 3.4, CELL * 0.9), y: 1.7 + 0.0 }), new THREE.MeshLambertMaterial({ map: trainTex }));
+    decorate(this, this.group, q);
     // буквы точек на полу
     for (const s of ['A', 'B']) {
       if (!this.sites[s].length) continue;

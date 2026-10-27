@@ -483,3 +483,9 @@ body.touch #chat { bottom: calc(150px + var(--safe-b)); left: calc(180px + var(-
 #board tr.bh b { font-size: 20px; margin-left: 6px; }
 #board .bt { font-size: 9px; background: rgba(255,255,255,.12); padding: 1px 4px; border-radius: 3px; color: #9fb0c2; vertical-align: middle; }
 #board td.mny { color: #7cd86a; }
+
+.misList { display: flex; flex-direction: column; gap: 6px; }
+.mis span { display: block; font-size: 14px; } .mis small { color: #8a96a6; font-size: 11px; } .mis .eBar { height: 4px; margin-top: 2px; }
+.mis.done span { color: #7cf08a; } .mis.done .eBar i { background: #4cd07a; }
+.misList.small .mis span { font-size: 12px; } .misList.small .mis small { display: none; }
+.eMis { font-size: 13px; color: #7cf08a; margin-top: 3px; }

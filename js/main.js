@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793131253';
-import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793131253';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793131253';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793131253';
-import { AgentModel } from './models.js?v=1793131253';
-import { Controls, isTouch } from './controls.js?v=1793131253';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793131253';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793131253';
-import { styleOf } from './decor.js?v=1793131253';
-import { Game } from './game.js?v=1793131253';
+import { MAPS, CELL } from './maps.js?v=1793131432';
+import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793131432';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793131432';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793131432';
+import { AgentModel } from './models.js?v=1793131432';
+import { Controls, isTouch } from './controls.js?v=1793131432';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793131432';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793131432';
+import { styleOf } from './decor.js?v=1793131432';
+import { Game } from './game.js?v=1793131432';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -382,6 +382,47 @@ function weekly() {
   }
   return save.weekly;
 }
+// ---------- миссии недели ----------
+const MISSIONS = [
+  { id: 'kills', t: n => `Убейте ${n} врагов`, n: [20, 30, 40], st: 'kills' },
+  { id: 'hs', t: n => `Убейте ${n} врагов выстрелом в голову`, n: [8, 12, 15], st: 'hs' },
+  { id: 'wins', t: n => `Выиграйте ${n} матча в любом режиме`, n: [2, 3], st: 'wins' },
+  { id: 'comp', t: n => `Сыграйте ${n} соревновательных матча`, n: [1, 2], st: 'm_comp' },
+  { id: 'wing', t: () => 'Выиграйте матч в «Напарниках»', n: [1], st: 'w_wing' },
+  { id: 'ar', t: () => 'Победите в «Гонке вооружений»', n: [1], st: 'w_ar' },
+  { id: 'sniper', t: n => `Убейте ${n} врагов из снайперской винтовки`, n: [5, 8], st: 'k_sniper' },
+  { id: 'pistol', t: n => `Убейте ${n} врагов из пистолетов`, n: [8, 12], st: 'k_pistol' },
+  { id: 'knife', t: n => `Убейте ${n} врагов ножом`, n: [1, 2], st: 'k_knife' },
+  { id: 'mvp', t: n => `Станьте MVP раунда ${n} раз`, n: [5, 8], st: 'mvps' },
+  { id: 'plant', t: n => `Заложите бомбу ${n} раза`, n: [2, 3], st: 'plants' },
+  { id: 'smg', t: n => `Убейте ${n} врагов из пистолетов-пулемётов`, n: [10, 15], st: 'k_smg' },
+  { id: 'rifle', t: n => `Убейте ${n} врагов из винтовок`, n: [15, 25], st: 'k_rifle' },
+];
+function missions() {
+  const w = weekId();
+  if (!save.missions || save.missions.week !== w) {
+    let seed = w * 9301 + 49297; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const pool = MISSIONS.slice(), list = [];
+    while (list.length < 3) { const m = pool.splice(Math.floor(rnd() * pool.length), 1)[0]; const n = m.n[Math.floor(rnd() * m.n.length)]; list.push({ id: m.id, n, prog: 0, done: false }); }
+    save.missions = { week: w, list }; persist();
+  }
+  return save.missions;
+}
+const missionDef = id => MISSIONS.find(m => m.id === id);
+const MISSION_XP = 400, MISSION_COINS = 350;
+// засчитать матч: вернуть выполненные миссии
+function missionProgress(stats) {
+  const done = [];
+  for (const m of missions().list) {
+    if (m.done) continue;
+    const d = missionDef(m.id); m.prog = Math.min(m.n, m.prog + (stats[d.st] || 0));
+    if (m.prog >= m.n) { m.done = true; done.push({ t: d.t(m.n), xp: MISSION_XP, c: MISSION_COINS }); }
+  }
+  return done;
+}
+function missionsHtml() {
+  return missions().list.map(m => { const d = missionDef(m.id); return `<div class="mis${m.done ? ' done' : ''}"><span>${m.done ? '✔ ' : ''}${esc(d.t(m.n))}</span><small>${m.prog}/${m.n} · +${MISSION_XP} XP · ◈ ${MISSION_COINS}</small><div class="eBar"><i style="width:${m.prog / m.n * 100}%"></i></div></div>`; }).join('');
+}
 function renderProfileChip() {
   const lv = Math.floor((save.xp || 0) / XP_PER_LVL) + 1, wk = weekly(), ready = wk.taken.length < 2;
   $('profChip').innerHTML = `${avatarHtml(38)}<span class="pcTxt"><b>${esc(nick())}</b><small>Ур. ${lv}</small></span>${ready ? '<i class="pcDot" title="Еженедельный дроп"></i>' : ''}`;
@@ -395,6 +436,7 @@ function openProfile() {
     <div class="pLvl"><b>Уровень ${lv}</b><div class="eBar"><i style="width:${(xp % XP_PER_LVL) / XP_PER_LVL * 100}%"></i></div><small>${xp % XP_PER_LVL} / ${XP_PER_LVL} XP</small></div>
     <div class="pRanks">${rk('comp')}${rk('wing')}</div>
     <div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div><div><b>${st.opened}</b>кейсов</div></div>
+    <h3 class="pDropH">Миссии недели <small>обновятся через ${weekLeft()}</small></h3><div class="misList">${missionsHtml()}</div>
     <h3 class="pDropH">Еженедельный дроп <small>${wk.taken.length < 2 ? `выберите ${2 - wk.taken.length} из 4` : 'получено · новый через ' + weekLeft()}</small></h3>
     <div class="grid items small pDrop" id="dropOffers"></div>`;
   const box = $('dropOffers');
@@ -435,7 +477,8 @@ function renderHome() {
   pr.innerHTML = `<img src="${caseIconURL(cs)}" alt=""><div><h4>Магазин</h4><b>${esc(cs.name)}</b><span>◈ ${cs.price}</span></div>`;
   pr.onclick = () => { showTab('cases'); openCaseScreen(cs); };
   const st = save.stats, lm = save.lastMatch, rc = rankData('comp'), rw = rankData('wing');
-  $('lastBox').innerHTML = `<h4>Звания</h4><div class="ranksH"><div><img src="${rankURL(rankOf(rc), 140)}" alt=""><small>Соревновательный</small><b>${rankOf(rc) < 0 ? 'Без звания' : RANKS[rankOf(rc)]}</b></div><div><img src="${rankURL(rankOf(rw), 140)}" alt=""><small>Напарники</small><b>${rankOf(rw) < 0 ? 'Без звания' : RANKS[rankOf(rw)]}</b></div></div><h4 style="margin-top:10px">Ваша статистика</h4><div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div></div>` +
+  const ms = missions().list;
+  $('lastBox').innerHTML = `<h4>Миссии недели · ${ms.filter(m => m.done).length}/${ms.length}</h4><div class="misList small">${missionsHtml()}</div><h4 style="margin-top:10px">Звания</h4><div class="ranksH"><div><img src="${rankURL(rankOf(rc), 140)}" alt=""><small>Соревновательный</small><b>${rankOf(rc) < 0 ? 'Без звания' : RANKS[rankOf(rc)]}</b></div><div><img src="${rankURL(rankOf(rw), 140)}" alt=""><small>Напарники</small><b>${rankOf(rw) < 0 ? 'Без звания' : RANKS[rankOf(rw)]}</b></div></div><h4 style="margin-top:10px">Ваша статистика</h4><div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div></div>` +
     (lm ? `<h4 style="margin-top:10px">Последний матч</h4><div style="font-size:14px">${esc(lm.map)} · <b style="color:${lm.won ? '#6fd36a' : '#ff6a5a'}">${lm.score}</b> · ${lm.k}/${lm.d}</div>` : '');
 }
 $('sideSw').onclick = e => { const b = e.target.closest('button'); if (!b) return; M.side = save.menuSide = b.dataset.side; persist(); setMenuAgent(save.agent[M.side]); renderHome(); play('tick'); };
@@ -779,9 +822,9 @@ function endMatch(g) {
   const order = g.actors.slice().sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   const place = order.indexOf(p) + 1;
   const won = dm ? place === 1 : my > th, draw = !dm && my === th;
-  const reward = dm ? Math.round((p.kills * 8 + Math.max(0, 6 - place) * 40) * g.diff.reward)
+  let reward = dm ? Math.round((p.kills * 8 + Math.max(0, 6 - place) * 40) * g.diff.reward)
     : Math.round((p.kills * 15 + my * 30 + (won ? 250 : 50)) * g.diff.reward);
-  const xpGain = Math.round((p.kills * 20 + (p.mvps || 0) * 40 + (dm ? Math.max(0, 6 - place) * 60 : my * 25 + (won ? 200 : draw ? 100 : 60))) * Math.max(0.3, g.diff.reward));
+  let xpGain = Math.round((p.kills * 20 + (p.mvps || 0) * 40 + (dm ? Math.max(0, 6 - place) * 60 : my * 25 + (won ? 200 : draw ? 100 : 60))) * Math.max(0.3, g.diff.reward));
   let rank = null;
   if (g.mode === 'comp' || g.mode === 'wing') {
     // рейтинг Эло против уровня ботов: на слабых ботах высоко не подняться
@@ -794,6 +837,10 @@ function endMatch(g) {
     const after = rankOf(r);
     rank = { before, after, delta, elo: r.elo, mode: g.mode === 'comp' ? 'Соревновательный' : 'Напарники', name: after < 0 ? `Без звания · побед до звания: ${Math.max(0, 2 - r.wins)}` : RANKS[after] };
   }
+  const kt = p.killTypes || {};
+  const mdone = missionProgress({ kills: p.kills, hs: p.hs || 0, mvps: p.mvps || 0, plants: p.plants || 0, wins: won ? 1 : 0, m_comp: g.mode === 'comp' ? 1 : 0, w_wing: g.mode === 'wing' && won ? 1 : 0, w_ar: g.ar && won ? 1 : 0,
+    k_sniper: kt.sniper || 0, k_pistol: kt.pistol || 0, k_knife: kt.knife || 0, k_smg: kt.smg || 0, k_rifle: kt.rifle || 0 });
+  for (const m of mdone) { reward += m.c; xpGain += m.xp; }
   const xpFrom = save.xp || 0; save.xp = xpFrom + xpGain;
   save.lastMatch = { map: g.o.map.name, score: dm ? `#${place}` : `${my}:${th}`, won, k: p.kills, d: p.deaths };
   save.coins += reward; save.stats.matches++; if (won) save.stats.wins++; save.stats.kills += p.kills; save.stats.deaths += p.deaths; persist();
@@ -810,7 +857,7 @@ function endMatch(g) {
     const w = a.weapons[1] || a.weapons[2];
     return { name: a.name, team: a.team, agent: a.agent, gun: w ? w.id : (a.team === 'T' ? 'ak47' : 'm4a4'), skin: w ? w.skin : null, gloves: a.skins && a.skins.gloves, k: a.kills, d: a.deaths, mvps: a.mvps || 0, hs: a.hs || 0, me: a === p, place: order.indexOf(a) + 1, badge: badges.get(a) || '' };
   });
-  const data = { dm, won, draw, place, total: order.length, my, th, team: p.team, map: g.o.map.name, mode: (MODES.find(m => m[0] === g.mode) || [])[1] || '', players, reward, xpFrom, xpGain, rank };
+  const data = { dm, won, draw, place, total: order.length, my, th, team: p.team, map: g.o.map.name, mode: (MODES.find(m => m[0] === g.mode) || [])[1] || '', players, reward, xpFrom, xpGain, rank, mdone };
   game.dispose(); game = null; stopAmbience(2);
   controls.enabled = false; controls.reset(); closeBuy();
   $('hud').classList.add('hidden'); $('pause').classList.add('hidden');
@@ -863,6 +910,7 @@ function showEnd(d) {
   $('eRew').innerHTML = `<div class="eRow"><span>Награда</span><b class="eCoins">◈ 0</b></div>
     <div class="eRow"><span>Опыт</span><b>+${d.xpGain} XP</b></div>
     <div class="eLvl"><span class="eL">Ур. ${lvl(d.xpFrom)}</span><div class="eBar"><i></i></div></div>
+    ${(d.mdone || []).map(m => `<div class="eMis">✔ ${esc(m.t)}</div>`).join('')}
     ${d.rank ? `<div class="eRank"><div class="eRm">${esc(d.rank.mode)} · ${d.rank.elo} <em class="${d.rank.delta >= 0 ? 'up' : 'down'}">${d.rank.delta >= 0 ? '+' : ''}${d.rank.delta}</em></div><img src="${rankURL(d.rank.before, 200)}" alt=""><div class="eRn">${d.rank.before < 0 ? 'Без звания' : esc(RANKS[d.rank.before])}</div></div>` : ''}`;
   scr.className = ''; scr.classList.toggle('lose', !d.won && !d.draw);
   END = { d, scene, cam, models, t: 0, coinsShown: 0, rankDone: false, lvlUp: false };
@@ -1048,7 +1096,9 @@ function renderLoading(dt) {
   if (Ld.t >= Ld.dur) finishLoad();
 }
 function finishLoad() {
-  LOADING = null; startAmbience(styleOf(game.o.map));
+  const lg = LOADING && LOADING.g; LOADING = null;
+  if (!game || game !== lg) return;
+  startAmbience(styleOf(game.o.map));
   $('load').classList.add('hidden'); $('hud').classList.remove('hidden');
   $('touch').classList.toggle('hidden', !touch);
   $('fps').classList.toggle('hidden', !save.settings.fps);

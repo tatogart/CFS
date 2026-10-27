@@ -1,8 +1,8 @@
 // Мир: сетка карты, геометрия, лучи, навигация
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL, setCell } from './maps.js?v=1793131253';
-import { rng, shade } from './art.js?v=1793131253';
-import { decorate, roofStyle } from './decor.js?v=1793131253';
+import { CELL, setCell } from './maps.js?v=1793131432';
+import { rng, shade } from './art.js?v=1793131432';
+import { decorate, roofStyle } from './decor.js?v=1793131432';
 
 const WALK = new Set(['.', 'w', 'T', 'K', 'A', 'B', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 

@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793131253';
-import { World } from './world.js?v=1793131253';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793131253';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793131253';
-import { play, soundFor } from './sfx.js?v=1793131253';
-import { Bot, planRound } from './bots.js?v=1793131253';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793131253';
+import { CELL } from './maps.js?v=1793131432';
+import { World } from './world.js?v=1793131432';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793131432';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793131432';
+import { play, soundFor } from './sfx.js?v=1793131432';
+import { Bot, planRound } from './bots.js?v=1793131432';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793131432';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -533,6 +533,7 @@ export class Game {
     if (v === this.player) { this.vm.visible = false; }
     if (a && a !== v) {
       if (v.dmgBy) for (const id in v.dmgBy) { const h = this.actors[id]; if (h && h !== a && v.dmgBy[id] >= 41 && this.isEnemy(h, v)) h.assists = (h.assists || 0) + 1; }
+      if (this.isEnemy(a, v) && def) { a.killTypes = a.killTypes || {}; a.killTypes[def.type] = (a.killTypes[def.type] || 0) + 1; }
       if (this.isEnemy(a, v)) { a.kills++; a.roundKills++; if (hs) a.hs = (a.hs || 0) + 1; a.money = Math.min(16000, a.money + (def.kill || 300)); if (this.ar) this.arKill(a, v, def); }
       if (a === this.player && this.ui.onKill) this.ui.onKill(hs);
       if (a === this.player && this.aimMode) { this.aimStats.kills++; if (hs) this.aimStats.hs++; }
@@ -789,6 +790,7 @@ export class Game {
     const site = this.world.siteAt(a.pos.x, a.pos.z) === 1 ? 'A' : 'B';
     this.bomb = { planted: true, pos: a.pos.clone(), timer: BOMB_TIME, site, beep: 0, planter: a };
     if (a.bot) this.radio(a, 'planted', { site });
+    a.plants = (a.plants || 0) + 1;
     this.ui.announce && this.ui.announce('Bomb has been planted');
     this._c4Mesh(this.bomb.pos);
     this.state = 'planted';

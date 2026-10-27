@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793124825';
-import { World } from './world.js?v=1793124825';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793124825';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793124825';
-import { play, soundFor } from './sfx.js?v=1793124825';
-import { Bot, planRound } from './bots.js?v=1793124825';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793124825';
+import { CELL } from './maps.js?v=1793126269';
+import { World } from './world.js?v=1793126269';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793126269';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793126269';
+import { play, soundFor } from './sfx.js?v=1793126269';
+import { Bot, planRound } from './bots.js?v=1793126269';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793126269';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -273,6 +273,7 @@ export class Game {
     let mvp = this.actors.filter(a => a.team === winner).sort((x, y) => y.roundKills - x.roundKills)[0];
     if (reason === 'defuse' && this.defuser) mvp = this.defuser;
     if (reason === 'bomb' && this.bomb && this.bomb.planter) mvp = this.bomb.planter;
+    if (mvp) mvp.mvps = (mvp.mvps || 0) + 1;
     const why = reason === 'bomb' ? 'Бомба взорвана' : reason === 'defuse' ? 'Бомба обезврежена' : reason === 'time' ? 'Время вышло' : 'Противник уничтожен';
     this.ui.roundBanner ? this.ui.roundBanner(winner, why, mvp, this) : this.centerMsg(winner, 3);
     this.ev({ e: 'end', w: winner, why, mvp: mvp ? mvp.id : -1 });
@@ -396,9 +397,10 @@ export class Game {
     spread += def.move * mv;
     if (!a.onGround) spread += def.move * 1.6 + 0.04;
     if (a.crouchK > 0.5) spread *= 0.75;
-    if (def.scope && !a.scope) spread += def.noscope;
+    if (def.scope && !a.scope) spread += def.noscope || 0;
+    if (def.pellets) spread = Math.max(spread, 0.045);
     spread += def.recoil * 0.25 * Math.min(a.recoilIdx, 10) * (def.type === 'pistol' ? 0.6 : 0.15);
-    const pellets = 1;
+    const pellets = def.pellets || 1;
     const comp = a.bot ? a.brain.comp : 0;
     for (let k = 0; k < pellets; k++) {
       const rr = Math.sqrt(Math.random()) * spread, ang = Math.random() * Math.PI * 2;
@@ -470,7 +472,7 @@ export class Game {
     if (tr) this.tracer(from, end);
     this.ev({ e: 'shot', a: a.id, f: tr ? [+from.x.toFixed(2), +from.y.toFixed(2), +from.z.toFixed(2)] : 0, p: [+end.x.toFixed(2), +end.y.toFixed(2), +end.z.toFixed(2)], h: h ? 1 : hit.t < maxD ? 2 : 0, n: [hit.n.x, hit.n.y, hit.n.z] });
     if (h) {
-      this.damage(h.v, a, def.dmg * Math.pow(0.985, h.t / 5), h.zone, h.mult, def, dir);
+      this.damage(h.v, a, def.dmg * Math.pow(def.falloff || 0.985, h.t / 5), h.zone, h.mult, def, dir);
       this.puff(end, '#a01010', 0.35);
     } else if (hit.t < maxD) {
       this.decal(end, hit.n);
@@ -517,7 +519,7 @@ export class Game {
     v.model.root.visible = true;
     if (v === this.player) { this.vm.visible = false; }
     if (a && a !== v) {
-      if (this.isEnemy(a, v)) { a.kills++; a.roundKills++; a.money = Math.min(16000, a.money + (def.kill || 300)); }
+      if (this.isEnemy(a, v)) { a.kills++; a.roundKills++; if (hs) a.hs = (a.hs || 0) + 1; a.money = Math.min(16000, a.money + (def.kill || 300)); }
       if (a === this.player && this.ui.onKill) this.ui.onKill(hs);
       if (a === this.player && this.aimMode) { this.aimStats.kills++; if (hs) this.aimStats.hs++; }
     }
@@ -825,8 +827,9 @@ export class Game {
     a.armor = 100; a.helmet = true; a.nades = [];
     if (!a.weapons[3]) this.give(a, 'knife');
     if (a.bot) {
-      const pri = ['ak47', 'm4a4', 'ak47', 'm4a4', 'awp', 'galil', 'famas', 'mp9', 'mac10'][Math.floor(Math.random() * 9)];
-      this.give(a, pri); this.give(a, Math.random() < 0.4 ? 'deagle' : a.team === 'T' ? 'glock' : 'usp');
+      const L = ['ak47', 'm4a4', 'ak47', 'm4a1s', 'awp', 'galil', 'famas', 'mp9', 'mac10', 'sg553', 'aug', 'ump45', 'mp7', 'p90', 'xm1014', 'nova', 'negev', 'ssg08', 'scar20'];
+      const pri = L[Math.floor(Math.random() * L.length)];
+      this.give(a, pri); this.give(a, ['deagle', 'p250', 'tec9', 'fiveseven', 'glock', 'usp'][Math.floor(Math.random() * 6)]);
     } else {
       if (!a.weapons[1]) this.give(a, a.team === 'T' ? 'ak47' : 'm4a4');
       if (!a.weapons[2]) this.give(a, a.team === 'T' ? 'glock' : 'usp');
@@ -944,14 +947,14 @@ export class Game {
       this.net.toHost({ t: 'cmd', c, v });
       if (c === 'slot') { this.selectSlot(a, v); a.localSw = this.time; }
       else if (c === 'cycle') { this.cycle(a, v); a.localSw = this.time; }
-      else if (c === 'aim') { const def = a.cur && WEAPONS[a.cur.id]; if (def && def.scope && a.reloadT <= 0) { a.scope = (a.scope + 1) % 3; a.localScope = this.time; } }
+      else if (c === 'aim') { const def = a.cur && WEAPONS[a.cur.id]; if (def && def.scope && a.reloadT <= 0) { a.scope = (a.scope + 1) % (def.zoom ? def.zoom.length + 1 : 3); a.localScope = this.time; } }
       return;
     }
     switch (c) {
       case 'reload': this.reload(a); break;
       case 'slot': this.selectSlot(a, v); break;
       case 'cycle': this.cycle(a, v); break;
-      case 'aim': { const def = a.cur && WEAPONS[a.cur.id]; if (def && def.scope && a.switchT <= 0 && a.reloadT <= 0) a.scope = (a.scope + 1) % 3; break; }
+      case 'aim': { const def = a.cur && WEAPONS[a.cur.id]; if (def && def.scope && a.switchT <= 0 && a.reloadT <= 0) a.scope = (a.scope + 1) % (def.zoom ? def.zoom.length + 1 : 3); break; }
       case 'spray': this.spray(a, v); break;
       case 'buy': this.buy(a, v); break;
       case 'drop':
@@ -1204,7 +1207,8 @@ export class Game {
     const sh = this.shake * this.shake * 0.06;
     const vp = pitch + view.punch.p * 0.5 + (Math.random() - 0.5) * sh, vy = yaw + view.punch.y * 0.5 + (Math.random() - 0.5) * sh;
     this.camera.rotation.order = 'YXZ'; this.camera.rotation.set(vp, vy, 0);
-    const fov = view.scope === 1 ? 40 : view.scope === 2 ? 15 : this.baseFov;
+    const zd = view.cur && WEAPONS[view.cur.id], zl = zd && zd.zoom;
+    const fov = !view.scope ? this.baseFov : zl ? (zl[view.scope - 1] || this.baseFov) : view.scope === 1 ? 40 : 15;
     if (this.camera.fov !== fov) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     // вьюмодель
     if (view.cur) {

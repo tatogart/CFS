@@ -1,14 +1,14 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793124825';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793124825';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793124825';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793124825';
-import { AgentModel } from './models.js?v=1793124825';
-import { Controls, isTouch } from './controls.js?v=1793124825';
-import { initAudio, play, setVolume } from './sfx.js?v=1793124825';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd } from './music.js?v=1793124825';
-import { Game } from './game.js?v=1793124825';
+import { MAPS, CELL } from './maps.js?v=1793126269';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793126269';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793126269';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793126269';
+import { AgentModel } from './models.js?v=1793126269';
+import { Controls, isTouch } from './controls.js?v=1793126269';
+import { initAudio, play, setVolume } from './sfx.js?v=1793126269';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd } from './music.js?v=1793126269';
+import { Game } from './game.js?v=1793126269';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -215,7 +215,6 @@ async function renderKits() {
   const c = el('div', 'kit custom' + (cur === 'custom' ? ' on' : ''), `<div class="kArt" style="--kc:#3cf06a"><span>★</span></div>
     <input class="kTitle" maxlength="24" value="${esc(save.customKitName || 'Мой кит')}" title="Название кита">
     <div class="kAuth">Свои треки (mp3, m4a, ogg) — хранятся только на этом устройстве</div>
-    <div class="kRow"><a class="kLink" href="https://www.youtube.com/@frozy808" target="_blank" rel="noopener">Канал FROZY ↗</a></div>
     <label class="kSlot"><span>YouTube в меню</span><input class="kYt" placeholder="ссылка на трек с YouTube" value="${esc(save.ytMenu ? 'https://youtu.be/' + save.ytMenu : '')}"></label>
     ${slots.map(([s, lb], i) => `<label class="kSlot"><span>${lb}</span><em>${recs[i] ? esc(recs[i].name) : 'нет файла'}</em><input type="file" accept="audio/*" data-slot="${s}">${recs[i] ? `<button data-del="${s}">✕</button>` : ''}</label>`).join('')}
     <div class="kBtns"><button class="pv">▶ Слушать</button><button class="eq">${cur === 'custom' ? '✔ Надет' : 'Надеть'}</button></div>`);
@@ -464,7 +463,7 @@ const hud = {
   onRoundEnd() {},
   onKill() {},
   matchOver(g) { endMatch(g); },
-  menuOpen() { return !$('buy').classList.contains('hidden') || !$('pause').classList.contains('hidden') || !$('over').classList.contains('hidden'); },
+  menuOpen() { return !$('buy').classList.contains('hidden') || !$('pause').classList.contains('hidden') ; },
   pause() { openPause(); },
   openBuy() { openBuy(); },
 };
@@ -529,9 +528,9 @@ function updateHud(g, dt) {
   cr.style.setProperty('--len', (S.chLen ?? 8) + 'px'); cr.style.setProperty('--th', (S.chThick ?? 2) + 'px');
   cr.style.setProperty('--o', S.chOutline === false ? 'none' : '0 0 0 1px rgba(0,0,0,.7)');
   cr.querySelector('b').style.display = S.chDot === false ? 'none' : '';
-  const scoped = p.alive && p.scope > 0;
+  const sdef = p.cur && WEAPONS[p.cur.id], scoped = p.alive && p.scope > 0 && sdef && sdef.type === 'sniper';
   $('scope').classList.toggle('hidden', !scoped);
-  cr.style.display = scoped || (view !== p && g.spectTP) || (def && def.scope && !view.scope) ? 'none' : '';
+  cr.style.display = scoped || (view !== p && g.spectTP) || (def && def.type === 'sniper' && !view.scope) ? 'none' : '';
   // эффекты
   hud.flashT = Math.max(0, (hud.flashT || 0) - dt);
   $('flashOv').style.opacity = hud.flashT > 0 ? Math.min(1, hud.flashT / 1.2).toFixed(3) : 0;
@@ -632,44 +631,170 @@ function openPause() { $('pause').classList.remove('hidden'); $('pSens').value =
 $('pSens').oninput = e => { if (touch) { save.settings.touchSens = +e.target.value; controls.touchSens = +e.target.value; } else save.settings.sens = +e.target.value; persist(); };
 $('resume').onclick = () => { $('pause').classList.add('hidden'); if (!touch) controls.lock(); };
 $('quit').onclick = () => { $('pause').classList.add('hidden'); quitGame(); };
-$('overOk').onclick = () => { $('over').classList.add('hidden'); quitGame(); };
-
+// ---------- конец матча: сцена как в CS2 ----------
+const XP_LVL = 1000;
 function endMatch(g) {
   controls.unlock();
-  if (g.dm) return endDM(g);
-  const p = g.player, won = g.score[p.team] > g.score[p.team === 'T' ? 'CT' : 'T'], draw = g.score.T === g.score.CT;
-  const reward = Math.round((p.kills * 15 + g.score[p.team] * 30 + (won ? 250 : 50)) * g.diff.reward);
-  let rankHtml = '';
+  const p = g.player, dm = g.dm;
+  const my = g.score[p.team], th = g.score[p.team === 'T' ? 'CT' : 'T'];
+  const order = g.actors.slice().sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+  const place = order.indexOf(p) + 1;
+  const won = dm ? place === 1 : my > th, draw = !dm && my === th;
+  const reward = dm ? Math.round((p.kills * 8 + Math.max(0, 6 - place) * 40) * g.diff.reward)
+    : Math.round((p.kills * 15 + my * 30 + (won ? 250 : 50)) * g.diff.reward);
+  const xpGain = Math.round((p.kills * 20 + (p.mvps || 0) * 40 + (dm ? Math.max(0, 6 - place) * 60 : my * 25 + (won ? 200 : draw ? 100 : 60))) * Math.max(0.3, g.diff.reward));
+  let rank = null;
   if (g.mode === 'comp' || g.mode === 'wing') {
     // рейтинг Эло против уровня ботов: на слабых ботах высоко не подняться
     const r = rankData(g.mode), before = rankOf(r), opp = BOT_ELO[g.diff.id] || 1000;
     const exp = 1 / (1 + Math.pow(10, (opp - r.elo) / 400)), res = draw ? 0.5 : won ? 1 : 0;
-    const my = g.score[p.team], th = g.score[p.team === 'T' ? 'CT' : 'T'], margin = 1 + Math.min(0.5, Math.abs(my - th) / 26);
+    const margin = 1 + Math.min(0.5, Math.abs(my - th) / 26);
     const kd = Math.max(-6, Math.min(6, (p.kills - p.deaths) * 0.6));
     const delta = Math.round(40 * margin * (res - exp) + kd);
     r.elo = Math.max(0, r.elo + delta); r.games++; if (won) r.wins++; else if (!draw) r.losses++;
     const after = rankOf(r);
-    const mname = g.mode === 'comp' ? 'Соревновательный' : 'Напарники';
-    const nm = i => i < 0 ? `Без звания (побед до звания: ${Math.max(0, 2 - r.wins)})` : RANKS[i];
-    rankHtml = `<div class="rankBox"><div class="rankMode">${mname} · рейтинг ${r.elo} (${delta >= 0 ? '+' : ''}${delta})</div><div class="rankRow"><img src="${rankURL(before, 160)}" alt=""><span>→</span><img src="${rankURL(after, 160)}" alt=""></div><b class="${after > before ? 'up' : after < before ? 'down' : ''}">${after > before ? '▲ Повышение: ' : after < before ? '▼ Понижение: ' : ''}${esc(nm(after))}</b></div>`;
+    rank = { before, after, delta, elo: r.elo, mode: g.mode === 'comp' ? 'Соревновательный' : 'Напарники', name: after < 0 ? `Без звания · побед до звания: ${Math.max(0, 2 - r.wins)}` : RANKS[after] };
   }
-  save.lastMatch = { map: g.o.map.name, score: `${g.score[p.team]}:${g.score[p.team === 'T' ? 'CT' : 'T']}`, won, k: p.kills, d: p.deaths };
+  const xpFrom = save.xp || 0; save.xp = xpFrom + xpGain;
+  save.lastMatch = { map: g.o.map.name, score: dm ? `#${place}` : `${my}:${th}`, won, k: p.kills, d: p.deaths };
   save.coins += reward; save.stats.matches++; if (won) save.stats.wins++; save.stats.kills += p.kills; save.stats.deaths += p.deaths; persist();
-  $('overTitle').textContent = draw ? 'Ничья' : won ? 'Победа!' : 'Поражение';
-  const rows = g.actors.slice().sort((a, b) => b.kills - a.kills).map(a => `<tr style="color:${a.team === 'T' ? '#e8b04a' : '#6aa8ff'}${a === p ? ';font-weight:800' : ''}"><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td></tr>`).join('');
-  $('overBody').innerHTML = `<p class="center" style="font-size:22px">T ${g.score.T} : ${g.score.CT} CT</p><table><tr><th>Игрок</th><th>Убийства</th><th>Смерти</th></tr>${rows}</table><div class="reward">+ ◈ ${reward} монет</div>${rankHtml}`;
-  $('over').classList.remove('hidden');
-  play(won ? 'win' : 'lose');
+  // кто стоит на сцене: своя команда (или топ-5 в бою насмерть), лучший — в центре
+  const pool = (dm ? order : order.filter(a => a.team === p.team)).slice(0, 5);
+  if (!pool.includes(p)) pool[pool.length - 1] = p;
+  const kd = a => a.kills / Math.max(1, a.deaths);
+  const top = (f) => { let b = null; for (const a of pool) if (f(a) > 0 && (!b || f(a) > f(b))) b = a; return b; };
+  const badges = new Map();
+  const give = (a, t) => { if (a && !badges.has(a)) badges.set(a, t); };
+  give(top(a => a.mvps || 0), 'MVP матча'); give(top(a => a.kills), 'Больше всех убийств'); give(top(a => a.hs || 0), 'Мастер хедшотов'); give(top(kd), 'Лучший K/D');
+  const players = pool.map(a => {
+    const w = a.weapons[1] || a.weapons[2];
+    return { name: a.name, team: a.team, agent: a.agent, gun: w ? w.id : (a.team === 'T' ? 'ak47' : 'm4a4'), skin: w ? w.skin : null, gloves: a.skins && a.skins.gloves, k: a.kills, d: a.deaths, mvps: a.mvps || 0, hs: a.hs || 0, me: a === p, place: order.indexOf(a) + 1, badge: badges.get(a) || '' };
+  });
+  const data = { dm, won, draw, place, total: order.length, my, th, team: p.team, map: g.o.map.name, mode: (MODES.find(m => m[0] === g.mode) || [])[1] || '', players, reward, xpFrom, xpGain, rank };
+  game.dispose(); game = null;
+  controls.enabled = false; controls.reset(); closeBuy();
+  $('hud').classList.add('hidden'); $('pause').classList.add('hidden');
+  showEnd(data);
+  play(won || (dm && place <= 3) ? 'win' : 'lose');
+  if (won) setTimeout(() => { if (END) playMusic('mvp'); }, 900);
 }
-function endDM(g) {
-  const p = g.player, order = g.actors.slice().sort((a, b) => b.kills - a.kills), place = order.indexOf(p) + 1;
-  const reward = Math.round((p.kills * 8 + Math.max(0, 6 - place) * 40) * g.diff.reward);
-  save.coins += reward; save.stats.kills += p.kills; save.stats.deaths += p.deaths; save.stats.matches++; if (place === 1) save.stats.wins++;
-  save.lastMatch = { map: g.o.map.name, score: `#${place}`, won: place === 1, k: p.kills, d: p.deaths }; persist();
-  $('overTitle').textContent = place === 1 ? 'Первое место!' : `Место ${place} из ${order.length}`;
-  $('overBody').innerHTML = `<table><tr><th>#</th><th>Игрок</th><th>Убийства</th><th>Смерти</th></tr>${order.map((a, i) => `<tr style="${a === p ? 'font-weight:800;color:#ffe08a' : ''}"><td>${i + 1}</td><td>${esc(a.name)}</td><td>${a.kills}</td><td>${a.deaths}</td></tr>`).join('')}</table><div class="reward">+ ◈ ${reward} монет</div>`;
-  $('over').classList.remove('hidden');
-  play(place <= 3 ? 'win' : 'lose');
+
+let END = null;
+function showEnd(d) {
+  const scene = new THREE.Scene();
+  const col = d.draw ? '#8a96a6' : d.won ? (d.dm ? '#e8c050' : d.team === 'T' ? '#e8a640' : '#5aa0ff') : '#d04848';
+  const bg = document.createElement('canvas'); bg.width = bg.height = 512; const c = bg.getContext('2d');
+  const gr = c.createRadialGradient(256, 300, 10, 256, 256, 400); gr.addColorStop(0, col); gr.addColorStop(0.35, '#1a2230'); gr.addColorStop(1, '#05070a');
+  c.fillStyle = gr; c.fillRect(0, 0, 512, 512);
+  const bt = new THREE.CanvasTexture(bg); bt.colorSpace = THREE.SRGBColorSpace; scene.background = bt;
+  scene.add(new THREE.HemisphereLight('#c8d8ff', '#151a22', 0.8));
+  const key = new THREE.DirectionalLight('#fff0dc', 2.0); key.position.set(1.5, 5, 5); scene.add(key);
+  const rim = new THREE.DirectionalLight(col, 2.4); rim.position.set(-2, 3, -4); scene.add(rim);
+  const rim2 = new THREE.DirectionalLight(col, 1.4); rim2.position.set(3, 2, -3); scene.add(rim2);
+  // световые пятна под каждым агентом
+  const fc = document.createElement('canvas'); fc.width = fc.height = 128; const f = fc.getContext('2d');
+  const fg = f.createRadialGradient(64, 64, 2, 64, 64, 64); fg.addColorStop(0, 'rgba(255,255,255,.55)'); fg.addColorStop(1, 'rgba(255,255,255,0)'); f.fillStyle = fg; f.fillRect(0, 0, 128, 128);
+  const spotT = new THREE.CanvasTexture(fc);
+  const flc = document.createElement('canvas'); flc.width = flc.height = 256; const fl = flc.getContext('2d');
+  const flg = fl.createRadialGradient(128, 128, 10, 128, 128, 128); flg.addColorStop(0, 'rgba(14,18,25,1)'); flg.addColorStop(0.6, 'rgba(10,13,18,.9)'); flg.addColorStop(1, 'rgba(5,7,10,0)'); fl.fillStyle = flg; fl.fillRect(0, 0, 256, 256);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(16, 10).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(flc), transparent: true, depthWrite: false })); floor.position.z = -1.5; scene.add(floor);
+  const fill = new THREE.DirectionalLight('#dfe8ff', 1.1); fill.position.set(-2, 1.6, 6); scene.add(fill);
+  const slots = [0, -1, 1, -2, 2], gap = 1.15;
+  const models = d.players.map((pl, i) => {
+    const m = new AgentModel(pl.agent, pl.gun, pl.skin || null); if (pl.gloves) m.setGloves(pl.gloves);
+    const x = slots[i] * gap, z = -Math.abs(slots[i]) * 0.35;
+    m.root.position.set(x, 0, z); m.root.rotation.y = Math.PI - x * 0.12;
+    scene.add(m.root);
+    const sp = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: spotT, color: i === 0 ? col : '#9fb0c8', transparent: true, depthWrite: false, opacity: 0 }));
+    sp.position.set(x, 0.01, z); scene.add(sp);
+    return { m, sp, x, z, pl, ph: Math.random() * 6 };
+  });
+  const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+  const scr = $('endScr');
+  const title = d.dm ? (d.place === 1 ? 'ПЕРВОЕ МЕСТО' : `МЕСТО ${d.place}`) : d.draw ? 'НИЧЬЯ' : d.won ? 'ПОБЕДА' : 'ПОРАЖЕНИЕ';
+  const sub = d.dm ? `из ${d.total} · ${esc(d.map)}` : `<b class="${d.team === 'T' ? 't' : 'ct'}">${d.my}</b> : <b class="${d.team === 'T' ? 'ct' : 't'}">${d.th}</b>`;
+  $('eTitle').innerHTML = `<div class="eMode">${esc(d.mode)}${d.dm ? '' : ' · ' + esc(d.map)}</div><h1>${title}</h1><div class="eScore">${sub}</div>`;
+  $('eTitle').style.setProperty('--ec', col);
+  $('eCards').innerHTML = models.map(o => `<div class="eCard${o.pl.me ? ' me' : ''} ${o.pl.team === 'T' ? 't' : 'ct'}">
+    ${o.pl.badge ? `<div class="eBadge">★ ${esc(o.pl.badge)}</div>` : '<div class="eBadge none"></div>'}
+    <div class="eName">${d.dm ? `<i>#${o.pl.place}</i> ` : ''}${esc(o.pl.name)}</div>
+    <div class="eStats"><span><b>${o.pl.k}</b>У</span><span><b>${o.pl.d}</b>С</span><span><b>${o.pl.mvps}</b>★</span><span><b>${o.pl.k ? Math.round(o.pl.hs / o.pl.k * 100) : 0}%</b>ГОЛ</span></div></div>`).join('');
+  const lvl = x => Math.floor(x / XP_LVL) + 1;
+  $('eRew').innerHTML = `<div class="eRow"><span>Награда</span><b class="eCoins">◈ 0</b></div>
+    <div class="eRow"><span>Опыт</span><b>+${d.xpGain} XP</b></div>
+    <div class="eLvl"><span class="eL">Ур. ${lvl(d.xpFrom)}</span><div class="eBar"><i></i></div></div>
+    ${d.rank ? `<div class="eRank"><div class="eRm">${esc(d.rank.mode)} · ${d.rank.elo} <em class="${d.rank.delta >= 0 ? 'up' : 'down'}">${d.rank.delta >= 0 ? '+' : ''}${d.rank.delta}</em></div><img src="${rankURL(d.rank.before, 200)}" alt=""><div class="eRn">${d.rank.before < 0 ? 'Без звания' : esc(RANKS[d.rank.before])}</div></div>` : ''}`;
+  scr.className = ''; scr.classList.toggle('lose', !d.won && !d.draw);
+  END = { d, scene, cam, models, t: 0, coinsShown: 0, rankDone: false, lvlUp: false };
+  renderer.setSize(innerWidth, innerHeight, false);
+}
+$('eOk').onclick = () => { if (!END) return; if (END.t < 4.5) { END.t = 4.5; return; } closeEnd(); };
+function closeEnd() {
+  if (!END) return;
+  END.scene.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  END = null; $('endScr').className = 'hidden';
+  quitGame();
+}
+function renderEnd(dt) {
+  const E = END, d = E.d; E.t += dt; const t = E.t;
+  const W = innerWidth, H = innerHeight, asp = W / H;
+  const ease = x => 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3);
+  // камера: издалека и сверху наезжает на строй
+  // строй помещается между краем экрана и панелью наград справа
+  const rwW = Math.min(W * 0.3, ($('eRew').offsetWidth || 0) + 20), effW = W - rwW;
+  const tan = Math.tan(15 * Math.PI / 180), span = Math.max(2, d.players.length) * 1.15 + 0.5;
+  const D = Math.max(2.2 / tan * 0.5 / 0.62, span / 2 / (tan * asp * effW / W));
+  const k = ease(t / 3.2);
+  const dist = D * (1.9 - 0.9 * k), sway = Math.sin(t * 0.25) * 0.25 * k;
+  E.cam.aspect = asp; E.cam.setViewOffset(W, H, rwW / 2 * k, 0, W, H);
+  E.cam.position.set(sway + (1 - k) * 1.2, 1.25 + (1 - k) * 2.2, dist);
+  E.cam.lookAt(sway * 0.4, 0.62, -0.3);
+  for (let i = 0; i < E.models.length; i++) {
+    const o = E.models[i], st = 0.35 + i * 0.22, a = ease((t - st) / 0.7);
+    o.m.root.position.y = 0;
+    o.m.root.visible = t > st;
+    o.m.root.position.x = o.x; o.m.root.position.z = o.z + (1 - a) * -1.2;
+    o.sp.material.opacity = a * (i === 0 ? 0.8 : 0.45);
+    o.m.update({ dt, speed: 0, crouch: false, pitch: -0.25 + Math.sin(t * 0.8 + o.ph) * 0.03 });
+    o.m.torso.position.y = 0.08 + Math.sin(t * 1.4 + o.ph) * 0.006;
+    o.m.root.rotation.y = Math.PI - o.x * 0.12 + Math.sin(t * 0.5 + o.ph) * 0.04;
+  }
+  renderer.render(E.scene, E.cam);
+  // заголовок: удар по центру, затем уезжает вверх
+  const tt = $('eTitle'), up = ease((t - 1.5) / 0.6), slam = ease(t / 0.45);
+  tt.style.opacity = Math.min(1, t / 0.25); tt.style.left = (W - rwW * up) / 2 + 'px';
+  tt.style.transform = `translate(-50%, ${(1 - up) * (H * 0.36)}px) scale(${(2.2 - 1.2 * slam) * (1 - 0.35 * up)})`;
+  tt.style.filter = `blur(${(1 - slam) * 8}px)`;
+  // карточки под ногами агентов
+  const cards = $('eCards').children, v = new THREE.Vector3();
+  v.set(0, 0, 0).project(E.cam); const x0 = v.x, y0 = (-v.y * 0.5 + 0.5) * H;
+  v.set(1.15, 0, 0).project(E.cam); const cw = Math.min(170, Math.abs(v.x - x0) * 0.5 * W - 6);
+  const cardH = cards[0] ? cards[0].offsetHeight : 80, cy = Math.min(y0 - 6, H - cardH - (H < 460 ? 64 : 80));
+  for (let i = 0; i < E.models.length; i++) {
+    const o = E.models[i], cd = cards[i]; if (!cd) continue;
+    v.set(o.x, 0, 0).project(E.cam);
+    const sx = (v.x * 0.5 + 0.5) * W;
+    const a = ease((t - 1.6 - i * 0.15) / 0.5);
+    cd.style.opacity = a; cd.style.width = cw + 'px';
+    cd.style.transform = `translate(${sx}px, ${cy + (i === 0 ? -8 : 0) + (1 - a) * 30}px) translateX(-50%)`;
+  }
+  // награды: монеты, опыт, звание
+  const rw = $('eRew'), ra = ease((t - 2.6) / 0.5);
+  rw.style.opacity = ra; rw.style.transform = `translateX(${(1 - ra) * 40}px)`;
+  const ck = ease((t - 2.9) / 1.2), cn = Math.round(d.reward * ck);
+  if (cn !== E.coinsShown) { E.coinsShown = cn; rw.querySelector('.eCoins').textContent = '◈ ' + cn; if (cn % 7 === 0 && ck < 1) play('step'); }
+  const xp = d.xpFrom + d.xpGain * ease((t - 3.2) / 1.4), lv = Math.floor(xp / XP_LVL) + 1;
+  rw.querySelector('.eBar i').style.width = ((xp % XP_LVL) / XP_LVL * 100) + '%';
+  const lvEl = rw.querySelector('.eL'); const txt = 'Ур. ' + lv;
+  if (lvEl.textContent !== txt) { lvEl.textContent = txt; if (lv > Math.floor(d.xpFrom / XP_LVL) + 1) { lvEl.classList.remove('pop'); void lvEl.offsetWidth; lvEl.classList.add('pop'); play('buy'); } }
+  if (d.rank && !E.rankDone && t > 4.4) {
+    E.rankDone = true;
+    const box = rw.querySelector('.eRank'), img = box.querySelector('img');
+    img.src = rankURL(d.rank.after, 200); box.querySelector('.eRn').textContent = (d.rank.after > d.rank.before ? '▲ ' : d.rank.after < d.rank.before ? '▼ ' : '') + d.rank.name;
+    box.classList.add(d.rank.after > d.rank.before ? 'up' : d.rank.after < d.rank.before ? 'down' : 'same', 'flip');
+    if (d.rank.after !== d.rank.before) play(d.rank.after > d.rank.before ? 'win' : 'lose');
+  }
+  $('eOk').style.opacity = ease((t - 2) / 0.5);
 }
 
 // ---------- запуск матча ----------
@@ -719,8 +844,9 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   if (window.__stop) return;
+  if (END) { renderEnd(dt); return; }
   if (!game) { if (!$('menu').classList.contains('hidden')) renderMenu3d(dt); return; }
-  const paused = !$('pause').classList.contains('hidden') || !$('over').classList.contains('hidden');
+  const paused = !$('pause').classList.contains('hidden');
   if (!paused) game.update(dt);
   if (!game) return;
   game.render();
@@ -754,4 +880,4 @@ function renderInstall() {
   const b = $('installBtn'); if (b) b.onclick = async () => { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) { /* отмена */ } installEvt = null; renderInstall(); };
 }
 renderInstall();
-window.__cfs = { get game() { return game; }, startGame, save, hud };
+window.__cfs = { get game() { return game; }, get end() { return END; }, startGame, save, hud };

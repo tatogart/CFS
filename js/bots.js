@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793124825';
-import { WEAPONS } from './data.js?v=1793124825';
+import { CELL } from './maps.js?v=1793126269';
+import { WEAPONS } from './data.js?v=1793126269';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -53,7 +53,9 @@ export class Bot {
     const half = g.o.winTo - 1, pistol = g.round === 1 || g.round === half + 1;
     const nadeSkill = this.d.nades;
     const tryB = id => g.buy(a, id);
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
     if (pistol) {
+      if (Math.random() < 0.3) tryB(T ? pick(['tec9', 'p250']) : pick(['fiveseven', 'p250']));
       if (Math.random() < 0.5) tryB('vest'); else { if (Math.random() < nadeSkill) tryB('smoke'); tryB('flash'); }
       if (!T && Math.random() < 0.3) tryB('kit');
       return;
@@ -61,11 +63,11 @@ export class Bot {
     const m = a.money;
     if (m >= 3800) {
       const awp = m >= 6200 && Math.random() < 0.2;
-      tryB(awp ? 'awp' : T ? 'ak47' : 'm4a4');
+      tryB(awp ? 'awp' : T ? pick(['ak47', 'ak47', 'ak47', 'sg553']) : pick(['m4a4', 'm4a1s', 'm4a1s', 'aug']));
       tryB('vesthelm');
-    } else if (m >= 2600) { tryB(T ? 'galil' : 'famas'); tryB('vest'); }
-    else if (m >= 1900 && Math.random() < 0.5) { tryB(T ? 'mac10' : 'mp9'); tryB('vest'); }
-    else if (m >= 900 && Math.random() < 0.6) tryB('deagle');
+    } else if (m >= 2600) { tryB(pick([T ? 'galil' : 'famas', T ? 'galil' : 'famas', 'ssg08', 'mp7', 'p90', 'xm1014'])); tryB('vest'); }
+    else if (m >= 1900 && Math.random() < 0.5) { tryB(pick([T ? 'mac10' : 'mp9', 'ump45', 'nova', 'ssg08'])); tryB('vest'); }
+    else if (m >= 900 && Math.random() < 0.6) tryB(pick(['deagle', 'deagle', 'p250', T ? 'tec9' : 'fiveseven']));
     // гранаты по уровню
     if (Math.random() < nadeSkill) tryB('smoke');
     if (Math.random() < nadeSkill) tryB('flash');
@@ -349,11 +351,11 @@ export class Bot {
       if (def && def.type === 'knife' && dist > 2) shoot = false;
       if (shoot && def) {
         if (def.scope && !a.scope) a.scope = 1;
-        if (def.type === 'rifle' || def.type === 'smg') {
+        if (def.type === 'rifle' || def.type === 'smg' || def.type === 'mg' || (def.type === 'sniper' && def.auto)) {
           const burstLen = dist > 22 ? Math.max(2, this.d.burst / 3) : this.d.burst * 2;
           if (this.pauseT > 0) { this.pauseT -= dt; }
           else { inp.fire = true; this.burst += dt / def.rate; if (this.burst > burstLen) { this.burst = 0; this.pauseT = (dist > 22 ? 0.35 : 0.15) * (1 + (1 - this.d.fire) * 6) + (1 - this.d.comp) * 0.3; } }
-        } else if (def.type === 'pistol' || def.type === 'sniper') {
+        } else if (def.type === 'pistol' || def.type === 'sniper' || def.type === 'shotgun') {
           if (this.pauseT > 0) this.pauseT -= dt;
           else { inp.fire = (this.tap = !this.tap); if (inp.fire) this.pauseT = (1 - this.d.fire) * 0.9 + (1 - this.d.comp) * 0.15; }
         } else inp.fire = true;

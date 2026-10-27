@@ -118,6 +118,7 @@ function build() {
   v('pistol', () => gun({ len: 0.55, crack: 1.0, body: 2600, bodyDec: 0.03, thump: 120, thumpDec: 0.035, thumpA: 0.6, tail: 0.35, tailF: 1100, tailDec: 0.16 , bolt: 0.06}));
   v('deagle', () => gun({ len: 0.9, crack: 1.0, body: 1300, bodyDec: 0.07, thump: 60, thumpDec: 0.09, thumpA: 1.3, tail: 0.6, tailF: 650, tailDec: 0.3, drive: 2 , bolt: 0.08}));
   v('awp', () => gun({ len: 1.4, crack: 1.1, body: 1100, bodyDec: 0.09, thump: 46, thumpDec: 0.16, thumpA: 1.8, tail: 0.8, tailF: 500, tailDec: 0.5, drive: 2.6, sub: 1.0, bolt: 0.55 }));
+  v('shotgun', () => gun({ len: 1.0, crack: 1.2, body: 900, bodyDec: 0.08, thump: 55, thumpDec: 0.11, thumpA: 1.6, tail: 0.7, tailF: 550, tailDec: 0.35, drive: 2.4, bolt: 0.3 }));
   v('silenced', () => mkbuf(0.25, (d, n, SR) => { let a = 0; const k = lpK(1800, SR); for (let i = 0; i < n; i++) { const t = i / SR, x = Math.random() * 2 - 1; a += k * (x - a); d[i] = a * Math.exp(-t / 0.025) * 2 + Math.sin(TAU * 180 * t) * Math.exp(-t / 0.02) * 0.4; } clickAt(d, SR, 0.03, [3200, 4700], 0.35); }));
   v('step', () => mkbuf(0.14, (d, n, SR) => { let a = 0, b2 = 0; const k = lpK(380 + Math.random() * 200, SR); for (let i = 0; i < n; i++) { const t = i / SR, x = Math.random() * 2 - 1; a += k * (x - a); b2 += k * (a - b2); d[i] = b2 * 4 * Math.exp(-t / 0.022) + Math.sin(TAU * 75 * t) * Math.exp(-t / 0.02) * 0.5 + (x - a) * 0.08 * Math.exp(-Math.abs(t - 0.035) / 0.006); } }), 4);
   B.knife = [whoosh(0.22, 500, 2600), whoosh(0.2, 700, 3000)];
@@ -152,10 +153,10 @@ function build() {
   B.round = [tones([[660, 0, 0.12, 0.3], [990, 0.13, 0.2, 0.3]], 0.4, 0)];
 }
 
-const REV = { ak47: 0.5, rifle: 0.5, smg: 0.45, pistol: 0.45, deagle: 0.55, awp: 0.6, silenced: 0.2, he: 0.7, boom: 0.8, flash: 0.6, fire: 0.3, step: 0.15, bounce: 0.2, beep: 0.25, knife: 0.15, reload: 0.15, hurt: 0.15, smoke: 0.3 };
-const VARY = new Set(['ak47', 'rifle', 'smg', 'pistol', 'deagle', 'awp', 'silenced', 'step', 'knife', 'bounce', 'hit']);
+const REV = { ak47: 0.5, rifle: 0.5, smg: 0.45, pistol: 0.45, deagle: 0.55, shotgun: 0.6, awp: 0.6, silenced: 0.2, he: 0.7, boom: 0.8, flash: 0.6, fire: 0.3, step: 0.15, bounce: 0.2, beep: 0.25, knife: 0.15, reload: 0.15, hurt: 0.15, smoke: 0.3 };
+const VARY = new Set(['ak47', 'rifle', 'smg', 'pistol', 'deagle', 'shotgun', 'awp', 'silenced', 'step', 'knife', 'bounce', 'hit']);
 // громкость по типам
-const GAIN = { ak47: 0.95, rifle: 0.9, smg: 0.8, pistol: 0.8, deagle: 0.95, awp: 1.0, silenced: 0.5, step: 0.45, knife: 0.5, throw: 0.4, reload: 0.5, draw: 0.4, empty: 0.5,
+const GAIN = { ak47: 0.95, rifle: 0.9, smg: 0.8, pistol: 0.8, deagle: 0.95, shotgun: 1.0, awp: 1.0, silenced: 0.5, step: 0.45, knife: 0.5, throw: 0.4, reload: 0.5, draw: 0.4, empty: 0.5,
   hit: 0.55, head: 0.6, hurt: 0.6, he: 1.0, boom: 1.0, flash: 0.9, ring: 0.35, smoke: 0.5, fire: 0.7, bounce: 0.4, beep: 0.45, plant: 0.5, defuse: 0.5,
   tick: 0.25, ui: 0.3, spray: 0.5, buy: 0.4, win: 0.5, lose: 0.5, rare: 0.5, round: 0.4 };
 // d — дистанция, pan — стерео (-1..1), k — множитель громкости
@@ -178,13 +179,15 @@ export function play(name, d = 0, pan = 0, k = 1) {
   src.start();
 }
 export function soundFor(id) {
-  if (id === 'ak47' || id === 'galil') return 'ak47';
-  if (id === 'm4a4' || id === 'famas') return 'rifle';
-  if (id === 'usp') return 'silenced';
-  if (id === 'mp9' || id === 'mac10') return 'smg';
-  if (id === 'awp') return 'awp';
+  if (id === 'ak47' || id === 'galil' || id === 'negev' || id === 'sg553') return 'ak47';
+  if (id === 'm4a4' || id === 'famas' || id === 'aug') return 'rifle';
+  if (id === 'usp' || id === 'm4a1s') return 'silenced';
+  if (id === 'mp9' || id === 'mac10' || id === 'ump45' || id === 'mp7' || id === 'p90') return 'smg';
+  if (id === 'awp' || id === 'ssg08') return 'awp';
+  if (id === 'g3sg1' || id === 'scar20') return 'deagle';
+  if (id === 'nova' || id === 'xm1014') return 'shotgun';
   if (id === 'deagle') return 'deagle';
-  if (id === 'glock') return 'pistol';
+  if (id === 'glock' || id === 'p250' || id === 'tec9' || id === 'fiveseven') return 'pistol';
   return 'knife';
 }
 export function audioCtx() { return ctx; }

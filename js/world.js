@@ -1,7 +1,7 @@
 // Мир: сетка карты, геометрия, лучи, навигация
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793105575';
-import { rng, shade } from './art.js?v=1793105575';
+import { CELL, setCell } from './maps.js?v=1793105792';
+import { rng, shade } from './art.js?v=1793105792';
 
 const WALK = new Set(['.', 'w', 'T', 'K', 'A', 'B', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 
@@ -79,6 +79,7 @@ function texCanvas(kind, base, alt, seed) {
 
 export class World {
   constructor(map, quality = 1) {
+    setCell(map.cell || 3);
     this.map = map; this.quality = quality;
     const grid = map.grid; this.h = grid.length; this.w = grid[0].length;
     this.cells = grid.map(r => r.split(''));
@@ -234,7 +235,7 @@ export class World {
     gS[start] = 0; open.push([hf(start), start]);
     const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
     let found = false, iter = 0;
-    while (open.length && iter++ < 6000) {
+    while (open.length && iter++ < 25000) {
       let bi = 0; for (let n = 1; n < open.length; n++) if (open[n][0] < open[bi][0]) bi = n;
       const [, k] = open[bi]; open[bi] = open[open.length - 1]; open.pop();
       if (closed[k]) continue; closed[k] = 1;

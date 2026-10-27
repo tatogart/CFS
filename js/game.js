@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793126269';
-import { World } from './world.js?v=1793126269';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793126269';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793126269';
-import { play, soundFor } from './sfx.js?v=1793126269';
-import { Bot, planRound } from './bots.js?v=1793126269';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793126269';
+import { CELL } from './maps.js?v=1793126924';
+import { World } from './world.js?v=1793126924';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793126924';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793126924';
+import { play, soundFor } from './sfx.js?v=1793126924';
+import { Bot, planRound } from './bots.js?v=1793126924';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793126924';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -148,7 +148,7 @@ export class Game {
       this._finishActors(this.player.team);
       return;
     }
-    const p = this.player = mkActor(this.net ? this.net.myName : 'Вы', side, false, this.o.agents[side]);
+    const p = this.player = mkActor(this.net ? this.net.myName : (this.o.nick || 'Вы'), side, false, this.o.agents[side]);
     p.skins = { ...lo }; p.nid = 0;
     if (p.skins.gloves) p.model.setGloves(p.skins.gloves);
     // хост: живые игроки из лобби

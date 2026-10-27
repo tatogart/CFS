@@ -1,6 +1,6 @@
 // Music kit: встроенные киты синтезируются на лету (секвенсор WebAudio),
 // свой кит — треки игрока из файлов (хранятся в IndexedDB на устройстве).
-import { audioCtx, initAudio } from './sfx.js?v=1793126269';
+import { audioCtx, initAudio } from './sfx.js?v=1793126924';
 
 // ступени ладов (полутоны)
 const MINOR = [0, 2, 3, 5, 7, 8, 10], PHRYG = [0, 1, 3, 5, 7, 8, 10], DORIAN = [0, 2, 3, 5, 7, 9, 10];
@@ -120,4 +120,11 @@ export async function playMusic(mode, kit = kitId) {
   startSeq(KITS.find(k => k.id === kit) || KITS[0], mode, DUR[mode]);
 }
 export function stopMusic(fade = 0.6) { stopAll(fade); }
+// приложение свёрнуто / вкладка скрыта: глушим всё, при возврате продолжаем
+let hiddenPaused = false;
+export function setHidden(h) {
+  const ctx = audioCtx();
+  if (h) { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); if (audioEl && !audioEl.paused) { audioEl.pause(); hiddenPaused = true; } }
+  else { if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); if (hiddenPaused && audioEl) audioEl.play().catch(() => {}); hiddenPaused = false; }
+}
 export function musicMode() { return seq ? seq.mode : audioEl ? 'file' : null; }

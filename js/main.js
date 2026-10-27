@@ -1,14 +1,14 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793126269';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793126269';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793126269';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793126269';
-import { AgentModel } from './models.js?v=1793126269';
-import { Controls, isTouch } from './controls.js?v=1793126269';
-import { initAudio, play, setVolume } from './sfx.js?v=1793126269';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd } from './music.js?v=1793126269';
-import { Game } from './game.js?v=1793126269';
+import { MAPS, CELL } from './maps.js?v=1793126924';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793126924';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793126924';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793126924';
+import { AgentModel } from './models.js?v=1793126924';
+import { Controls, isTouch } from './controls.js?v=1793126924';
+import { initAudio, play, setVolume } from './sfx.js?v=1793126924';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793126924';
+import { Game } from './game.js?v=1793126924';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -324,10 +324,88 @@ function renderAgentLists() {
     }
   }
 }
+// ---------- сворачивание: музыка не должна играть в фоне ----------
+function onHide(h) {
+  setHidden(h);
+  const yb = $('ytBox');
+  if (h) { if (yb.querySelector('iframe')) { yb.innerHTML = ''; yb.dataset.id = ''; yb.dataset.wasOn = '1'; } }
+  else if (yb.dataset.wasOn) { yb.dataset.wasOn = ''; if (!game) updYt(); }
+  if (h && game && $('pause').classList.contains('hidden')) openPause();
+}
+document.addEventListener('visibilitychange', () => onHide(document.hidden));
+addEventListener('pagehide', () => onHide(true));
+addEventListener('pageshow', () => { if (!document.hidden) onHide(false); });
+addEventListener('freeze', () => onHide(true));
+
+// ---------- профиль ----------
+const AV_COLORS = ['#e8a640', '#5aa0ff', '#4cd07a', '#e05555', '#b06cff', '#3fd0d0', '#ff7ac0', '#9aa6b6'];
+const XP_PER_LVL = 1000;
+const nick = () => (save.nick || 'Игрок');
+function avatarHtml(size = 40) {
+  const c = AV_COLORS[save.avatar || 0];
+  return `<span class="avatar" style="--av:${c};width:${size}px;height:${size}px;font-size:${Math.round(size * 0.5)}px">${esc(nick().trim()[0] || '?').toUpperCase()}</span>`;
+}
+function weekId(t = Date.now()) { return Math.floor((t / 86400000 + 3) / 7); } // неделя с понедельника
+function weekLeft() { const next = (weekId() + 1) * 7 - 3, ms = next * 86400000 - Date.now(); const d = Math.floor(ms / 86400000), h = Math.floor(ms % 86400000 / 3600000); return d ? `${d} д ${h} ч` : `${h} ч ${Math.floor(ms % 3600000 / 60000)} мин`; }
+function weekly() {
+  const w = weekId();
+  if (!save.weekly || save.weekly.week !== w) {
+    // 4 предложения недели, забрать можно 2 (как в CS2)
+    const pool = SKINS.filter(s => s.rarity !== 'gold'), pick = () => {
+      const r = Math.random(), rar = r < 0.55 ? 'milspec' : r < 0.85 ? 'restricted' : r < 0.97 ? 'classified' : 'covert';
+      const l = pool.filter(s => s.rarity === rar); return l[Math.floor(Math.random() * l.length)].id;
+    };
+    const offers = [];
+    while (offers.length < 3) { const id = pick(); if (!offers.includes(id)) offers.push(id); }
+    offers.splice(Math.floor(Math.random() * 4), 0, 'coins:' + (500 + Math.floor(Math.random() * 6) * 250));
+    save.weekly = { week: w, offers, taken: [] }; persist();
+  }
+  return save.weekly;
+}
+function renderProfileChip() {
+  const lv = Math.floor((save.xp || 0) / XP_PER_LVL) + 1, wk = weekly(), ready = wk.taken.length < 2;
+  $('profChip').innerHTML = `${avatarHtml(38)}<span class="pcTxt"><b>${esc(nick())}</b><small>Ур. ${lv}</small></span>${ready ? '<i class="pcDot" title="Еженедельный дроп"></i>' : ''}`;
+}
+function openProfile() {
+  const xp = save.xp || 0, lv = Math.floor(xp / XP_PER_LVL) + 1, st = save.stats;
+  const rk = m => { const r = rankData(m), i = rankOf(r); return `<div class="pRank"><img src="${rankURL(i, 180)}" alt=""><small>${m === 'comp' ? 'Соревновательный' : 'Напарники'}</small><b>${i < 0 ? 'Без звания' : RANKS[i]}</b><span>Рейтинг ${r.elo} · побед ${r.wins} · пор. ${r.losses}</span></div>`; };
+  const wk = weekly();
+  const body = $('profBody');
+  body.innerHTML = `<div class="pTop">${avatarHtml(72)}<div class="pId"><input id="nickIn" maxlength="16" value="${esc(nick())}" placeholder="Ник" autocomplete="off"><div class="avPick">${AV_COLORS.map((c, i) => `<button data-av="${i}" class="${(save.avatar || 0) === i ? 'on' : ''}" style="background:${c}"></button>`).join('')}</div></div></div>
+    <div class="pLvl"><b>Уровень ${lv}</b><div class="eBar"><i style="width:${(xp % XP_PER_LVL) / XP_PER_LVL * 100}%"></i></div><small>${xp % XP_PER_LVL} / ${XP_PER_LVL} XP</small></div>
+    <div class="pRanks">${rk('comp')}${rk('wing')}</div>
+    <div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div><div><b>${st.opened}</b>кейсов</div></div>
+    <h3 class="pDropH">Еженедельный дроп <small>${wk.taken.length < 2 ? `выберите ${2 - wk.taken.length} из 4` : 'получено · новый через ' + weekLeft()}</small></h3>
+    <div class="grid items small pDrop" id="dropOffers"></div>`;
+  const box = $('dropOffers');
+  wk.offers.forEach((o, i) => {
+    let c;
+    if (o.startsWith('coins:')) { c = el('div', 'item', `<div class="pCoins">◈</div><div class="wn">Монеты</div><div class="sn">◈ ${o.slice(6)}</div>`); c.style.setProperty('--rc', '#e4ae39'); }
+    else { c = itemCard(o); c.querySelector('.wn').insertAdjacentHTML('beforebegin', `<div class="rarT" style="color:${RARITY[skinById[o].rarity].color}">${RARITY[skinById[o].rarity].name}</div>`); }
+    const taken = wk.taken.includes(i);
+    if (taken) c.classList.add('taken'); else if (wk.taken.length >= 2) c.classList.add('locked');
+    c.onclick = () => {
+      if (taken || wk.taken.length >= 2) return;
+      wk.taken.push(i);
+      if (o.startsWith('coins:')) save.coins += +o.slice(6); else addItem(o);
+      persist(); play('buy'); coins(); renderInv(); openProfile(); renderProfileChip();
+    };
+    box.appendChild(c);
+  });
+  const ni = $('nickIn');
+  ni.oninput = () => { save.nick = ni.value.replace(/[<>]/g, '').trim().slice(0, 16); persist(); renderProfileChip(); body.querySelector('.pTop .avatar').outerHTML = avatarHtml(72); };
+  body.querySelectorAll('[data-av]').forEach(b => b.onclick = () => { save.avatar = +b.dataset.av; persist(); openProfile(); renderProfileChip(); });
+  $('profile').classList.remove('hidden');
+}
+$('profChip').onclick = () => { play('tick'); openProfile(); };
+$('profClose').onclick = () => $('profile').classList.add('hidden');
+$('profile').onclick = e => { if (e.target.id === 'profile') $('profile').classList.add('hidden'); };
+
 // ---------- главная ----------
 function renderHome() {
   if (!homeReady) return;
   const ag = agentById[save.agent[M.side]];
+  renderProfileChip();
   $('homeAgent').textContent = ag.name; $('homeSide').textContent = M.side === 'T' ? 'Террористы' : 'Спецназ';
   document.querySelectorAll('#sideSw button').forEach(b => b.classList.toggle('on', b.dataset.side === M.side));
   const map = MAPS.find(m => m.id === save.last.map) || MAPS[0], diff = DIFFICULTIES.find(d => d.id === save.last.diff);
@@ -632,7 +710,7 @@ $('pSens').oninput = e => { if (touch) { save.settings.touchSens = +e.target.val
 $('resume').onclick = () => { $('pause').classList.add('hidden'); if (!touch) controls.lock(); };
 $('quit').onclick = () => { $('pause').classList.add('hidden'); quitGame(); };
 // ---------- конец матча: сцена как в CS2 ----------
-const XP_LVL = 1000;
+const XP_LVL = XP_PER_LVL;
 function endMatch(g) {
   controls.unlock();
   const p = g.player, dm = g.dm;
@@ -812,7 +890,7 @@ function startGame() {
   $('loading').classList.remove('hidden');
   setTimeout(() => {
     try {
-      game = new Game(renderer, { map, diff, side, size, winTo, mode, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
+      game = new Game(renderer, { nick: nick(), map, diff, side, size, winTo, mode, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
     } catch (e) { $('loading').classList.add('hidden'); alert('Ошибка запуска: ' + e.message); console.error(e); return; }
     $('menu').classList.add('hidden'); $('hud').classList.remove('hidden'); $('loading').classList.add('hidden');
     $('touch').classList.toggle('hidden', !touch);

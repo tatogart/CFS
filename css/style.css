@@ -295,3 +295,16 @@ body.touch .bitem { padding: 4px; font-size: 11px; }
 .graf button { flex: 0 0 auto; width: 84px; background: var(--card); border: 2px solid var(--line); border-radius: 8px; padding: 4px; font-size: 11px; font-weight: 700; }
 .graf button img { width: 72px; height: 72px; display: block; margin: 0 auto 2px; background: repeating-linear-gradient(45deg, #2a313b 0 6px, #252b34 6px 12px); border-radius: 4px; }
 .graf button.on { border-color: #fff; }
+
+/* баннер конца раунда */
+#banner { position: absolute; left: 0; right: 0; top: 17%; display: flex; align-items: center; justify-content: center; gap: 18px; padding: 14px 20px; opacity: 0; z-index: 4; }
+
+#banner.ct { background: linear-gradient(90deg, transparent, rgba(30,62,110,.92) 18%, rgba(30,62,110,.92) 82%, transparent); border-top: 2px solid rgba(156,196,255,.6); border-bottom: 2px solid rgba(156,196,255,.6); }
+#banner.t { background: linear-gradient(90deg, transparent, rgba(110,72,18,.92) 18%, rgba(110,72,18,.92) 82%, transparent); border-top: 2px solid rgba(255,210,122,.6); border-bottom: 2px solid rgba(255,210,122,.6); }
+#banner .bIcon svg { width: 64px; height: 64px; display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+#banner .bText { display: flex; flex-direction: column; }
+#banner b { font-family: "Barlow Condensed", Impact, sans-serif; font-weight: 800; font-style: italic; font-size: 44px; letter-spacing: 2px; line-height: 1; color: #fff; text-shadow: 0 3px 10px rgba(0,0,0,.6); }
+#banner span { font-size: 15px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,.85); margin-top: 2px; }
+#banner em { font-style: normal; font-size: 14px; color: #ffe08a; margin-top: 4px; }
+body.touch #banner { top: 14%; padding: 8px 12px; } body.touch #banner b { font-size: 28px; } body.touch #banner .bIcon svg { width: 42px; height: 42px; }
+#vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.38)); pointer-events: none; }

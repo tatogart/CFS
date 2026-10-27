@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793107299';
-import { World } from './world.js?v=1793107299';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793107299';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793107299';
-import { play, soundFor } from './sfx.js?v=1793107299';
-import { Bot, planRound } from './bots.js?v=1793107299';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793107299';
+import { CELL } from './maps.js?v=1793117349';
+import { World } from './world.js?v=1793117349';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793117349';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793117349';
+import { play, soundFor } from './sfx.js?v=1793117349';
+import { Bot, planRound } from './bots.js?v=1793117349';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793117349';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -14,6 +14,27 @@ const ROUND_TIME = 115, FREEZE = 6, BOMB_TIME = 40, END_TIME = 5, PLANT_TIME = 3
 const BOT_NAMES = ['Кирпич', 'Тень', 'Шрам', 'Волк', 'Сокол', 'Гром', 'Лис', 'Боцман', 'Призрак', 'Рыжий', 'Седой', 'Бархан', 'Ястреб', 'Кобра', 'Мангуст'];
 const ZONES = [['head', 1.66, 0.15, 4], ['chest', 1.33, 0.26, 1], ['stomach', 1.05, 0.24, 1.25], ['legs', 0.68, 0.2, 0.75], ['legs', 0.32, 0.17, 0.75]];
 
+// текстуры клубов дыма: шум внутри мягкого круга
+let cloudTex = null;
+function cloudTextures() {
+  if (cloudTex) return cloudTex;
+  cloudTex = [];
+  for (let v = 0; v < 3; v++) {
+    const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S; const g = cv.getContext('2d');
+    for (let k = 0; k < 26; k++) {
+      const a = Math.random() * 6.28, r = Math.random() * 30, x = 64 + Math.cos(a) * r, y = 64 + Math.sin(a) * r, rr = 18 + Math.random() * 26;
+      const gr = g.createRadialGradient(x, y, 0, x, y, rr); const l = 200 + Math.random() * 55;
+      gr.addColorStop(0, `rgba(${l},${l},${l},0.35)`); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    }
+    // мягкий край
+    g.globalCompositeOperation = 'destination-in';
+    const m = g.createRadialGradient(64, 64, 20, 64, 64, 64); m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = m; g.fillRect(0, 0, S, S);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; cloudTex.push(t);
+  }
+  return cloudTex;
+}
 let softTex = null;
 function softSprite() {
   if (softTex) return softTex;
@@ -40,17 +61,18 @@ export class Game {
     this.quality = opts.quality;
     this.scene = new THREE.Scene();
     const th = opts.map.theme;
-    this.scene.background = new THREE.Color(th.sky);
-    this.scene.fog = new THREE.Fog(th.fog, 40, th.void ? 260 : 140);
+    this.scene.background = new THREE.Color(th.sky).lerp(new THREE.Color('#9aa3ab'), 0.4);
+    this.scene.fog = new THREE.Fog(new THREE.Color(th.fog).lerp(new THREE.Color('#9aa3ab'), 0.45), 25, th.void ? 240 : 115);
     this.world = new World(opts.map, this.quality);
     this.scene.add(this.world.group);
-    const hemi = new THREE.HemisphereLight(th.sky, th.floor, 1.25); this.scene.add(hemi);
-    const sun = this.sun = new THREE.DirectionalLight(th.sun, 2.6);
+    const hemi = new THREE.HemisphereLight('#c9d4de', '#4a4136', 0.95); this.scene.add(hemi);
+    const sun = this.sun = new THREE.DirectionalLight('#ffe6c4', 2.9);
     // небо: купол с градиентом и солнцем
     {
       const cv = document.createElement('canvas'); cv.width = 32; cv.height = 256; const g = cv.getContext('2d');
       const gr = g.createLinearGradient(0, 0, 0, 256);
-      gr.addColorStop(0, '#2f6fb8'); gr.addColorStop(0.42, th.sky); gr.addColorStop(0.5, th.fog); gr.addColorStop(1, th.fog);
+      const dz = c => '#' + new THREE.Color(c).lerp(new THREE.Color('#9aa3ab'), 0.4).getHexString();
+      gr.addColorStop(0, '#46617c'); gr.addColorStop(0.42, dz(th.sky)); gr.addColorStop(0.5, dz(th.fog)); gr.addColorStop(1, dz(th.fog));
       g.fillStyle = gr; g.fillRect(0, 0, 32, 256);
       const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
       const dome = new THREE.Mesh(new THREE.SphereGeometry(450, 24, 16), new THREE.MeshBasicMaterial({ map: tx, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false }));
@@ -60,11 +82,11 @@ export class Game {
     }
     const cx = this.world.w * CELL / 2, cz = this.world.h * CELL / 2;
     sun.position.set(cx + 30, 60, cz + 20); sun.target.position.set(cx, 0, cz); this.scene.add(sun, sun.target);
-    if (this.quality >= 2) {
-      sun.castShadow = true; const s = sun.shadow; s.mapSize.set(2048, 2048); const ext = Math.max(cx, cz) + 4;
+    if (this.quality >= 1) {
+      sun.castShadow = true; const s = sun.shadow; s.mapSize.set(this.quality >= 2 ? 2048 : 1024, this.quality >= 2 ? 2048 : 1024); const ext = Math.max(cx, cz) + 4;
       s.camera.left = -ext; s.camera.right = ext; s.camera.top = ext; s.camera.bottom = -ext; s.camera.near = 10; s.camera.far = 160; s.bias = -0.0006;
     }
-    this.scene.add(new THREE.AmbientLight('#ffffff', 0.35));
+    this.scene.add(new THREE.AmbientLight('#b8c2cc', 0.18));
     this.camera = new THREE.PerspectiveCamera(this.settings.fov, innerWidth / innerHeight, 0.05, 600);
     this.baseFov = this.settings.fov;
     // вьюмодель
@@ -149,7 +171,7 @@ export class Game {
     const half = this.o.winTo - 1;
     if (!first && !this.practice && this.round === half + 1) this._swapSides();
     this.state = this.practice ? 'live' : 'freeze'; this.stateT = this.practice ? 1e9 : FREEZE;
-    this.roundTime = ROUND_TIME; this.bomb = null;
+    this.roundTime = ROUND_TIME; this.bomb = null; this.defuser = null;
     for (const n of this.nades) n.mesh && this.scene.remove(n.mesh); this.nades = [];
     for (const s of this.smokes) this.scene.remove(s.grp); this.smokes = [];
     for (const f of this.fires) this.scene.remove(f.grp); this.fires = [];
@@ -203,8 +225,12 @@ export class Game {
       else a.money += lossMoney + (a.team === 'T' && this.bomb && this.bomb.planted ? 800 : 0);
       a.money = Math.min(16000, a.money);
     }
-    const text = winner === 'T' ? 'Террористы победили' : 'Спецназ победил';
-    this.centerMsg(text + (reason === 'bomb' ? ' — бомба взорвана' : reason === 'defuse' ? ' — бомба обезврежена' : reason === 'time' ? ' — время вышло' : ''), END_TIME - 0.5, winner === 'T' ? '#e8b04a' : '#6aa8ff');
+    // MVP: больше всего убийств в раунде у победителей (или сапёр / тот, кто заложил)
+    let mvp = this.actors.filter(a => a.team === winner).sort((x, y) => y.roundKills - x.roundKills)[0];
+    if (reason === 'defuse' && this.defuser) mvp = this.defuser;
+    if (reason === 'bomb' && this.bomb && this.bomb.planter) mvp = this.bomb.planter;
+    const why = reason === 'bomb' ? 'Бомба взорвана' : reason === 'defuse' ? 'Бомба обезврежена' : reason === 'time' ? 'Время вышло' : 'Противник уничтожен';
+    this.ui.roundBanner ? this.ui.roundBanner(winner, why, mvp, this) : this.centerMsg(winner, 3);
     play(winner === this.player.team ? 'win' : 'lose');
     this.ui.onRoundEnd && this.ui.onRoundEnd(this, winner);
   }
@@ -529,18 +555,22 @@ export class Game {
   }
   spawnSmoke(p) {
     const grp = new THREE.Group(); grp.position.copy(p);
-    const parts = [];
-    const nP = this.quality >= 1 ? 22 : 14;
+    const parts = [], texs = cloudTextures();
+    const nP = this.quality >= 1 ? 46 : 30;
     for (let i = 0; i < nP; i++) {
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: softSprite(), color: new THREE.Color().setHSL(0, 0, 0.72 + Math.random() * 0.12), transparent: true, opacity: 0.0, depthWrite: false, fog: true }));
-      const a = Math.random() * 6.28, r = Math.random() * 2.6, y = 0.4 + Math.random() * 2.6;
-      s.userData.o = new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r); s.userData.sz = 2.6 + Math.random() * 1.6;
+      // нижние клубы темнее, верхние светлее — как объёмный дым
+      const a = Math.random() * Math.PI * 2, r = Math.pow(Math.random(), 0.7) * 3.0, y = 0.3 + Math.random() * 3.2;
+      const shade = 0.5 + (y / 3.5) * 0.22 + Math.random() * 0.06;
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: texs[i % texs.length], color: new THREE.Color(shade, shade * 1.01, shade * 1.03), transparent: true, opacity: 0, depthWrite: false, fog: true }));
+      s.material.rotation = Math.random() * Math.PI * 2;
+      s.userData = { o: new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r), sz: 3.2 + Math.random() * 2.6, rs: (Math.random() - 0.5) * 0.15, delay: Math.random() * 0.35, dr: new THREE.Vector3((Math.random() - 0.5) * 0.08, 0.04 + Math.random() * 0.05, (Math.random() - 0.5) * 0.08) };
+      s.position.set(0, 0.3, 0); s.scale.setScalar(0.3);
       grp.add(s); parts.push(s);
     }
     this.scene.add(grp);
     // дым тушит огонь
     for (const f of this.fires) if (f.c.distanceTo(p) < 4) f.t = Math.min(f.t, 0.3);
-    this.smokes.push({ c: p.clone().setY(p.y + 1.3), r: 0, R: 3.6, t: 0, life: 17.5, grp, parts });
+    this.smokes.push({ c: p.clone().setY(p.y + 1.5), r: 0, R: 3.6, t: 0, life: 18, grp, parts });
   }
   smokeBlocks(a, b) {
     for (const s of this.smokes) {
@@ -675,7 +705,8 @@ export class Game {
   plant(a) {
     a.hasBomb = false;
     const site = this.world.siteAt(a.pos.x, a.pos.z) === 1 ? 'A' : 'B';
-    this.bomb = { planted: true, pos: a.pos.clone(), timer: BOMB_TIME, site, beep: 0 };
+    this.bomb = { planted: true, pos: a.pos.clone(), timer: BOMB_TIME, site, beep: 0, planter: a };
+    this.ui.announce && this.ui.announce('Bomb has been planted');
     this._c4Mesh(this.bomb.pos);
     this.state = 'planted';
     a.money += 300;
@@ -907,7 +938,7 @@ export class Game {
     if (!T && B && B.planted && !B.done && a.in.use && a.pos.distanceTo(B.pos) < 1.6) {
       if (a.defuseT === 0) { const [d, pan] = this.listen(a.pos); play('defuse', d, pan); }
       a.defuseT += dt;
-      if (a.defuseT >= (a.kit ? 5 : 10)) { B.done = true; a.defuseT = 0; a.money += 300; this.endRound('CT', 'defuse'); }
+      if (a.defuseT >= (a.kit ? 5 : 10)) { this.defuser = a; B.done = true; a.defuseT = 0; a.money += 300; this.endRound('CT', 'defuse'); }
     } else a.defuseT = 0;
   }
 
@@ -953,7 +984,13 @@ export class Game {
       const s = this.smokes[k]; s.t += dt;
       s.r = Math.min(s.R, s.R * s.t / 1.2);
       const fade = s.t > s.life - 2 ? Math.max(0, (s.life - s.t) / 2) : 1;
-      for (const p of s.parts) { const g = Math.min(1, s.t / 1.2); p.position.copy(p.userData.o).multiplyScalar(0.3 + 0.7 * g); p.position.y = p.userData.o.y * (0.4 + 0.6 * g) - 1.3 + 1.3; p.scale.setScalar(p.userData.sz * (0.4 + 0.6 * g)); p.material.opacity = 0.92 * fade; }
+      for (const p of s.parts) {
+        const u = p.userData, tt = Math.max(0, s.t - u.delay), g = 1 - Math.pow(1 - Math.min(1, tt / 1.6), 3);
+        p.position.set(u.o.x * g + u.dr.x * s.t, 0.3 + (u.o.y - 0.3) * g + u.dr.y * s.t * (1 - fade * 0.5), u.o.z * g + u.dr.z * s.t);
+        p.scale.setScalar(u.sz * (0.25 + 0.75 * g) * (1 + (1 - fade) * 0.4));
+        p.material.rotation += u.rs * dt;
+        p.material.opacity = Math.min(1, tt * 3) * 0.9 * fade;
+      }
       if (s.t > s.life) { this.scene.remove(s.grp); this.smokes.splice(k, 1); }
     }
     for (let k = this.fires.length - 1; k >= 0; k--) {

@@ -1,13 +1,13 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793107299';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, skinById, weaponName, agentById } from './data.js?v=1793107299';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793107299';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793107299';
-import { AgentModel } from './models.js?v=1793107299';
-import { Controls, isTouch } from './controls.js?v=1793107299';
-import { initAudio, play, setVolume } from './sfx.js?v=1793107299';
-import { Game } from './game.js?v=1793107299';
+import { MAPS, CELL } from './maps.js?v=1793117349';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, skinById, weaponName, agentById } from './data.js?v=1793117349';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793117349';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793117349';
+import { AgentModel } from './models.js?v=1793117349';
+import { Controls, isTouch } from './controls.js?v=1793117349';
+import { initAudio, play, setVolume } from './sfx.js?v=1793117349';
+import { Game } from './game.js?v=1793117349';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -23,12 +23,12 @@ setVolume(save.settings.volume);
 const canvas = $('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !touch, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
-function quality() { const q = save.settings.quality; return q === 'auto' ? (touch ? 0 : 2) : +q; }
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+function quality() { const q = save.settings.quality; return q === 'auto' ? (touch ? 1 : 2) : +q; }
 function applyQuality() {
   const q = quality();
   renderer.setPixelRatio(Math.min(devicePixelRatio, q === 0 ? 1 : q === 1 ? 1.25 : 1.75));
-  renderer.shadowMap.enabled = q >= 2; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = q >= 1; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setSize(innerWidth, innerHeight, false);
 }
 applyQuality();
@@ -345,6 +345,8 @@ function renderSettings() {
 }
 
 // ---------- HUD ----------
+const CT_ICON = '<svg viewBox="0 0 64 64"><path d="M32 4 56 12v18c0 15-10 25-24 30C18 55 8 45 8 30V12z" fill="#2f5d9a" stroke="#9cc4ff" stroke-width="3"/><path d="M20 30l8 8 16-16" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const T_ICON = '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="#7a5418" stroke="#ffd27a" stroke-width="3"/><path d="M32 12l5 13h14l-11 8 4 14-12-8-12 8 4-14-11-8h14z" fill="#ffd27a"/></svg>';
 const hud = {
   centerT: 0,
   center(t, dur, color) { const c = $('center'); c.textContent = t; c.style.color = color || '#fff'; c.style.opacity = 1; this.centerT = dur; },
@@ -359,7 +361,24 @@ const hud = {
     f.prepend(d); while (f.children.length > 5) f.lastChild.remove();
     setTimeout(() => d.remove(), 6000);
   },
-  roundStart(g) { closeBuy(); $('board').classList.add('hidden'); },
+  roundStart(g) { closeBuy(); $('board').classList.add('hidden'); $('banner').className = 'hidden'; hud.bannerAt = 0; },
+  // баннер конца раунда как в CS + голос диктора
+  roundBanner(winner, why, mvp, g) {
+    const b = $('banner'), ct = winner === 'CT';
+    b.className = ct ? 'ct' : 't';
+    b.innerHTML = `<div class="bIcon">${ct ? CT_ICON : T_ICON}</div><div class="bText"><b>${ct ? 'COUNTER-TERRORISTS WIN' : 'TERRORISTS WIN'}</b><span>${esc(why)}</span>${mvp ? `<em>★ MVP раунда: ${esc(mvp.name)}${mvp.roundKills ? ` — ${mvp.roundKills} ${mvp.roundKills === 1 ? 'убийство' : mvp.roundKills < 5 ? 'убийства' : 'убийств'}` : ''}</em>` : ''}</div>`;
+    this.bannerAt = performance.now(); this.centerT = 0; $('center').style.opacity = 0;
+    this.announce(ct ? 'Counter-Terrorists win' : 'Terrorists win');
+  },
+  announce(text) {
+    try {
+      if (!window.speechSynthesis || save.settings.volume <= 0) return;
+      const u = new SpeechSynthesisUtterance(text);
+      const v = speechSynthesis.getVoices().find(x => /^en(-|_)(US|GB)/i.test(x.lang) && /male|david|daniel|alex|fred|google uk english male/i.test(x.name)) || speechSynthesis.getVoices().find(x => /^en/i.test(x.lang));
+      if (v) u.voice = v; u.lang = 'en-US'; u.rate = 0.92; u.pitch = 0.7; u.volume = Math.min(1, save.settings.volume + 0.2);
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    } catch (e) { /* нет синтеза речи */ }
+  },
   onRoundEnd() {},
   onKill() {},
   matchOver(g) { endMatch(g); },
@@ -427,6 +446,13 @@ function updateHud(g, dt) {
   $('flashOv').style.opacity = hud.flashT > 0 ? Math.min(1, hud.flashT / 1.2).toFixed(3) : 0;
   $('smokeOv').style.opacity = (g.camInSmoke() * 0.92).toFixed(2);
   if (hud.hurtT > 0) { hud.hurtT -= dt; if (hud.hurtT <= 0) $('hurtOv').style.opacity = 0; }
+  // анимация баннера (раскрытие, держится ~4 с, затем гаснет)
+  if (hud.bannerAt) {
+    const t = (performance.now() - hud.bannerAt) / 1000, b = $('banner');
+    const k = t < 0.3 ? 1 - Math.pow(1 - t / 0.3, 3) : 1, o = t > 4 ? Math.max(0, 1 - (t - 4) / 0.4) : Math.min(1, t / 0.15);
+    b.style.transform = `scaleY(${k.toFixed(3)})`; b.style.opacity = o.toFixed(3);
+    if (t > 4.5) { hud.bannerAt = 0; b.className = 'hidden'; }
+  }
   if (hud.hitT > 0) { hud.hitT -= dt; if (hud.hitT <= 0) $('hitm').style.opacity = 0; }
   if (hud.centerT > 0) { hud.centerT -= dt; if (hud.centerT <= 0) $('center').style.opacity = 0; }
   // подсказки и прогресс

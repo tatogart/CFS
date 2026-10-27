@@ -1,7 +1,7 @@
 // Мир: сетка карты, геометрия, лучи, навигация
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL, setCell } from './maps.js?v=1793107299';
-import { rng, shade } from './art.js?v=1793107299';
+import { CELL, setCell } from './maps.js?v=1793117349';
+import { rng, shade } from './art.js?v=1793117349';
 
 const WALK = new Set(['.', 'w', 'T', 'K', 'A', 'B', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 
@@ -65,6 +65,7 @@ function texCanvas(kind, base, alt, seed) {
     // грязь: тёмные пятна
     const dirt = Math.max(0, m - 0.6) * 0.9;
     shade *= 1 - dirt;
+    { const L = 0.3 * r + 0.59 * gg + 0.11 * b, k = 0.32; r += (L - r) * k; gg += (L - gg) * k; b += (L - b) * k; shade *= 0.92; }
     d[i * 4] = Math.max(0, Math.min(255, r * shade)); d[i * 4 + 1] = Math.max(0, Math.min(255, gg * shade)); d[i * 4 + 2] = Math.max(0, Math.min(255, b * shade)); d[i * 4 + 3] = 255;
   }
   g.putImageData(img, 0, 0);
@@ -75,6 +76,13 @@ function texCanvas(kind, base, alt, seed) {
   if (kind === 'panel') { g.fillStyle = alt; g.globalAlpha = 0.7; g.fillRect(0, S - 30, S, 10); g.globalAlpha = 1; }
   const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 8;
   return tx;
+}
+
+// тёмный низ стен: цвет вершин от y0 (тень) до y0+len (полный свет)
+function aoColors(geo, y0, len) {
+  const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) { const t = Math.min(1, Math.max(0, (pos.getY(i) - y0) / len)); const c = 0.5 + 0.5 * Math.sqrt(t); col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = c; }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
 }
 
 export class World {
@@ -139,7 +147,7 @@ export class World {
     const wallTex = texCanvas(th.wallTex, th.wall, th.wall2, 1), floorTex = texCanvas(th.floorTex, th.floor, shade(th.floor, -0.1), 2);
     const crateTex = texCanvas('wood', th.crate, shade(th.crate, -0.25), 3), bigTex = texCanvas('metal', shade(th.crate, -0.1), th.crate, 4), waterTex = texCanvas('water', '#2f6f96', '#3f8fb5', 5);
     const trainTex = texCanvas('metal', '#7a2f25', '#5a1f18', 6);
-    const wallMat = new THREE.MeshLambertMaterial({ map: wallTex });
+    const wallMat = new THREE.MeshLambertMaterial({ map: wallTex, vertexColors: true });
     const geo = new THREE.BoxGeometry(CELL, 1, CELL);
     // UV по высоте: повтор текстуры
     const counts = { wall: 0 }, walls = [];
@@ -157,10 +165,11 @@ export class World {
       const g2 = geo.clone(); g2.scale(1, hh, 1);
       const uv = g2.attributes.uv; const vrep = hh / CELL;
       for (let f = 0; f < uv.count; f++) { const face = Math.floor(f / 4); if (face !== 2 && face !== 3) uv.setY(f, uv.getY(f) * vrep); }
+      aoColors(g2, -hh / 2, 2.6);
       const m = new THREE.InstancedMesh(g2, wallMat, list.length);
       const mtx = new THREE.Matrix4();
       list.forEach(([i, j], n) => { mtx.makeTranslation((i + 0.5) * CELL, hh / 2, (j + 0.5) * CELL); m.setMatrixAt(n, mtx); });
-      m.receiveShadow = true; m.castShadow = q >= 2;
+      m.receiveShadow = true; m.castShadow = q >= 1;
       this.group.add(m);
     }
     // пол
@@ -193,10 +202,12 @@ export class World {
         const t2 = floorTex.clone(); t2.needsUpdate = true; t2.repeat.set(0.5, 0.5);
         const sideTex = wallTex.clone(); sideTex.needsUpdate = true; sideTex.repeat.set(1, 0.4);
         const top = new THREE.MeshLambertMaterial({ map: t2 }), side = new THREE.MeshLambertMaterial({ map: sideTex, color: '#d8d0c4' });
-        const m = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL, 1, CELL).translate(0, -0.5, 0), [side, side, top, side, side, side], raised.length);
+        const rg = new THREE.BoxGeometry(CELL, 1, CELL).translate(0, -0.5, 0); aoColors(rg, -1, 1.2);
+        top.vertexColors = side.vertexColors = true;
+        const m = new THREE.InstancedMesh(rg, [side, side, top, side, side, side], raised.length);
         const mtx = new THREE.Matrix4(), sc = new THREE.Matrix4();
         raised.forEach(([i, j, f], n) => { mtx.makeTranslation((i + 0.5) * CELL, f, (j + 0.5) * CELL); sc.makeScale(1, f, 1); mtx.multiply(sc); m.setMatrixAt(n, mtx); });
-        m.receiveShadow = true; m.castShadow = q >= 2; this.group.add(m);
+        m.receiveShadow = true; m.castShadow = q >= 1; this.group.add(m);
       }
     }
     // вода, ящики, вагоны, цветные спавны
@@ -205,7 +216,7 @@ export class World {
       if (!list.length) return;
       const g = geoFn(); const m = new THREE.InstancedMesh(g.geo, mt, list.length); const mtx = new THREE.Matrix4();
       list.forEach(([i, j], n) => { mtx.makeTranslation((i + 0.5) * CELL, g.y + this.fl(i, j), (j + 0.5) * CELL); m.setMatrixAt(n, mtx); });
-      m.castShadow = q >= 2; m.receiveShadow = true; this.group.add(m);
+      m.castShadow = q >= 1; m.receiveShadow = true; this.group.add(m);
     };
     addCells(c => c === 'w', () => ({ geo: new THREE.PlaneGeometry(CELL, CELL).rotateX(-Math.PI / 2), y: 0.02 }), new THREE.MeshLambertMaterial({ map: waterTex, transparent: true, opacity: 0.9 }));
     addCells(c => c === 'c', () => ({ geo: new THREE.BoxGeometry(CELL * 0.92, 1.0, CELL * 0.92), y: 0.5 }), new THREE.MeshLambertMaterial({ map: crateTex }));

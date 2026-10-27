@@ -1,7 +1,7 @@
 // 3D-модели: агенты (человечки с IK-руками), оружие
 import * as THREE from '../vendor/three.module.min.js';
-import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793107299';
-import { skinById, WEAPONS } from './data.js?v=1793107299';
+import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793117349';
+import { skinById, WEAPONS } from './data.js?v=1793117349';
 
 const matCache = new Map();
 export function mat(color, opts = {}) {

@@ -1,13 +1,13 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, skinById, weaponName, agentById } from './data.js';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js';
-import { weaponIconURL, caseIconURL, mapThumbURL } from './art.js';
-import { AgentModel } from './models.js';
-import { Controls, isTouch } from './controls.js';
-import { initAudio, play, setVolume } from './sfx.js';
-import { Game } from './game.js';
+import { MAPS, CELL } from './maps.js?v=1793103772';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, skinById, weaponName, agentById } from './data.js?v=1793103772';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793103772';
+import { weaponIconURL, caseIconURL, mapThumbURL } from './art.js?v=1793103772';
+import { AgentModel } from './models.js?v=1793103772';
+import { Controls, isTouch } from './controls.js?v=1793103772';
+import { initAudio, play, setVolume } from './sfx.js?v=1793103772';
+import { Game } from './game.js?v=1793103772';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };

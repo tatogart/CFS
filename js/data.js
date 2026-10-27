@@ -141,3 +141,17 @@ export const DIFFICULTIES = [
   { id: 'esports', name: 'Киберспорт', short: 'Кибер', desc: 'Идеальная раскидка, префаеры, хедшоты', reward: 2.2,
     react: 0.16, aim: 0.012, turn: 12, fire: 1, head: 0.8, nades: 1, strafe: 1, burst: 10, comp: 0.92, spot: 1.15 },
 ];
+
+// Граффити (спреи): рисуются процедурно в art.js
+export const GRAFFITI = [
+  { id: 'cfs', name: 'CFS', col: '#ff8a1a' },
+  { id: 'gg', name: 'GG', col: '#3cf06a' },
+  { id: 'ez', name: 'EZ', col: '#ff3fb4' },
+  { id: 'skull', name: 'Череп', col: '#f2f2f2' },
+  { id: 'heart', name: 'Сердце', col: '#ff3048' },
+  { id: 'crown', name: 'Корона', col: '#ffd23a' },
+  { id: 'smile', name: 'Смайл', col: '#ffe14a' },
+  { id: 'fire', name: 'Огонь', col: '#ff6a1a' },
+  { id: 'hs', name: 'Хедшот', col: '#ff2a2a' },
+  { id: 'nice', name: 'NICE', col: '#3cc8ff' },
+];

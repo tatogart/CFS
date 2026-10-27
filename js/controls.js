@@ -32,7 +32,7 @@ export class Controls {
     this.s.score = k.has('Tab');
   }
   _bind() {
-    const map = { KeyR: 'reload', Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', KeyQ: 'last', KeyB: 'buy', Escape: 'pause', KeyG: 'drop', KeyF: 'inspect', Space: 'jumpP' };
+    const map = { KeyR: 'reload', Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', KeyQ: 'last', KeyB: 'buy', Escape: 'pause', KeyG: 'drop', KeyF: 'inspect', KeyT: 'spray', Space: 'jumpP' };
     addEventListener('keydown', e => {
       if (!this.enabled) return;
       if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();

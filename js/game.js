@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793106875';
-import { World } from './world.js?v=1793106875';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES } from './data.js?v=1793106875';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793106875';
-import { play, soundFor } from './sfx.js?v=1793106875';
-import { Bot, planRound } from './bots.js?v=1793106875';
-import { weaponIconURL, mapThumbURL } from './art.js?v=1793106875';
+import { CELL } from './maps.js?v=1793107299';
+import { World } from './world.js?v=1793107299';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI } from './data.js?v=1793107299';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793107299';
+import { play, soundFor } from './sfx.js?v=1793107299';
+import { Bot, planRound } from './bots.js?v=1793107299';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793107299';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -267,7 +267,16 @@ export class Game {
     const g = new THREE.Group(); g.add(gun);
     const R = arms.userData.right, L = arms.userData.left;
     R.position.set(0.01, -0.05, 0.05); R.rotation.set(0.75, 0.25, 0); g.add(R);
-    if (inst.id === 'knife') { gun.scale.setScalar(1.8); gun.rotation.set(0.3, 0, -0.15); R.position.set(0.0, -0.06, inst.model === 'karambit' ? 0.2 : 0.17); R.rotation.set(0.9, 0.2, 0); }
+    this.vmSpin = null; this.vmKnife = null;
+    if (inst.id === 'knife') {
+      // нож крутится вокруг своей точки (у керамбита — кольцо), руки остаются на месте
+      const base = new THREE.Group(); base.scale.setScalar(1.8); base.rotation.set(0.3, 0, -0.15);
+      const piv = inst.model === 'karambit' ? new THREE.Vector3(0, -0.008, 0.125) : new THREE.Vector3(0, -0.004, 0.04);
+      const spin = new THREE.Group(); spin.position.copy(piv); base.add(spin);
+      g.remove(gun); gun.position.copy(piv).negate(); spin.add(gun); g.add(base);
+      this.vmSpin = spin; this.vmKnife = gun;
+      R.position.set(0.0, -0.06, inst.model === 'karambit' ? 0.2 : 0.17); R.rotation.set(0.9, 0.2, 0);
+    }
     const fore = gun.userData.fore;
     if (inst.nade || inst.c4 || WEAPONS[id] && WEAPONS[id].type === 'knife' || KNIVES[id] || id === 'knife') { L.position.set(-0.36, -0.2, 0.12); L.rotation.set(0.6, -0.4, 0); }
     else if (WEAPONS[id] && WEAPONS[id].type === 'pistol') { L.position.set(-0.03, -0.07, 0.04); L.rotation.set(0.75, -0.35, 0); }
@@ -632,7 +641,15 @@ export class Game {
     const arr = tr.l.geometry.attributes.position.array; arr[0] = a.x; arr[1] = a.y; arr[2] = a.z; arr[3] = b.x; arr[4] = b.y; arr[5] = b.z;
     tr.l.geometry.attributes.position.needsUpdate = true; tr.l.visible = true; tr.t = 0.06;
   }
+  // прижать точку попадания к поверхности стены/пола (луч шагает дискретно)
+  snapHit(p, n) {
+    if (n.x) p.x = Math.round(p.x / CELL) * CELL;
+    else if (n.z) p.z = Math.round(p.z / CELL) * CELL;
+    else p.y = Math.max(0, this.world.hAtPos(p.x - n.x * 0.01, p.z - n.z * 0.01));
+    return p;
+  }
   decal(p, n) {
+    this.snapHit(p, n);
     const d = new THREE.Mesh(this.decalGeo, this.decalMat);
     d.position.copy(p).addScaledVector(n, 0.01); d.lookAt(p.clone().add(n)); this.scene.add(d); this.decals.push(d);
     if (this.decals.length > 80) this.scene.remove(this.decals.shift());
@@ -689,6 +706,26 @@ export class Game {
       for (const v of this.actors) if (v.alive) { const dist = v.pos.distanceTo(B.pos); if (dist < 20) { const dmg = 500 * (1 - dist / 20); this.damage(v, null, dmg, 'chest', 1, { pen: 1 }, null); } }
       if (this.state !== 'end') this.endRound('T', 'bomb');
     }
+  }
+
+  // ---------- граффити ----------
+  spray(a, gid) {
+    if (!a.alive) return;
+    if (this.time < (a.sprayCd || 0)) { if (a === this.player) this.centerMsg(`Граффити через ${Math.ceil(a.sprayCd - this.time)} с`, 1); return; }
+    const o = this.eyePos(a), d = this.aimDir(a);
+    const hit = this.world.rayHit(o.x, o.y, o.z, d.x, d.y, d.z, 4);
+    if (hit.t >= 4) { if (a === this.player) this.centerMsg('Подойдите ближе к стене', 1); return; }
+    const g0 = GRAFFITI.find(x => x.id === (gid || this.o.graffiti)) || GRAFFITI[0];
+    this._sprayTex = this._sprayTex || {};
+    if (!this._sprayTex[g0.id]) { const cv = document.createElement('canvas'); cv.width = cv.height = 256; const t = new THREE.CanvasTexture(drawGraffiti(cv, g0)); t.colorSpace = THREE.SRGBColorSpace; this._sprayTex[g0.id] = t; }
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3), new THREE.MeshLambertMaterial({ map: this._sprayTex[g0.id], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, opacity: 0.95 }));
+    const p = this.snapHit(new THREE.Vector3().copy(o).addScaledVector(d, hit.t), hit.n).addScaledVector(hit.n, 0.02);
+    m.position.copy(p);
+    if (Math.abs(hit.n.y) > 0.9) { m.rotation.x = -Math.PI / 2; m.rotation.z = a.yaw; } else m.lookAt(p.clone().add(hit.n));
+    if (a.sprayMesh) this.scene.remove(a.sprayMesh);
+    a.sprayMesh = m; this.scene.add(m);
+    a.sprayCd = this.time + 8;
+    const [dd, pan] = this.listen(p); play('spray', this.isView(a) ? 0 : dd, pan);
   }
 
   // ---------- тренировка аима ----------
@@ -761,6 +798,7 @@ export class Game {
     }
     if (c.edge('inspect') && !p.scope && p.reloadT <= 0) this.inspectT = 3.2;
     if (p.in.fire || p.reloadT > 0) this.inspectT = 0;
+    if (c.edge('spray')) this.spray(p);
     if (c.edge('bomb')) this.selectSlot(p, 5);
     if (c.edge('drop') && p.hasBomb) {
       p.hasBomb = false; const d = this.aimDir(p); this.dropBomb(new THREE.Vector3(p.pos.x + d.x * 1.5, 0, p.pos.z + d.z * 1.5));
@@ -1011,23 +1049,25 @@ export class Game {
       const knifeT = view.cur && (view.cur.id === 'knife') ? this.vmKick : 0;
       this.vmGun.position.set(b.x + Math.sin(this.bobT) * 0.012 * bob, b.y - Math.abs(Math.cos(this.bobT)) * 0.012 * bob - reload * 0.12 - this.vmDraw * 0.25 - view.crouchK * 0.01, b.z + this.vmKick * 0.05 * (knifeT ? -1.5 : 1));
       this.vmGun.rotation.set(this.vmKick * 0.08 + reload * 0.7 - this.vmDraw * 0.6 - knifeT * 0.6, 0.05 + knifeT * 0.8, -reload * 0.3 + knifeT * 0.5);
-      const isKnife = view.cur && view.cur.id === 'knife', km = isKnife ? (view.cur.model || 'knife') : null;
-      const gunM = this.vmGun.children[0];
-      // нож: прокрутка при доставании
-      if (isKnife && this.vmDraw > 0) { const d = this.vmDraw; this.vmGun.rotation.z += d * d * Math.PI * 2 * (km === 'butterfly' ? 2 : 1); }
-      if (gunM) gunM.children.forEach(h => { if (h.userData.handle) h.rotation.x = 0; });
+      const isKnife = view.cur && view.cur.id === 'knife' && this.vmSpin, km = isKnife ? (view.cur.model || 'knife') : null;
+      const ks = this.vmSpin, kn = this.vmKnife;
+      if (ks) ks.rotation.set(0, 0, 0);
+      if (kn) kn.children.forEach(h => { if (h.userData.handle) h.rotation.x = 0; });
+      // нож: прокрутка при доставании (крутится только нож)
+      if (isKnife && this.vmDraw > 0) { const d = this.vmDraw; ks.rotation.x -= d * d * Math.PI * 2 * (km === 'butterfly' ? 2 : 1); }
       // осмотр: поворачиваем оружие к себе, крутим и возвращаем
       if (this.inspectT > 0 && view === p) {
         this.inspectT = Math.max(0, this.inspectT - dt);
         const u = 1 - this.inspectT / 3.2, e = Math.sin(Math.min(1, u * 4) * Math.PI / 2) * Math.sin(Math.min(1, (1 - u) * 4) * Math.PI / 2);
         const su = Math.max(0, Math.min(1, (u - 0.18) / 0.62)), spin = su * su * (3 - 2 * su);
         if (isKnife) {
-          this.vmGun.rotation.y += e * 0.7; this.vmGun.position.x -= e * 0.06; this.vmGun.position.y += e * 0.05;
-          if (km === 'karambit') { this.vmGun.rotation.x += spin * Math.PI * 4; this.vmGun.rotation.z += e * 0.4; }
+          // рука слегка поворачивает нож к себе, сам нож крутится в пальцах
+          this.vmGun.rotation.y += e * 0.35; this.vmGun.position.x -= e * 0.03; this.vmGun.position.y += e * 0.02;
+          if (km === 'karambit') ks.rotation.x -= spin * Math.PI * 4;
           else if (km === 'butterfly') {
-            this.vmGun.rotation.z += spin * Math.PI * 6;
-            if (gunM) gunM.children.forEach(h => { if (h.userData.handle) h.rotation.x = Math.abs(Math.sin(spin * Math.PI * 3)) * Math.PI * 0.95 * h.userData.handle; });
-          } else { this.vmGun.position.y += Math.sin(spin * Math.PI) * 0.14; this.vmGun.rotation.y += spin * Math.PI * 2; this.vmGun.rotation.x += Math.sin(spin * Math.PI) * 0.6; }
+            ks.rotation.z += spin * Math.PI * 4;
+            kn.children.forEach(h => { if (h.userData.handle) h.rotation.x = Math.abs(Math.sin(spin * Math.PI * 3)) * Math.PI * 0.95 * h.userData.handle; });
+          } else { ks.rotation.y += spin * Math.PI * 2; ks.rotation.x += Math.sin(spin * Math.PI) * 0.5; }
         } else {
           const ph = u < 0.5 ? 0 : (u - 0.5) * 2;
           this.vmGun.rotation.y += e * (0.9 + Math.sin(ph * Math.PI) * 0.7);

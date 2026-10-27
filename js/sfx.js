@@ -148,6 +148,7 @@ function build() {
   B.win = [tones([[523, 0, 0.35, 0.35], [659, 0.1, 0.35, 0.35], [784, 0.2, 0.4, 0.35], [1047, 0.32, 0.7, 0.4]], 1.1)];
   B.lose = [tones([[440, 0, 0.4, 0.35], [349, 0.18, 0.45, 0.35], [262, 0.38, 0.8, 0.35]], 1.2)];
   B.rare = [tones([[880, 0, 0.5, 0.3], [1109, 0.08, 0.5, 0.3], [1319, 0.16, 0.5, 0.3], [1760, 0.24, 0.9, 0.35], [2217, 0.36, 1.0, 0.25]], 1.5)];
+  B.spray = [mkbuf(0.9, (d, n, SR) => { clickAt(d, SR, 0, [2400, 3600], 0.5, 0.01); clickAt(d, SR, 0.08, [2600, 3900], 0.4, 0.01); let a = 0; const k = lpK(5000, SR); for (let i = 0; i < n; i++) { const t = i / SR, x = Math.random() * 2 - 1; a += k * (x - a); const env = t < 0.15 ? 0 : Math.min(1, (t - 0.15) / 0.03) * Math.exp(-(t - 0.15) / 0.5); d[i] += (x - a) * env * 0.8; } })];
   B.round = [tones([[660, 0, 0.12, 0.3], [990, 0.13, 0.2, 0.3]], 0.4, 0)];
 }
 
@@ -156,7 +157,7 @@ const VARY = new Set(['ak47', 'rifle', 'smg', 'pistol', 'deagle', 'awp', 'silenc
 // громкость по типам
 const GAIN = { ak47: 0.95, rifle: 0.9, smg: 0.8, pistol: 0.8, deagle: 0.95, awp: 1.0, silenced: 0.5, step: 0.45, knife: 0.5, throw: 0.4, reload: 0.5, draw: 0.4, empty: 0.5,
   hit: 0.55, head: 0.6, hurt: 0.6, he: 1.0, boom: 1.0, flash: 0.9, ring: 0.35, smoke: 0.5, fire: 0.7, bounce: 0.4, beep: 0.45, plant: 0.5, defuse: 0.5,
-  tick: 0.25, ui: 0.3, buy: 0.4, win: 0.5, lose: 0.5, rare: 0.5, round: 0.4 };
+  tick: 0.25, ui: 0.3, spray: 0.5, buy: 0.4, win: 0.5, lose: 0.5, rare: 0.5, round: 0.4 };
 // d — дистанция, pan — стерео (-1..1), k — множитель громкости
 export function play(name, d = 0, pan = 0, k = 1) {
   if (!ctx || !B[name]) return;

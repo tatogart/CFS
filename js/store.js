@@ -1,5 +1,5 @@
 // Сохранение: монеты, инвентарь, экипировка, настройки
-import { SKINS, CASES, RARITY, skinById } from './data.js?v=1793106875';
+import { SKINS, CASES, RARITY, skinById } from './data.js?v=1793107299';
 
 const KEY = 'cfs_save_v1';
 const defaults = () => ({
@@ -7,6 +7,7 @@ const defaults = () => ({
   inv: [],              // [{uid, skin}]
   equip: {},            // weaponId -> uid ('knife' -> uid ножа)
   agent: { T: 't_phoenix', CT: 'ct_sas' },
+  graffiti: 'cfs',
   settings: { sens: 1, touchSens: 1, fov: 78, quality: 'auto', volume: 0.7, fps: false, crosshair: '#4dff6a', autoFire: false, invertY: false },
   last: { map: 'dust2', diff: 'medium', side: 'auto', size: 5, winTo: 8 },
   stats: { kills: 0, deaths: 0, wins: 0, matches: 0, opened: 0 },

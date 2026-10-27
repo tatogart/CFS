@@ -1,13 +1,13 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793106875';
-import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, skinById, weaponName, agentById } from './data.js?v=1793106875';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793106875';
-import { weaponIconURL, caseIconURL, mapThumbURL } from './art.js?v=1793106875';
-import { AgentModel } from './models.js?v=1793106875';
-import { Controls, isTouch } from './controls.js?v=1793106875';
-import { initAudio, play, setVolume } from './sfx.js?v=1793106875';
-import { Game } from './game.js?v=1793106875';
+import { MAPS, CELL } from './maps.js?v=1793107299';
+import { WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, skinById, weaponName, agentById } from './data.js?v=1793107299';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase } from './store.js?v=1793107299';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL } from './art.js?v=1793107299';
+import { AgentModel } from './models.js?v=1793107299';
+import { Controls, isTouch } from './controls.js?v=1793107299';
+import { initAudio, play, setVolume } from './sfx.js?v=1793107299';
+import { Game } from './game.js?v=1793107299';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -163,7 +163,16 @@ function showDrop(skinId) {
 
 // ---------- инвентарь ----------
 $('invSort').onchange = () => renderInv();
+function renderGraffiti() {
+  const box = $('grafList'); box.innerHTML = '';
+  for (const g0 of GRAFFITI) {
+    const b = el('button', save.graffiti === g0.id ? 'on' : '', `<img src="${graffitiURL(g0)}" alt="">${esc(g0.name)}`);
+    b.onclick = () => { save.graffiti = g0.id; persist(); renderGraffiti(); play('spray'); };
+    box.appendChild(b);
+  }
+}
 function renderInv() {
+  renderGraffiti();
   const box = $('invList'); box.innerHTML = '';
   const sort = $('invSort').value;
   const list = save.inv.slice();
@@ -527,7 +536,7 @@ function startGame() {
   $('loading').classList.remove('hidden');
   setTimeout(() => {
     try {
-      game = new Game(renderer, { map, diff, side, size: +save.last.size, winTo: +save.last.winTo, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, admin: { ...(save.admin || {}) } }, hud);
+      game = new Game(renderer, { map, diff, side, size: +save.last.size, winTo: +save.last.winTo, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
     } catch (e) { $('loading').classList.add('hidden'); alert('Ошибка запуска: ' + e.message); console.error(e); return; }
     $('menu').classList.add('hidden'); $('hud').classList.remove('hidden'); $('loading').classList.add('hidden');
     $('touch').classList.toggle('hidden', !touch);

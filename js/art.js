@@ -1,5 +1,5 @@
 // Процедурная графика: узоры скинов, миниатюры оружия, кейсов и карт
-import { skinById, WEAPONS, KNIVES } from './data.js?v=1793106875';
+import { skinById, WEAPONS, KNIVES } from './data.js?v=1793107299';
 
 export function rng(seed) {
   let a = seed >>> 0;
@@ -409,4 +409,41 @@ export function mapThumbURL(map, px = 5) {
     g.fillStyle = 'rgba(200,30,30,0.9)'; g.fillText(s, (sx / n + 0.5) * px, (sy / n + 0.5) * px);
   }
   const url = cv.toDataURL(); iconCache.set(key, url); return url;
+}
+
+// ---- граффити: эффект баллончика (размытые края, подтёки, обводка) ----
+export function drawGraffiti(cv, g0) {
+  const g = cv.getContext('2d'), S = cv.width, c = g0.col, R = rng(hashStr(g0.id));
+  g.clearRect(0, 0, S, S);
+  g.save(); g.translate(S / 2, S / 2); g.scale(S / 256, S / 256);
+  const spray = (fn, col, blur = 6, lw = 0) => { g.shadowColor = col; g.shadowBlur = blur; g.fillStyle = col; g.strokeStyle = col; if (lw) g.lineWidth = lw; fn(); g.shadowBlur = 0; };
+  const text = (t, size, col, outline = '#111') => {
+    g.font = `900 ${size}px Impact, "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineJoin = 'round'; g.lineWidth = size * 0.16; g.strokeStyle = outline; g.strokeText(t, 0, 4);
+    spray(() => g.fillText(t, 0, 4), col, 8);
+    g.globalAlpha = 0.35; g.fillStyle = '#fff'; g.fillText(t, -3, -2); g.globalAlpha = 1;
+  };
+  switch (g0.id) {
+    case 'cfs': g.rotate(-0.15); text('CFS', 110, c); break;
+    case 'gg': g.rotate(-0.1); text('GG', 140, c); break;
+    case 'ez': g.rotate(0.12); text('EZ', 140, c); break;
+    case 'nice': g.rotate(-0.12); text('NICE', 92, c); break;
+    case 'hs': g.rotate(-0.08); spray(() => { g.beginPath(); g.arc(0, -10, 70, 0, 7); g.lineWidth = 12; g.stroke(); g.beginPath(); g.moveTo(-95, -10); g.lineTo(95, -10); g.moveTo(0, -105); g.lineTo(0, 85); g.lineWidth = 8; g.stroke(); }, c, 8); text('HS', 60, '#fff', c); break;
+    case 'heart': spray(() => { g.beginPath(); g.moveTo(0, 80); g.bezierCurveTo(-120, -10, -70, -110, 0, -45); g.bezierCurveTo(70, -110, 120, -10, 0, 80); g.fill(); }, c, 10); break;
+    case 'crown': spray(() => { g.beginPath(); g.moveTo(-90, 60); g.lineTo(-100, -50); g.lineTo(-45, 0); g.lineTo(0, -80); g.lineTo(45, 0); g.lineTo(100, -50); g.lineTo(90, 60); g.closePath(); g.fill(); }, c, 8); g.fillStyle = '#e03030'; for (const x of [-50, 0, 50]) { g.beginPath(); g.arc(x, 35, 10, 0, 7); g.fill(); } break;
+    case 'smile': spray(() => { g.beginPath(); g.arc(0, 0, 95, 0, 7); g.fill(); }, c, 10); g.fillStyle = '#111'; g.beginPath(); g.ellipse(-32, -25, 12, 20, 0, 0, 7); g.ellipse(32, -25, 12, 20, 0, 0, 7); g.fill(); g.lineWidth = 12; g.strokeStyle = '#111'; g.lineCap = 'round'; g.beginPath(); g.arc(0, 5, 55, 0.3, Math.PI - 0.3); g.stroke(); break;
+    case 'skull': spray(() => { g.beginPath(); g.arc(0, -20, 80, Math.PI * 0.9, Math.PI * 2.1); g.lineTo(50, 70); g.lineTo(-50, 70); g.closePath(); g.fill(); }, c, 8); g.fillStyle = '#111'; g.beginPath(); g.arc(-32, -15, 22, 0, 7); g.arc(32, -15, 22, 0, 7); g.fill(); g.beginPath(); g.moveTo(0, 15); g.lineTo(-10, 35); g.lineTo(10, 35); g.fill(); for (const x of [-30, -10, 10, 30]) g.fillRect(x - 3, 48, 6, 22); break;
+    case 'fire': spray(() => { g.beginPath(); g.moveTo(0, 100); g.bezierCurveTo(-100, 80, -80, -20, -30, -60); g.bezierCurveTo(-30, -20, -10, -10, 0, -110); g.bezierCurveTo(40, -40, 100, 0, 70, 60); g.bezierCurveTo(60, 90, 30, 100, 0, 100); g.fill(); }, c, 12); g.fillStyle = '#ffd23a'; g.beginPath(); g.moveTo(0, 90); g.bezierCurveTo(-45, 70, -30, 10, 0, -20); g.bezierCurveTo(30, 20, 45, 70, 0, 90); g.fill(); break;
+  }
+  // подтёки краски и брызги
+  g.fillStyle = c; g.globalAlpha = 0.85;
+  for (let k = 0; k < 6; k++) { const x = (R() - 0.5) * 160, y = 20 + R() * 50, L = 15 + R() * 40; g.fillRect(x, y, 3 + R() * 3, L); g.beginPath(); g.arc(x + 2.5, y + L, 3.5, 0, 7); g.fill(); }
+  for (let k = 0; k < 120; k++) { const a = R() * 7, r = 90 + R() * 35; g.globalAlpha = R() * 0.6; g.fillRect(Math.cos(a) * r, Math.sin(a) * r, 2, 2); }
+  g.restore(); g.globalAlpha = 1;
+  return cv;
+}
+export function graffitiURL(g0, size = 128) {
+  const key = 'gr|' + g0.id + size;
+  if (!iconCache.has(key)) iconCache.set(key, drawGraffiti(mk(size, size), g0).toDataURL());
+  return iconCache.get(key);
 }

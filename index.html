@@ -8,26 +8,38 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>CFS Strike</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <canvas id="view"></canvas>
 
 <!-- ===== Меню ===== -->
-<div id="menu" class="screen">
+<div id="menu" class="screen cs2">
   <header class="topbar">
-    <div class="logo">CFS<span>STRIKE</span></div>
-    <div class="coins" id="coins">0</div>
+    <div class="logo" id="logo">CFS<span>STRIKE</span></div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="home" class="on">Главная</button>
+      <button data-tab="play">Играть</button>
+      <button data-tab="inv">Инвентарь</button>
+      <button data-tab="cases">Кейсы</button>
+      <button data-tab="agents">Агенты</button>
+    </nav>
+    <div class="tright"><div class="coins" id="coins">0</div><button class="icon" data-tab="settings" aria-label="Настройки">⚙</button></div>
   </header>
-  <nav class="tabs" id="tabs">
-    <button data-tab="play" class="on">Играть</button>
-    <button data-tab="cases">Кейсы</button>
-    <button data-tab="inv">Инвентарь</button>
-    <button data-tab="agents">Агенты</button>
-    <button data-tab="settings">Настройки</button>
-  </nav>
   <main class="pages">
-    <section id="tab-play" class="page on">
+    <section id="tab-home" class="page on">
+      <div class="stage" id="stage"></div>
+      <div class="agentTag"><small id="homeSide"></small><b id="homeAgent"></b>
+        <div class="sideSw" id="sideSw"><button data-side="T">T</button><button data-side="CT">CT</button></div></div>
+      <aside class="homeSide">
+        <div class="hcard" id="promo"></div>
+        <div class="hcard" id="lastBox"></div>
+      </aside>
+      <button class="playBig" id="homePlay"><span>ИГРАТЬ</span><small id="homePlayInfo"></small></button>
+    </section>
+    <section id="tab-play" class="page panelPage">
       <h2>Карта</h2>
       <div class="maps" id="maps"></div>
       <h2>Боты</h2>
@@ -38,30 +50,45 @@
         <div><h3>Команды</h3><div class="pills" id="sizes"></div></div>
         <div><h3>Матч</h3><div class="pills" id="lengths"></div></div>
       </div>
-      <button class="big go" id="start">В бой</button>
+      <button class="playBig inline" id="start"><span>В БОЙ</span></button>
       <p class="hint">ПК: WASD, мышь, R — перезарядка, E — заложить/разминировать, B — закупка, 1-5 — оружие, Tab — счёт, Shift — шаг, Ctrl — присесть.</p>
     </section>
-    <section id="tab-cases" class="page">
+    <section id="tab-cases" class="page panelPage">
       <div class="grid cases" id="caseList"></div>
     </section>
-    <section id="tab-inv" class="page">
+    <section id="tab-inv" class="page panelPage">
       <div class="invtop"><span id="invCount"></span><select id="invSort"><option value="new">Сначала новые</option><option value="rar">По редкости</option><option value="w">По оружию</option></select></div>
       <div class="grid items" id="invList"></div>
     </section>
     <section id="tab-agents" class="page">
-      <div class="agentsWrap">
-        <canvas id="agentView"></canvas>
-        <div>
-          <h3>Террористы</h3><div class="agentList" id="agentsT"></div>
-          <h3>Спецназ</h3><div class="agentList" id="agentsCT"></div>
-        </div>
+      <div class="stage" id="stage2"></div>
+      <div class="agentPanel">
+        <h3>Террористы</h3><div class="agentList" id="agentsT"></div>
+        <h3>Спецназ</h3><div class="agentList" id="agentsCT"></div>
       </div>
     </section>
-    <section id="tab-settings" class="page">
+    <section id="tab-settings" class="page panelPage">
       <div class="set" id="settingsBox"></div>
       <div class="stats" id="statsBox"></div>
     </section>
   </main>
+</div>
+
+<!-- ===== Админка ===== -->
+<div id="adminPass" class="modal hidden">
+  <div class="panel small">
+    <h2>Вход в админку</h2>
+    <input id="passIn" type="password" inputmode="numeric" autocomplete="off" placeholder="Пароль">
+    <p class="hint" id="passErr"></p>
+    <button class="big go" id="passOk">Войти</button>
+    <button class="big" id="passCancel">Отмена</button>
+  </div>
+</div>
+<div id="admin" class="modal hidden">
+  <div class="panel">
+    <header class="ahead"><b>⚙ Админ-панель</b><button class="x" id="adminClose">✕</button></header>
+    <div id="adminBody"></div>
+  </div>
 </div>
 
 <!-- ===== Кейс ===== -->

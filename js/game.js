@@ -32,6 +32,7 @@ export class Game {
   constructor(renderer, opts, ui) {
     this.r = renderer; this.o = opts; this.ui = ui; this.ctrl = opts.controls;
     this.practice = opts.diff.id === 'none';
+    this.admin = opts.admin || {};
     this.diff = opts.diff;
     this.settings = opts.settings;
     this.quality = opts.quality;
@@ -205,9 +206,9 @@ export class Game {
     else { inst = a.weapons[slot]; if (!inst) return; }
     if (a.slot !== slot) a.last = a.slot;
     a.slot = slot; a.cur = inst; a.reloadT = 0; a.scope = 0; a.switchT = instant ? 0 : 0.45; a.recoilIdx = 0;
+    if (!instant && this.isView(a)) play('draw');
     const modelId = inst.nade || inst.c4 ? inst.id : (inst.model || inst.id);
     a.model.setWeapon(modelId, inst.skin);
-    if (a === this.player) this._buildViewmodel();
   }
   cycle(a, dir) {
     const order = [1, 2, 3, 4, 5].filter(s => (s <= 3 ? a.weapons[s] : s === 4 ? a.nades.length : a.hasBomb));
@@ -237,10 +238,11 @@ export class Game {
     if (a === this.player) play('buy');
     return true;
   }
-  _buildViewmodel() {
-    const a = this.player; if (!a || !a.cur) return;
-    this.vm.clear();
+  _buildViewmodel(a = this.viewing || this.player) {
+    if (!a || !a.cur) return;
     const inst = a.cur, id = inst.nade || inst.c4 ? inst.id : (inst.model || inst.id);
+    this.vmKey = a.id + '|' + a.agent.id + '|' + id + '|' + inst.skin;
+    this.vm.clear();
     const gun = buildWeapon(id, inst.skin);
     const arms = buildViewArms(a.agent);
     const g = new THREE.Group(); g.add(gun);
@@ -276,6 +278,7 @@ export class Game {
     if (inst.mag <= 0) { if (a.released) { if (a === this.player) play('empty'); this.reload(a); } a.released = false; return; }
     a.released = false;
     inst.mag--; a.fireCd = def.rate; a.lastFired = this.time;
+    if (a === this.player && this.admin.ammo) inst.mag++;
     if (this.time - a.lastShot > def.rate * 2.2) a.recoilIdx = Math.max(0, a.recoilIdx - (this.time - a.lastShot) * 10);
     a.lastShot = this.time;
     // разброс
@@ -303,13 +306,14 @@ export class Game {
     if (def.scope && a.scope) { a.scope = 0; a.rescope = def.rate * 0.95; }
     // звук и вспышка
     const snd = soundFor(inst.id);
-    if (a === this.player) { play(snd); this.vmKick = 1; this.flash.visible = !def.silenced; this.flashT = 0.05; this.flash.material.rotation = Math.random() * 6; }
+    if (this.isView(a)) { play(snd, 0, 0, a === this.player ? 1 : 0.8); this.vmKick = 1; this.flash.visible = !def.silenced; this.flashT = 0.05; this.flash.material.rotation = Math.random() * 6; }
     else { const [d, pan] = this.listen(a.pos); play(snd, d, pan); this.worldFlash(a); }
     this.noise(a, def.silenced ? 8 : 35);
     if (inst.mag === 0 && a.bot) this.reload(a);
   }
   noise(a, radius) { a.noiseR = radius; a.noiseT = this.time; }
-  listen(p) { const pl = this.player, dx = p.x - pl.pos.x, dz = p.z - pl.pos.z, d = Math.hypot(dx, dz); const right = [Math.cos(pl.yaw), -Math.sin(pl.yaw)]; const pan = d > 0.1 ? (dx * right[0] + dz * right[1]) / d : 0; return [d, pan * 0.8]; }
+  isView(a) { return a === (this.viewing || this.player); }
+  listen(p) { const pl = this.viewing || this.player, dx = p.x - pl.pos.x, dz = p.z - pl.pos.z, d = Math.hypot(dx, dz); const right = [Math.cos(pl.yaw), -Math.sin(pl.yaw)]; const pan = d > 0.1 ? (dx * right[0] + dz * right[1]) / d : 0; return [d, pan * 0.8]; }
   worldFlash(a) {
     const m = a.model; if (!m.gun || !m.root.visible) return;
     const p = m.gun.userData.muzzle.clone(); m.gun.localToWorld(p);
@@ -320,7 +324,7 @@ export class Game {
     const inst = a.cur; if (!inst || inst.nade || inst.c4) return; const def = WEAPONS[inst.id];
     if (!def.mag || a.reloadT > 0 || inst.mag >= def.mag || inst.reserve <= 0) return;
     a.reloadT = def.reload; a.scope = 0;
-    if (a === this.player) play('reload'); else { const [d, pan] = this.listen(a.pos); play('reload', d, pan); }
+    if (this.isView(a)) play('reload'); else { const [d, pan] = this.listen(a.pos); play('reload', d, pan); }
   }
   // точки попаданий по актёру
   hitTest(o, d, maxT, shooter) {
@@ -363,7 +367,7 @@ export class Game {
   }
   knife(a) {
     const o = this.eyePos(a), dir = this.aimDir(a);
-    if (a === this.player) { this.vmKick = 1; play('knife'); }
+    if (this.isView(a)) { this.vmKick = 1; play('knife'); } else { const [d, pan] = this.listen(a.pos); play('knife', d, pan); }
     for (const v of this.actors) {
       if (!v.alive || v === a || (v.team === a.team && !this.practice)) continue;
       const to = new THREE.Vector3(v.pos.x - o.x, v.pos.y + 1.2 - o.y, v.pos.z - o.z), d = to.length();
@@ -377,6 +381,8 @@ export class Game {
   }
   damage(v, a, raw, zone, mult, def, dir) {
     if (!v.alive) return;
+    if (v === this.player && this.admin.god) return;
+    if (a === this.player && v !== a && this.admin.oneshot) raw *= 20;
     let dmg = raw * mult;
     const pen = def.pen || 1;
     if (v.armor > 0 && zone !== 'legs' && (zone !== 'head' || v.helmet)) { const ad = dmg * (1 - pen) * 0.5; v.armor = Math.max(0, v.armor - ad); dmg *= pen; }
@@ -418,7 +424,7 @@ export class Game {
     const mesh = buildWeapon(type, null); mesh.scale.setScalar(1.3);
     mesh.position.copy(o); this.scene.add(mesh);
     this.nades.push({ type, pos: o.clone(), vel: vel.clone(), t: 0, owner: a, mesh, landed: false });
-    if (a === this.player) this.vmKick = 1;
+    if (this.isView(a)) { this.vmKick = 1; play('throw'); }
     if (!this.practice || a.bot) {
       if (a.nades.length) this.selectSlot(a, 4, false); else this.selectSlot(a, a.weapons[1] ? 1 : 2);
     } else {
@@ -615,7 +621,12 @@ export class Game {
     if (this.ui.menuOpen()) { c.edges.clear(); p.in.fire = false; p.in.mx = p.in.mz = 0; p.in.jump = p.in.crouch = p.in.use = false; return; }
     if (c.edge('pause') || c.edge('unlocked')) { this.ui.pause(); return; }
     if (c.edge('buy')) { if (this.canBuy(p)) this.ui.openBuy(); else this.centerMsg('Закупка недоступна', 1); }
-    if (!p.alive) { if (c.edge('fireP') || c.edge('jumpP')) this.spectNext(); c.edges.clear(); return; }
+    if (!p.alive) {
+      if (c.edge('fireP')) this.spectNext(1);
+      if (c.edge('aim')) this.spectNext(-1);
+      if (c.edge('jumpP') || c.edge('swap')) this.spectTP = !this.spectTP;
+      c.edges.clear(); return;
+    }
     const zoom = p.scope ? (p.scope === 1 ? 0.45 : 0.18) : 1;
     const sens = 0.0022 * (this.settings.sens || 1) * zoom;
     p.yaw -= lx * sens; p.pitch -= ly * sens * (this.settings.invertY ? -1 : 1);
@@ -645,10 +656,13 @@ export class Game {
     }
     c.edge('fireP');
   }
-  spectNext() {
-    const al = this.actors.filter(a => a.alive && a.team === this.player.team);
+  spectNext(dir = 1) {
+    // сначала союзники, если их нет — любой живой
+    let al = this.actors.filter(a => a.alive && a !== this.player && a.team === this.player.team);
+    if (!al.length) al = this.actors.filter(a => a.alive && a !== this.player);
     if (!al.length) { this.spect = null; return; }
-    const i = al.indexOf(this.spect); this.spect = al[(i + 1) % al.length];
+    const i = al.indexOf(this.spect); this.spect = al[(i + dir + al.length) % al.length];
+    this.camYaw = this.spect.yaw; this.camPitch = this.spect.pitch;
   }
 
   // ---------- физика ----------
@@ -679,6 +693,7 @@ export class Game {
     if (a.crouchK > 0.5) max *= 0.34;
     if (a.scope) max *= 0.6;
     if (a.plantT > 0 || a.defuseT > 0) max = 0;
+    if (a === this.player && this.admin.speed) max *= 1.6;
     const f = this.inFire(a.pos); if (f) { a.fireDmgT = (a.fireDmgT || 0) + dt; if (a.fireDmgT > 0.25) { a.fireDmgT = 0; this.damage(a, f.owner, 10, 'legs', 1.0, { pen: 1, kill: 300, icon: 'molotov' }, null); } }
     if (!a.alive) return;
     const wx = a.in.mx * max, wz = a.in.mz * max;
@@ -702,7 +717,7 @@ export class Game {
     // шаги
     const hs = this.hspeed(a);
     if (a.onGround && hs > 3.2 && !a.in.walk && a.crouchK < 0.5) {
-      a.stepT -= dt * hs; if (a.stepT <= 0) { a.stepT = 2.2; this.noise(a, 16); if (a !== this.player) { const [d, pan] = this.listen(a.pos); if (d < 25) play('step', d, pan); } else play('step', 3, 0); }
+      a.stepT -= dt * hs; if (a.stepT <= 0) { a.stepT = 2.2; this.noise(a, 16); if (!this.isView(a)) { const [d, pan] = this.listen(a.pos); if (d < 30) play('step', d, pan); } else play('step', 0, 0, 0.45); }
     }
   }
   _separate() {
@@ -740,6 +755,7 @@ export class Game {
     } else a.plantT = 0;
     const B = this.bomb;
     if (!T && B && B.planted && !B.done && a.in.use && a.pos.distanceTo(B.pos) < 1.6) {
+      if (a.defuseT === 0) { const [d, pan] = this.listen(a.pos); play('defuse', d, pan); }
       a.defuseT += dt;
       if (a.defuseT >= (a.kit ? 5 : 10)) { B.done = true; a.defuseT = 0; a.money += 300; this.endRound('CT', 'defuse'); }
     } else a.defuseT = 0;
@@ -751,7 +767,7 @@ export class Game {
     // состояние раунда
     if (!this.practice) {
       this.stateT -= dt;
-      if (this.state === 'freeze' && this.stateT <= 0) { this.state = 'live'; this.centerMsg('Вперёд!', 1); }
+      if (this.state === 'freeze' && this.stateT <= 0) { this.state = 'live'; this.centerMsg('Вперёд!', 1); play('round'); }
       else if (this.state === 'live') { this.roundTime -= dt; if (this.roundTime <= 0) this.endRound('CT', 'time'); }
       else if (this.state === 'end' && this.stateT <= 0) {
         const max = (this.o.winTo - 1) * 2;
@@ -759,6 +775,7 @@ export class Game {
         this.startRound(false);
       }
     }
+    if (this.admin.money) this.player.money = 16000;
     this._playerInput(dt);
     if (this.over) return;
     // в тренировке — возрождение
@@ -815,43 +832,67 @@ export class Game {
     const p = this.player;
     let view = p;
     if (!p.alive && !this.practice) {
-      if (!this.spect || !this.spect.alive) this.spectNext();
-      if (this.spect) view = this.spect;
-    }
+      this.deadT = (this.deadT || 0) + dt;
+      if (this.deadT > 1.5) {
+        if (!this.spect || !this.spect.alive) this.spectNext(1);
+        if (this.spect) view = this.spect;
+      }
+    } else this.deadT = 0;
     this.viewing = view;
+    const fp = view !== p && !this.spectTP;
     p.model.root.visible = !p.alive && view !== p;
-    if (view !== p) {
-      // третье лицо за союзником
-      const e = this.eyePos(view), back = this.aimDir(view).multiplyScalar(-2.6);
-      const cam = e.clone().add(back).add(new THREE.Vector3(0, 0.5, 0));
-      const d = this.world.ray(e.x, e.y, e.z, (cam.x - e.x) / 2.7, (cam.y - e.y) / 2.7, (cam.z - e.z) / 2.7, 2.7);
-      cam.copy(e).addScaledVector(cam.sub(e).normalize(), Math.max(0.3, d - 0.3));
-      this.camera.position.copy(cam); this.camera.lookAt(e.addScaledVector(this.aimDir(view), 5));
+    for (const a of this.actors) if (a.bot) {
+      a.model.root.visible = !(fp && a === view && a.alive);
+      if (a.tag && a === view && view !== p) a.tag.visible = false;
+    }
+    if (view !== p && this.spectTP) {
+      // вид от третьего лица
+      const e = this.eyePos(view), dir = this.aimDir(view);
+      const off = new THREE.Vector3(-dir.x * 2.6, -dir.y * 2.6 + 0.6, -dir.z * 2.6), L = off.length();
+      off.divideScalar(L);
+      const d = this.world.ray(e.x, e.y, e.z, off.x, off.y, off.z, L);
+      this.camera.position.copy(e).addScaledVector(off, Math.max(0.3, d - 0.3));
+      this.camera.lookAt(e.x + dir.x * 5, e.y + dir.y * 5, e.z + dir.z * 5);
       this.vm.visible = false;
-      this.camera.fov = this.baseFov; this.camera.updateProjectionMatrix();
+      if (this.camera.fov !== this.baseFov) { this.camera.fov = this.baseFov; this.camera.updateProjectionMatrix(); }
       return;
     }
-    const e = this.eyePos(p);
-    if (!p.alive) e.y = p.pos.y + 0.3;
+    // вид от первого лица (свой или наблюдаемого)
+    const e = this.eyePos(view);
+    if (!view.alive) e.y = view.pos.y + 0.3;
     this.camera.position.copy(e);
-    const vp = p.pitch + p.punch.p * 0.5, vy = p.yaw + p.punch.y * 0.5;
-    this.camera.rotation.set(0, 0, 0, 'YXZ'); this.camera.rotation.order = 'YXZ'; this.camera.rotation.y = vy; this.camera.rotation.x = vp;
-    const fov = p.scope === 1 ? 40 : p.scope === 2 ? 15 : this.baseFov;
+    let yaw = view.yaw, pitch = view.pitch;
+    if (view !== p) {
+      // сглаживаем повороты бота
+      if (this.camYaw == null) { this.camYaw = yaw; this.camPitch = pitch; }
+      let dy = yaw - this.camYaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
+      const k = Math.min(1, dt * 14);
+      this.camYaw += dy * k; this.camPitch += (pitch - this.camPitch) * k;
+      yaw = this.camYaw; pitch = this.camPitch;
+    }
+    const vp = pitch + view.punch.p * 0.5, vy = yaw + view.punch.y * 0.5;
+    this.camera.rotation.order = 'YXZ'; this.camera.rotation.set(vp, vy, 0);
+    const fov = view.scope === 1 ? 40 : view.scope === 2 ? 15 : this.baseFov;
     if (this.camera.fov !== fov) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     // вьюмодель
-    this.vm.visible = p.alive && !p.scope;
+    if (view.cur) {
+      const inst = view.cur, id = inst.nade || inst.c4 ? inst.id : (inst.model || inst.id);
+      if (this.vmKey !== view.id + '|' + view.agent.id + '|' + id + '|' + inst.skin) this._buildViewmodel(view);
+    }
+    this.vm.visible = view.alive && !view.scope;
     if (this.vmGun) {
-      const sp = this.hspeed(p), bob = p.onGround ? sp / 6 : 0;
+      const sp = this.hspeed(view), bob = view.onGround ? sp / 6 : 0;
       this.bobT = (this.bobT || 0) + dt * sp * 1.6;
       this.vmKick = Math.max(0, (this.vmKick || 0) - dt * 9);
       this.vmDraw = Math.max(0, (this.vmDraw || 0) - dt * 3.2);
-      const reload = p.reloadT > 0 ? Math.sin(Math.min(1, p.reloadT / (WEAPONS[p.cur.id]?.reload || 1)) * Math.PI) : 0;
+      const rl = view.cur && WEAPONS[view.cur.id] ? WEAPONS[view.cur.id].reload : 1;
+      const reload = view.reloadT > 0 ? Math.sin(Math.min(1, view.reloadT / (rl || 1)) * Math.PI) : 0;
       const b = this.vmBase;
-      const knifeT = p.cur && (p.cur.id === 'knife') ? this.vmKick : 0;
-      this.vmGun.position.set(b.x + Math.sin(this.bobT) * 0.012 * bob, b.y - Math.abs(Math.cos(this.bobT)) * 0.012 * bob - reload * 0.12 - this.vmDraw * 0.25 - p.crouchK * 0.01, b.z + this.vmKick * 0.05 * (knifeT ? -1.5 : 1));
+      const knifeT = view.cur && (view.cur.id === 'knife') ? this.vmKick : 0;
+      this.vmGun.position.set(b.x + Math.sin(this.bobT) * 0.012 * bob, b.y - Math.abs(Math.cos(this.bobT)) * 0.012 * bob - reload * 0.12 - this.vmDraw * 0.25 - view.crouchK * 0.01, b.z + this.vmKick * 0.05 * (knifeT ? -1.5 : 1));
       this.vmGun.rotation.set(this.vmKick * 0.08 + reload * 0.7 - this.vmDraw * 0.6 - knifeT * 0.6, 0.05 + knifeT * 0.8, -reload * 0.3 + knifeT * 0.5);
-      if (this.flashT > 0) { this.flashT -= dt; const m = this.vmMuzzle.clone().applyMatrix4(this.vmGun.matrixWorld); this.flash.position.copy(m); } else this.flash.visible = false;
       this.vmGun.updateMatrixWorld();
+      if (this.flashT > 0) { this.flashT -= dt; const m = this.vmMuzzle.clone().applyMatrix4(this.vmGun.matrixWorld); this.flash.position.copy(m); } else this.flash.visible = false;
     }
   }
   render() {

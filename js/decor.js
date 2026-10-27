@@ -2,8 +2,8 @@
 // Окна, двери, ставни, карнизы, фонари, навесы, кондиционеры, трубы, провода с бельём,
 // деревья, крыши с баками и антеннами, город и горы на горизонте, пятна на полу.
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793131432';
-import { rng, shade } from './art.js?v=1793131432';
+import { CELL } from './maps.js?v=1793131785';
+import { rng, shade } from './art.js?v=1793131785';
 
 // стиль оформления по карте
 const STYLE_BY_MAP = { dust2: 'dust', mirage: 'dust', inferno: 'inferno', nuke: 'industrial', overpass: 'park', ancient: 'jungle', anubis: 'egypt', vertigo: 'construction', train: 'industrial', aim: 'indoor', shortdust: 'dust', lake: 'lake', canals: 'inferno', baggage: 'indoor', shoots: 'dust', poolday: 'lake' };
@@ -278,6 +278,25 @@ export function decorate(world, group, quality) {
     const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: decalTex(k), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), list.length);
     list.forEach(([i, j], n) => { const s = k === 'drain' ? 0.9 : 1.4 + R() * 2.2; m.setMatrixAt(n, mat4((i + 0.5 + (R() - 0.5) * 0.4) * CELL, world.fl(i, j) + 0.012, (j + 0.5 + (R() - 0.5) * 0.4) * CELL, s, 1, s, R() * 6.28)); });
     m.renderOrder = 1; group.add(m);
+  }
+
+  // ---------- буквы точек на стенах (как в CS) ----------
+  for (const site of ['A', 'B']) {
+    const S = world.sites[site]; if (!S.length) continue;
+    const c = S.center, near = faces.filter(f => f.h > 2.6 && Math.hypot(f.x - c.x, f.z - c.z) < 16).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z));
+    const used = [];
+    for (const f of near) {
+      if (used.length >= 3) break;
+      if (used.some(u => Math.hypot(u.x - f.x, u.z - f.z) < 9)) continue;
+      used.push(f);
+      const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d');
+      g.font = 'bold 112px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = 'rgba(180,20,20,.9)'; g.fillText(site, 64, 70);
+      g.globalCompositeOperation = 'destination-out'; for (let k = 0; k < 140; k++) { g.globalAlpha = Math.random() * 0.5; g.fillRect(Math.random() * 128, Math.random() * 128, 2 + Math.random() * 5, 1 + Math.random() * 3); }
+      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshLambertMaterial({ map: t, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      m.position.set(f.x + f.nx * 0.03, f.base + 1.9, f.z + f.nz * 0.03); m.rotation.y = f.a; group.add(m);
+    }
   }
 
   // ---------- сборка ----------

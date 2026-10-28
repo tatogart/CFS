@@ -621,3 +621,4 @@ body.tedit .tb.teSel { outline: 2px solid #ffd860; box-shadow: 0 0 14px #ffd860;
 .vRow > div { flex: 1; } .vRow b { display: block; font-size: 16px; } .vRow small { color: #9fb0c2; font-size: 12px; } .vRow .big { width: auto; padding: 8px 18px; margin: 0; } .vRow select { max-width: 160px; }
 .vRes { margin-top: 10px; font-size: 15px; min-height: 22px; } .vRes .yes { color: #4cd07a; font-weight: 800; } .vRes .no { color: #ff6a5a; font-weight: 800; }
 @media (max-height: 460px) { .pTabs button span { display: none; } .pTabs button { min-width: 48px; } .pInfo { display: none; } .pmHead img { width: 60px; height: 60px; } .pmHead b { font-size: 24px; } .pmScore b { font-size: 32px; } }
+#errBox { position: fixed; z-index: 100; left: 8px; right: 8px; bottom: 8px; padding: 8px 12px; background: rgba(160,30,30,.92); color: #fff; font-size: 13px; border-radius: 4px; }

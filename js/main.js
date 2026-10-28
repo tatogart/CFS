@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793184313';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793184313';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793184313';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793184313';
-import { AgentModel } from './models.js?v=1793184313';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793184313';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793184313';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793184313';
-import { styleOf } from './decor.js?v=1793184313';
-import { Game } from './game.js?v=1793184313';
+import { MAPS, CELL } from './maps.js?v=1793187085';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793187085';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793187085';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793187085';
+import { AgentModel } from './models.js?v=1793187085';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793187085';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793187085';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793187085';
+import { styleOf } from './decor.js?v=1793187085';
+import { Game } from './game.js?v=1793187085';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -552,6 +552,15 @@ $('profChip').onclick = () => { play('tick'); openProfile(); };
 $('profClose').onclick = () => $('profile').classList.add('hidden');
 $('profile').onclick = e => { if (e.target.id === 'profile') $('profile').classList.add('hidden'); };
 
+// ---------- ошибки: показываем, а не молча ломаемся ----------
+function showErr(e) {
+  let b = document.getElementById('errBox');
+  if (!b) { b = document.createElement('div'); b.id = 'errBox'; b.onclick = () => b.remove(); document.body.appendChild(b); }
+  b.textContent = 'Ошибка: ' + (e && e.message ? e.message : e) + ' (нажмите, чтобы скрыть)';
+}
+addEventListener('error', e => showErr(e.error || e.message));
+addEventListener('unhandledrejection', e => showErr(e.reason));
+
 // ---------- главная ----------
 function renderHome() {
   if (!homeReady) return;
@@ -575,7 +584,7 @@ function renderHome() {
 }
 $('sideSw').onclick = e => { const b = e.target.closest('button'); if (!b) return; M.side = save.menuSide = b.dataset.side; persist(); setMenuAgent(save.agent[M.side]); renderHome(); play('tick'); };
 $('homePlay').onclick = () => { initAudio(); showTab('play'); };
-homeReady = true; renderHome();
+homeReady = true; try { renderHome(); } catch (e) { console.error(e); showErr(e); }
 
 // ---------- админка: 4 нажатия по логотипу ----------
 let logoTaps = [], adminOk = false;
@@ -725,8 +734,8 @@ function recordMatch(g, res, extra = {}) {
   if (h.length > 30) h.length = 30;
   persist();
 }
-const RES_TXT = { win: ['ПОБЕДА', 'win'], lose: ['ПОРАЖЕНИЕ', 'lose'], draw: ['НИЧЬЯ', 'draw'], cancel: ['ОТМЕНЁН · CFAC', 'cancel'] };
 function historyHtml(limit = 30) {
+  const RES_TXT = { win: ['ПОБЕДА', 'win'], lose: ['ПОРАЖЕНИЕ', 'lose'], draw: ['НИЧЬЯ', 'draw'], cancel: ['ОТМЕНЁН · CFAC', 'cancel'] };
   const h = (save.history || []).slice(0, limit);
   if (!h.length) return '<div class="empty">Сыграйте матч — он появится здесь.</div>';
   return h.map((m, i) => {

@@ -1,7 +1,7 @@
 // 3D-модели: агенты (человечки с IK-руками), оружие
 import * as THREE from '../vendor/three.module.min.js';
-import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793168645';
-import { skinById, WEAPONS, KNIVES } from './data.js?v=1793168645';
+import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793168869';
+import { skinById, WEAPONS, KNIVES } from './data.js?v=1793168869';
 
 const matCache = new Map();
 export function mat(color, opts = {}) {
@@ -64,7 +64,7 @@ const W3D = {
   W3D.g3sg1 = P('galil', [[0, 0.12, -0.1, 0.034, 0.034, 0.28, 'd', 0, 'cyl'], [0, 0.12, -0.26, 0.048, 0.048, 0.05, 'd', 0, 'cyl']]);
   W3D.scar20 = P('m4a4', [[0, 0.13, -0.1, 0.034, 0.034, 0.28, 'd', 0, 'cyl'], [0, 0.13, -0.26, 0.048, 0.048, 0.05, 'd', 0, 'cyl']]);
 }
-for (const k of ['karambit', 'butterfly', 'bayonet', 'flip', 'gut', 'huntsman', 'falchion', 'talon']) W3D[k] = W3D.knife;
+for (const k of ['karambit', 'butterfly', 'bayonet', 'flip', 'gut', 'huntsman', 'falchion', 'talon', 'kukri', 'skeleton', 'stiletto', 'ursus', 'bowie']) W3D[k] = W3D.knife;
 const NADE_COLORS = { he: '#3d5a2a', flash: '#9aa0a6', smoke: '#5d6b74', molotov: '#4a7a3a', c4: '#6b5a3a' };
 
 export function buildWeapon(id, skinId) {
@@ -126,6 +126,34 @@ function buildKnife(id, blade, dark, grp, def) {
       for (let k = 0; k < 4; k++) { const sl = new THREE.Mesh(rod(0.008, 0.008, 0.016), dark); sl.position.set(0, 0, 0.025 + k * 0.026); h.add(sl); }
       h.userData.handle = sx; }
     add(G('bpin', () => new THREE.CylinderGeometry(0.004, 0.004, 0.026, 8).rotateZ(Math.PI / 2)), metal, 0, 0, 0.003);
+  } else if (id === 'kukri' || id === 'bowie') {
+    // тяжёлые клинки: кукри с изгибом вниз, боуи с обухом-«щучкой» и гардой
+    const wood = mat(id === 'kukri' ? '#4a2e1a' : '#5a3a22'), brass = mat('#c8a040');
+    const pts = id === 'kukri'
+      ? [[0, -0.012], [0.05, -0.02], [0.1, -0.032], [0.15, -0.04], [0.185, -0.03], [0.195, -0.012], [0.175, -0.004], [0.13, -0.012], [0.08, -0.0], [0.04, 0.01], [0, 0.014]]
+      : [[0, -0.016], [0.14, -0.016], [0.195, -0.002], [0.17, 0.008], [0.145, 0.005], [0.115, 0.017], [0, 0.017]];
+    add(bladeGeo(id, pts, 0.005), blade).userData.blade = true;
+    if (id === 'bowie') add(rod(0.018, 0.07, 0.008), brass, 0, 0.0, 0.004); else add(rod(0.016, 0.04, 0.008), brass, 0, 0, 0.004);
+    add(G('hgrip_' + id, () => new THREE.CylinderGeometry(0.0145, id === 'kukri' ? 0.019 : 0.016, 0.105, 10).rotateX(Math.PI / 2)), wood, 0, -0.003, 0.062);
+    add(G('hpom', () => new THREE.SphereGeometry(0.016, 10, 8)), id === 'kukri' ? metal : brass, 0, -0.003, 0.118);
+    for (const z of [0.035, 0.09]) add(G('kring', () => new THREE.CylinderGeometry(0.0175, 0.0175, 0.006, 10).rotateX(Math.PI / 2)), brass, 0, -0.003, z);
+  } else if (id === 'skeleton') {
+    // рукоять-скелет: две полосы стали и кольцо, обмотка паракордом
+    add(bladeGeo(id, [[0, -0.012], [0.1, -0.012], [0.145, 0.0], [0.115, 0.011], [0, 0.012]], 0.0045), blade).userData.blade = true;
+    for (const sy of [-1, 1]) add(rod(0.006, 0.006, 0.1), metal, 0, sy * 0.011 - 0.002, 0.055);
+    add(rod(0.006, 0.028, 0.008), metal, 0, -0.002, 0.004);
+    add(G('skring', () => new THREE.TorusGeometry(0.017, 0.004, 8, 18).rotateY(Math.PI / 2)), metal, 0, -0.002, 0.118).userData.ring = true;
+    const cord = mat('#7a1a1a'); for (let k = 0; k < 5; k++) add(rod(0.008, 0.03, 0.006), cord, 0, -0.002, 0.03 + k * 0.016);
+  } else if (id === 'stiletto' || id === 'ursus') {
+    // складные: клинок на оси, может раскладываться
+    const pts = id === 'stiletto' ? [[0, -0.007], [0.15, -0.004], [0.178, 0], [0.15, 0.005], [0, 0.007]] : [[0, -0.013], [0.11, -0.013], [0.135, -0.004], [0.152, 0.011], [0, 0.013]];
+    const piv = new THREE.Group(); piv.position.set(0, 0, 0.0); grp.add(piv); piv.userData.fold = true;
+    const bl = new THREE.Mesh(bladeGeo(id, pts, id === 'stiletto' ? 0.004 : 0.0045), blade); piv.add(bl);
+    const hm = mat(id === 'stiletto' ? '#3a2a22' : '#1e2226');
+    add(rod(0.013, id === 'stiletto' ? 0.02 : 0.028, 0.115), hm, 0, -0.002, 0.06);
+    for (const sx of [-1, 1]) add(rod(0.002, id === 'stiletto' ? 0.022 : 0.03, 0.11), metal, sx * 0.0075, -0.002, 0.062);
+    add(G('fpin', () => new THREE.CylinderGeometry(0.004, 0.004, 0.018, 8).rotateZ(Math.PI / 2)), metal, 0, 0, 0.004);
+    if (id === 'stiletto') { add(rod(0.016, 0.03, 0.005), metal, 0, -0.002, 0.004); add(rod(0.015, 0.021, 0.008), metal, 0, -0.002, 0.118); }
   } else {
     // штык-нож, складной, крюк, охотничий, фальшион, обычный нож
     const big = id === 'bayonet' || id === 'huntsman';

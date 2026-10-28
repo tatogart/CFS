@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793168645';
-import { World } from './world.js?v=1793168645';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793168645';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793168645';
-import { play, soundFor } from './sfx.js?v=1793168645';
-import { Bot, planRound } from './bots.js?v=1793168645';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793168645';
+import { CELL } from './maps.js?v=1793168869';
+import { World } from './world.js?v=1793168869';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793168869';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793168869';
+import { play, soundFor } from './sfx.js?v=1793168869';
+import { Bot, planRound } from './bots.js?v=1793168869';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793168869';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -365,11 +365,13 @@ export class Game {
     if (inst.id === 'knife') {
       // нож крутится вокруг своей точки (у керамбита — кольцо), руки остаются на месте
       const base = new THREE.Group(); base.scale.setScalar(1.8); base.rotation.set(0.3, 0, -0.15);
-      const piv = inst.model === 'karambit' || inst.model === 'talon' ? new THREE.Vector3(0, -0.008, 0.125) : new THREE.Vector3(0, -0.004, 0.04);
-      const spin = new THREE.Group(); spin.position.copy(piv); base.add(spin);
+      const ringed = inst.model === 'karambit' || inst.model === 'talon';
+      const piv = ringed ? new THREE.Vector3(0, -0.008, 0.125) : new THREE.Vector3(0, -0.004, 0.04);
+      const spin = new THREE.Group(); spin.position.copy(piv); spin.userData.p0 = piv.clone(); base.add(spin);
       g.remove(gun); gun.position.copy(piv).negate(); spin.add(gun); g.add(base);
       this.vmSpin = spin; this.vmKnife = gun;
-      R.position.set(0.0, -0.06, inst.model === 'karambit' || inst.model === 'talon' ? 0.2 : 0.17); R.rotation.set(0.9, 0.2, 0);
+      R.position.set(0.0, -0.06, ringed ? 0.2 : 0.17); R.rotation.set(0.9, 0.2, 0);
+      this.vmFold = null; gun.traverse(o => { if (o.userData.fold) this.vmFold = o; });
     }
     const fore = gun.userData.fore;
     if (inst.nade || inst.c4 || WEAPONS[id] && WEAPONS[id].type === 'knife' || KNIVES[id] || id === 'knife') { L.position.set(-0.36, -0.2, 0.12); L.rotation.set(0.6, -0.4, 0); }
@@ -1126,7 +1128,7 @@ export class Game {
     if (c.edge('prev')) this.act(p, 'cycle', -1);
     if (c.edge('nade')) { if (p.nades.length) this.act(p, 'slot', 4); else this.centerMsg('Нет гранат', 1); }
     if (c.edge('aim')) this.act(p, 'aim');
-    if (c.edge('inspect') && !p.scope && p.reloadT <= 0) this.inspectT = 3.2;
+    if (c.edge('inspect') && !p.scope && p.reloadT <= 0) { this.inspectT = 3.2; this.inspectVar = Math.random() < 0.22 ? 1 : 0; if (this.inspectVar && this.ui.center) this.centerMsg('✦ Секретный осмотр', 1, '#ffd860'); }
     if (c.edge('useP') && p.alive && !this.ar) { const it = this.lookWeapon(p); const B = this.bomb; const busy = (p.hasBomb && this.plantSite(p.pos.x, p.pos.z)) || (B && B.planted && !B.done && p.pos.distanceTo(B.pos) < 1.6); if (it && !busy) this.pickUp(p, it, true); }
     if (c.edge('hand')) { this.settings.hand = this.settings.hand === 'left' ? 'right' : 'left'; this.vm.scale.x = this.settings.hand === 'left' ? -1 : 1; this.centerMsg(this.settings.hand === 'left' ? 'Оружие в левой руке' : 'Оружие в правой руке', 1); if (this.ui.onHand) this.ui.onHand(this.settings.hand); }
     if (p.in.fire || p.reloadT > 0) this.inspectT = 0;
@@ -1443,23 +1445,52 @@ export class Game {
       if (anim) this._vmReloadAnim(view, rl, dt);
       const isKnife = view.cur && view.cur.id === 'knife' && this.vmSpin, km = isKnife ? (view.cur.model || 'knife') : null;
       const ks = this.vmSpin, kn = this.vmKnife;
-      if (ks) ks.rotation.set(0, 0, 0);
+      if (ks) { ks.rotation.set(0, 0, 0); if (ks.userData.p0) ks.position.copy(ks.userData.p0); }
       if (kn) kn.children.forEach(h => { if (h.userData.handle) h.rotation.x = 0; });
-      // нож: прокрутка при доставании (крутится только нож)
-      if (isKnife && this.vmDraw > 0) { const d = this.vmDraw; ks.rotation.x -= d * d * Math.PI * 2 * (km === 'butterfly' ? 2 : 1); }
+      const fold = isKnife ? this.vmFold : null; if (fold) fold.rotation.x = 0;
+      // нож: прокрутка при доставании (крутится только нож); складные — раскрываются щелчком
+      if (isKnife && this.vmDraw > 0) {
+        const d = this.vmDraw;
+        if (fold) { fold.rotation.x = -Math.min(1, d * 1.6) * Math.PI * 0.95; ks.rotation.z += d * d * 1.2; }
+        else if (km === 'kukri' || km === 'bowie') { ks.rotation.x -= d * d * Math.PI * 2; this.vmGun.position.y += d * (1 - d) * 0.2; }
+        else ks.rotation.x -= d * d * Math.PI * 2 * (km === 'butterfly' ? 2 : 1);
+      }
       // осмотр: поворачиваем оружие к себе, крутим и возвращаем
       if (this.inspectT > 0 && view === p) {
         this.inspectT = Math.max(0, this.inspectT - dt);
         const u = 1 - this.inspectT / 3.2, e = Math.sin(Math.min(1, u * 4) * Math.PI / 2) * Math.sin(Math.min(1, (1 - u) * 4) * Math.PI / 2);
         const su = Math.max(0, Math.min(1, (u - 0.18) / 0.62)), spin = su * su * (3 - 2 * su);
-        if (isKnife) {
+        if (isKnife && this.inspectVar) {
+          // секретный осмотр: подброс над рукой, три оборота и ловля
+          const t = Math.max(0, Math.min(1, (u - 0.15) / 0.55)), air = Math.sin(t * Math.PI);
+          this.vmGun.rotation.y += e * 0.35; this.vmGun.position.x -= e * 0.03;
+          ks.position.y += air * 0.22; ks.position.z -= air * 0.04; ks.rotation.x -= t * Math.PI * 6; ks.rotation.y += air * 0.6;
+          if (fold) fold.rotation.x = -Math.sin(Math.min(1, u * 1.4) * Math.PI) * Math.PI * 0.95;
+          if (u > 0.68 && u < 0.76) this.vmGun.position.y -= (0.76 - u) * 0.3;
+        } else if (isKnife) {
           // рука слегка поворачивает нож к себе, сам нож крутится в пальцах
           this.vmGun.rotation.y += e * 0.35; this.vmGun.position.x -= e * 0.03; this.vmGun.position.y += e * 0.02;
-          if (km === 'karambit' || km === 'talon') ks.rotation.x -= spin * Math.PI * 4;
+          if (km === 'karambit' || km === 'talon' || km === 'skeleton') ks.rotation.x -= spin * Math.PI * (km === 'skeleton' ? 6 : 4);
+          else if (fold) {
+            // складной: закрыть, крутануть в пальцах и раскрыть щелчком
+            const c1 = Math.max(0, Math.min(1, (u - 0.15) / 0.15)), c2 = Math.max(0, Math.min(1, (u - 0.62) / 0.08));
+            fold.rotation.x = -(c1 - c2) * Math.PI * 0.95;
+            ks.rotation.z += Math.sin(Math.max(0, Math.min(1, (u - 0.3) / 0.32)) * Math.PI) * 0.9; ks.rotation.y += spin * Math.PI * 2;
+          } else if (km === 'kukri') {
+            // кукри: тяжёлый переворот через обух
+            ks.rotation.x -= spin * Math.PI * 2; ks.rotation.z += Math.sin(spin * Math.PI) * 0.8; this.vmGun.position.y += Math.sin(spin * Math.PI) * 0.03;
+          } else if (km === 'bowie') {
+            // боуи: плоский оборот в ладони и показ клинка
+            ks.rotation.y += spin * Math.PI * 2; ks.rotation.z -= Math.sin(spin * Math.PI) * 0.7;
+          }
           else if (km === 'butterfly') {
             ks.rotation.z += spin * Math.PI * 4;
             kn.children.forEach(h => { if (h.userData.handle) h.rotation.x = Math.abs(Math.sin(spin * Math.PI * 3)) * Math.PI * 0.95 * h.userData.handle; });
           } else { ks.rotation.y += spin * Math.PI * 2; ks.rotation.x += Math.sin(spin * Math.PI) * 0.5; }
+        } else if (this.inspectVar) {
+          // секретный осмотр оружия: оборот вокруг ствола и прокрутка
+          const t = Math.max(0, Math.min(1, (u - 0.2) / 0.5)), tt = t * t * (3 - 2 * t);
+          this.vmGun.rotation.z -= e * 0.3 + tt * Math.PI * 2; this.vmGun.rotation.y += e * 0.7; this.vmGun.position.x -= e * 0.06; this.vmGun.position.y += e * 0.05 + Math.sin(t * Math.PI) * 0.04;
         } else {
           const ph = u < 0.5 ? 0 : (u - 0.5) * 2;
           this.vmGun.rotation.y += e * (0.9 + Math.sin(ph * Math.PI) * 0.7);

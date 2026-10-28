@@ -101,6 +101,29 @@ export const SKINS = [
   S('deagle_cobalt', 'deagle', 'Кобальт', 'restricted', 'carbon', ['#0d1b3a', '#2a6bff', '#142852']),
   S('mac_blizzard', 'mac10', 'Метель', 'milspec', 'splat', ['#dfe8ee', '#7a96aa', '#ffffff']),
   S('galil_glacier', 'galil', 'Ледник', 'milspec', 'stripes', ['#a8d4f0', '#ffffff']),
+  // Коллекция Armory Pass «Арсенал CFS»
+  S('ar_ak_kinetic', 'ak47', 'Кинетика', 'covert', 'fade', ['#00e5ff', '#ff2bd6', '#2a0b4a']),
+  S('ar_m4_cyber', 'm4a4', 'Киберпанк', 'covert', 'lightning', ['#0a0f1f', '#f7ff3a', '#ff2a6a']),
+  S('ar_awp_aurora', 'awp', 'Северное сияние', 'covert', 'marble', ['#041a2a', '#2affb4', '#7a3aff']),
+  S('ar_deagle_lava', 'deagle', 'Лава', 'classified', 'fire', ['#1a0500', '#ff5a00', '#ffd23a']),
+  S('ar_m4s_ion', 'm4a1s', 'Ионный шторм', 'classified', 'fade', ['#2a5cff', '#c8f0ff']),
+  S('ar_usp_ghost', 'usp', 'Призрак', 'classified', 'web', ['#cfd6dc', '#3a4250']),
+  S('ar_mp9_star', 'mp9', 'Звёздный свет', 'restricted', 'marble', ['#0a0a2a', '#ffe680', '#3a6aff']),
+  S('ar_glock_candy', 'glock', 'Леденец', 'restricted', 'stripes', ['#ff4a8a', '#ffffff']),
+  S('ar_aug_tsunami', 'aug', 'Цунами', 'restricted', 'fade', ['#0a3a7a', '#3ad6ff']),
+  S('ar_p90_retro', 'p90', 'Ретроволна', 'milspec', 'stripes', ['#ff6a3a', '#3a1a5a']),
+  S('ar_famas_rapid', 'famas', 'Стремнина', 'milspec', 'lightning', ['#122030', '#5affd8', '#2a6aff']),
+  S('ar_galil_jade', 'galil', 'Нефрит', 'milspec', 'marble', ['#0a3a22', '#4ad68a', '#0e5a36']),
+  S('kn_kukri_sapphire', 'kukri', 'Доплер «Сапфир»', 'gold', 'marble', ['#020a2a', '#2a6aff', '#7ac8ff']),
+  S('kn_kukri_case', 'kukri', 'Закалка', 'gold', 'case', ['#3a5f9e', '#c9a13b', '#6f7a86']),
+  S('kn_skel_fade', 'skeleton', 'Градиент', 'gold', 'fade', ['#ffd000', '#ff3cc8', '#3c64ff']),
+  S('kn_skel_slaughter', 'skeleton', 'Убийство', 'gold', 'slaughter', ['#8a1010', '#e04040', '#f0d0c0']),
+  S('kn_stil_damascus', 'stiletto', 'Дамасская сталь', 'gold', 'damascus', ['#6f7680', '#c4ccd6']),
+  S('kn_stil_night', 'stiletto', 'Ночь', 'gold', 'carbon', ['#0a0c10', '#3a4250', '#14181e']),
+  S('kn_ursus_tiger', 'ursus', 'Зуб тигра', 'gold', 'fade', ['#ffd000', '#ff7a00']),
+  S('kn_ursus_uv', 'ursus', 'Ультрафиолет', 'gold', 'fade', ['#2a0f3f', '#5a2a7a', '#1a0a26']),
+  S('kn_bowie_web', 'bowie', 'Кровавая паутина', 'gold', 'web', ['#1a0505', '#e02020']),
+  S('kn_bowie_marble', 'bowie', 'Мраморный градиент', 'gold', 'fade', ['#ffe600', '#ff1f1f', '#2a3cff']),
   // Ножи
   S('kn_kar_fade', 'karambit', 'Градиент', 'gold', 'fade', ['#ffd000', '#ff3cc8', '#3c64ff']),
   S('kn_kar_doppler', 'karambit', 'Доплер', 'gold', 'marble', ['#1a0a2a', '#d23cff', '#2a8aff']),
@@ -182,6 +205,11 @@ export const KNIVES = {
   huntsman: { name: '★ Охотничий нож' },
   falchion: { name: '★ Фальшион' },
   talon: { name: '★ Нож «Коготь»' },
+  kukri: { name: '★ Нож Кукри' },
+  skeleton: { name: '★ Нож «Скелет»' },
+  stiletto: { name: '★ Стилет' },
+  ursus: { name: '★ Нож «Урсус»' },
+  bowie: { name: '★ Нож Боуи' },
 };
 export const GLOVES = {
   sport: { name: '★ Спортивные перчатки' },
@@ -258,3 +286,11 @@ export const GRAFFITI = [
 
 // «Гонка вооружений»: за каждое убийство — следующее оружие, последний уровень — нож
 export const AR_LADDER = ['m4a1s', 'ak47', 'aug', 'sg553', 'famas', 'galil', 'p90', 'mp7', 'ump45', 'mac10', 'xm1014', 'nova', 'negev', 'awp', 'ssg08', 'deagle', 'fiveseven', 'tec9', 'p250', 'glock', 'knife'];
+
+// Armory Pass: коллекция за звёзды
+export const ARMORY = {
+  price: 2000, stars: 40, start: 5, xpPerStar: 500,
+  caseItems: ['ar_ak_kinetic', 'ar_m4_cyber', 'ar_awp_aurora', 'ar_deagle_lava', 'ar_m4s_ion', 'ar_usp_ghost', 'ar_mp9_star', 'ar_glock_candy', 'ar_aug_tsunami', 'ar_p90_retro', 'ar_famas_rapid', 'ar_galil_jade',
+    'kn_kukri_sapphire', 'kn_kukri_case', 'kn_skel_fade', 'kn_skel_slaughter', 'kn_stil_damascus', 'kn_stil_night', 'kn_ursus_tiger', 'kn_ursus_uv', 'kn_bowie_web', 'kn_bowie_marble'],
+  cost: { milspec: 2, restricted: 4, classified: 8, covert: 14, gold: 30 },
+};

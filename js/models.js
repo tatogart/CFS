@@ -1,7 +1,7 @@
 // 3D-модели: агенты (человечки с IK-руками), оружие
 import * as THREE from '../vendor/three.module.min.js';
-import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793189321';
-import { skinById, WEAPONS, KNIVES } from './data.js?v=1793189321';
+import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793194850';
+import { skinById, WEAPONS, KNIVES } from './data.js?v=1793194850';
 
 const matCache = new Map();
 export function mat(color, opts = {}) {
@@ -353,7 +353,7 @@ const tmp1 = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.V
 
 // Руки от первого лица
 export function buildViewArms(agent, gloveSkin) {
-  const c = agent.c, grp = new THREE.Group();
+  const c = agent.c, grp = new THREE.Group(), kind = gloveSkin && skinById[gloveSkin] ? skinById[gloveSkin].weapon : null;
   const sleeve = mat(c.shirt), glove = gloveSkin ? skinMaterial(gloveSkin) : mat(c.glove), strap = gloveSkin ? mat('#1a1b1e') : mat(c.glove);
   const mkArm = sx => {
     const g = new THREE.Group();
@@ -366,6 +366,11 @@ export function buildViewArms(agent, gloveSkin) {
     for (let f = 0; f < 4; f++) { const fi = new THREE.Mesh(G('vfing', () => box(0.0145, 0.018, 0.05)), glove); fi.position.set(-0.024 + f * 0.016, -0.03, -0.035); fi.rotation.x = 1.1; hand.add(fi); }
     const th = new THREE.Mesh(G('vthumb', () => box(0.016, 0.018, 0.045)), glove); th.position.set(-sx * 0.036, 0.0, -0.03); th.rotation.set(0.4, sx * 0.5, 0); hand.add(th);
     const band = new THREE.Mesh(G('vband', () => box(0.07, 0.056, 0.016)), strap); band.position.z = 0.04; hand.add(band);
+    // форма зависит от типа перчаток
+    if (kind === 'broken') hand.children.forEach(o => { if (o.geometry === G('vfing') || o.geometry === G('vthumb')) o.material = mat(c.skin); });   // без пальцев
+    if (kind === 'bloodhound' || kind === 'hydra') { const k = new THREE.Mesh(G('vknuck', () => box(0.068, 0.016, 0.026)), mat(kind === 'hydra' ? '#2a3a2a' : '#1a1b1e')); k.position.set(0, 0.02, -0.03); hand.add(k); }
+    if (kind === 'hydra' || kind === 'bloodhound') { const cf = new THREE.Mesh(G('vcuff2', () => new THREE.CylinderGeometry(0.047, 0.047, 0.07, 10).rotateX(Math.PI / 2)), glove); cf.position.z = 0.065; hand.add(cf); }
+    if (kind === 'tactical') for (let k = 0; k < 2; k++) { const st = new THREE.Mesh(G('vstrap', () => box(0.072, 0.012, 0.012)), mat('#d0a020')); st.position.set(0, 0.026, 0.005 + k * 0.022); hand.add(st); }
     return g;
   };
   grp.userData.right = mkArm(1); grp.userData.left = mkArm(-1);

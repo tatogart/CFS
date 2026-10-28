@@ -622,3 +622,61 @@ body.tedit .tb.teSel { outline: 2px solid #ffd860; box-shadow: 0 0 14px #ffd860;
 .vRes { margin-top: 10px; font-size: 15px; min-height: 22px; } .vRes .yes { color: #4cd07a; font-weight: 800; } .vRes .no { color: #ff6a5a; font-weight: 800; }
 @media (max-height: 460px) { .pTabs button span { display: none; } .pTabs button { min-width: 48px; } .pInfo { display: none; } .pmHead img { width: 60px; height: 60px; } .pmHead b { font-size: 24px; } .pmScore b { font-size: 32px; } }
 #errBox { position: fixed; z-index: 100; left: 8px; right: 8px; bottom: 8px; padding: 8px 12px; background: rgba(160,30,30,.92); color: #fff; font-size: 13px; border-radius: 4px; }
+.wloSlot.locked { opacity: .7; cursor: default; } .wloSlot.locked i::after { content: ' · 🔒'; }
+
+/* выбор команды */
+#teamSel { position: fixed; inset: 0; z-index: 42; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: radial-gradient(ellipse at center, rgba(10,14,20,.6), rgba(4,6,10,.92)); backdrop-filter: blur(6px); font-family: "Barlow Condensed", system-ui, sans-serif; }
+#teamSel.hidden { display: none; }
+.tsTitle { font-size: 40px; font-weight: 800; letter-spacing: 6px; } .tsSub { color: #9fb0c2; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; }
+.tsCards { display: flex; gap: 16px; align-items: stretch; }
+.tsCard { width: min(240px, 28vw); padding: 22px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(180deg, rgba(30,38,50,.9), rgba(12,16,22,.95)); display: flex; flex-direction: column; align-items: center; gap: 6px; font-family: inherit; transition: transform .15s, box-shadow .15s; }
+.tsCard:hover { transform: translateY(-4px); }
+.tsCard svg { width: 76px; height: 76px; fill: #fff; } .tsCard b { font-size: 24px; letter-spacing: 3px; } .tsCard small { color: #9fb0c2; font-size: 14px; } .tsCard span { color: #c4cfdb; font-size: 14px; }
+.tsCard.t { box-shadow: inset 0 -4px 0 #e8a640; } .tsCard.t:hover { box-shadow: inset 0 -4px 0 #e8a640, 0 0 30px rgba(232,166,64,.35); }
+.tsCard.ct { box-shadow: inset 0 -4px 0 #5aa0ff; } .tsCard.ct:hover { box-shadow: inset 0 -4px 0 #5aa0ff, 0 0 30px rgba(90,160,255,.35); }
+.tsCard.auto { width: min(180px, 22vw); justify-content: center; } .tsCard.auto svg { width: 46px; height: 46px; } .tsCard.auto span { font-size: 30px; font-weight: 800; color: #ffd860; }
+@media (max-height: 460px) { .tsTitle { font-size: 28px; } .tsCard { padding: 12px 10px; } .tsCard svg { width: 48px; height: 48px; } .tsCard b { font-size: 18px; } }
+
+/* ===================== Современный интерфейс (стекло, мягкие тени, анимации) ===================== */
+:root { --glass: rgba(16, 22, 32, .62); --glass2: rgba(22, 30, 44, .72); --gline: rgba(255,255,255,.09); --glow: 0 10px 40px rgba(0,0,0,.45); --rad: 12px; }
+button { transition: transform .12s ease, background-color .15s, box-shadow .15s, border-color .15s, color .15s, filter .15s; }
+button:active { transform: scale(.97); }
+.big { border-radius: 10px; background: linear-gradient(180deg, rgba(40,50,66,.9), rgba(24,30,42,.92)); border-color: var(--gline); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+.big:hover { filter: brightness(1.12); }
+.big.go { background: linear-gradient(180deg, #ffc04a, #e48a14); box-shadow: 0 6px 22px rgba(240,160,32,.3), inset 0 1px 0 rgba(255,255,255,.35); }
+.pills button { border-radius: 999px; background: var(--glass); border-color: var(--gline); backdrop-filter: blur(6px); }
+.pills button:hover { border-color: rgba(255,255,255,.25); }
+.pills button.on { background: linear-gradient(180deg, #ffc04a, #e48a14); border-color: transparent; box-shadow: 0 4px 16px rgba(240,160,32,.3); }
+.cs2 .panelPage.on { background: var(--glass); border: 1px solid var(--gline); border-radius: 16px; box-shadow: var(--glow); backdrop-filter: blur(14px); }
+.hcard { background: var(--glass); border: 1px solid var(--gline); border-radius: var(--rad); box-shadow: var(--glow); backdrop-filter: blur(12px); }
+.item { border-radius: 12px; background: linear-gradient(180deg, rgba(36,46,60,.92), rgba(20,26,36,.95)); border-color: var(--gline); transition: transform .15s, box-shadow .15s; }
+.item:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(0,0,0,.45), 0 0 0 1px color-mix(in srgb, var(--rc) 50%, transparent); }
+.caseCard { transition: transform .15s, box-shadow .15s; } .caseCard:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(0,0,0,.5); }
+.map { transition: transform .15s, box-shadow .15s; border-radius: 12px !important; overflow: hidden; } .map:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(0,0,0,.5); }
+.modal { background: rgba(4,6,10,.6); backdrop-filter: blur(8px); }
+.panel { background: linear-gradient(180deg, rgba(26,34,48,.94), rgba(14,19,27,.96)); border: 1px solid var(--gline); border-radius: 18px; box-shadow: 0 24px 70px rgba(0,0,0,.6); animation: popIn .22s ease-out; }
+@keyframes popIn { from { transform: scale(.94) translateY(8px); opacity: 0; } }
+.page.on { animation: fadeUp .25s ease-out; } @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } }
+.set label { border-radius: 10px; background: rgba(255,255,255,.035); border: 1px solid var(--gline); }
+input[type=range] { accent-color: #f0a020; }
+select, input[type=text], input[type=number], input:not([type]) { border-radius: 8px; }
+.coins { background: linear-gradient(180deg, rgba(60,46,14,.9), rgba(36,28,8,.9)); border-color: rgba(255,207,90,.35); box-shadow: 0 0 14px rgba(255,207,90,.12); }
+.topProf { border-radius: 10px; background: var(--glass); }
+.tPlay { border-radius: 10px; }
+.cs2 .topbar { backdrop-filter: blur(14px); background: linear-gradient(180deg, rgba(6,9,14,.88), rgba(10,14,20,.7)); }
+.playBig { border-radius: 14px; background: linear-gradient(135deg, #63d260, #2a8a3a); box-shadow: 0 10px 36px rgba(60,190,80,.35), inset 0 1px 0 rgba(255,255,255,.35); }
+.playBig:hover { filter: brightness(1.08); box-shadow: 0 14px 44px rgba(60,190,80,.5), inset 0 1px 0 rgba(255,255,255,.35); }
+.profChip { border-radius: 12px; background: var(--glass); backdrop-filter: blur(10px); }
+.sideSw button { border-radius: 10px; }
+/* HUD: стеклянные плашки с акцентной полосой */
+#hp, #ammo, #topScore, #money { backdrop-filter: blur(8px); }
+#hp { background: linear-gradient(90deg, rgba(10,14,20,.72), rgba(10,14,20,.35)); border-left: 3px solid #4cd07a; border-radius: 4px 12px 12px 4px; padding: 4px 14px; }
+#ammo { background: linear-gradient(270deg, rgba(10,14,20,.72), rgba(10,14,20,.35)); border-right: 3px solid #ffd860; border-radius: 12px 4px 4px 12px; }
+#topScore { background: linear-gradient(180deg, rgba(10,14,20,.78), rgba(10,14,20,.55)); border: 1px solid var(--gline); border-radius: 0 0 14px 14px; top: var(--safe-t); padding: 6px 16px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+#money { background: rgba(10,14,20,.5); padding: 1px 10px; border-radius: 8px; }
+#feed div { border-radius: 8px; background: rgba(10,14,20,.62); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,.06); }
+#mini { border-radius: 14px !important; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+#slots div { border-radius: 8px; }
+.tb { backdrop-filter: blur(6px); background: rgba(16,22,32,.42); border-color: rgba(255,255,255,.28); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+#banner, #center { text-shadow: 0 4px 18px rgba(0,0,0,.6); }
+.bitem { border-radius: 10px !important; transition: transform .12s, box-shadow .12s; } .bitem:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,.4); }

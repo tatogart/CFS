@@ -2,8 +2,8 @@
 // Окна, двери, ставни, карнизы, фонари, навесы, кондиционеры, трубы, провода с бельём,
 // деревья, крыши с баками и антеннами, город и горы на горизонте, пятна на полу.
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793189321';
-import { rng, shade } from './art.js?v=1793189321';
+import { CELL } from './maps.js?v=1793194850';
+import { rng, shade } from './art.js?v=1793194850';
 
 // стиль оформления по карте
 const STYLE_BY_MAP = { dust2: 'dust', mirage: 'dust', inferno: 'inferno', nuke: 'industrial', overpass: 'park', ancient: 'jungle', anubis: 'egypt', vertigo: 'construction', train: 'industrial', aim: 'indoor', shortdust: 'dust', lake: 'lake', canals: 'inferno', baggage: 'indoor', shoots: 'dust', poolday: 'lake' };
@@ -138,6 +138,16 @@ export function decorate(world, group, quality) {
       const c = pick(['#c8a020', '#b03030', '#2a6aa8', '#3a8a4a']);
       put(solid, f, 0, 2.7, 0.03, 1.1, 0.5, 0.04, c); put(solid, f, 0, 2.7, 0.05, 0.9, 0.08, 0.02, '#f0f0f0');
     }
+    // балконы на высоких стенах: плита, перила, цветы
+    if (f.h >= 6 && style !== 'indoor' && style !== 'construction' && hash(f.wi * 3 + 1, f.wj * 7 + 2) < 0.16 * dens) {
+      const y = 3.6, rail = style === 'inferno' || style === 'dust' || style === 'egypt' ? darkMetal : trim;
+      put(solid, f, 0, y, 0.42, CELL * 0.9, 0.12, 0.84, shade(wallC, -0.08));
+      for (const u of [-0.6, -0.3, 0, 0.3, 0.6]) put(solid, f, u, y + 0.42, 0.8, 0.04, 0.72, 0.04, rail);
+      put(solid, f, 0, y + 0.8, 0.8, CELL * 0.9, 0.05, 0.06, rail);
+      for (const sd of [-1, 1]) put(solid, f, sd * 0.66, y + 0.42, 0.42, 0.04, 0.72, 0.8, rail);
+      put(solid, f, 0, y + 1.0, 0.02, 0.7, 1.3, 0.04, '#1c262e');   // дверь на балкон
+      if (style === 'inferno' || style === 'lake' || style === 'park') for (const u of [-0.45, 0.4]) { put(solid, f, u, y + 0.16, 0.6, 0.2, 0.2, 0.2, '#8a4a2a'); put(plant, f, u, y + 0.35, 0.6, 0.26, 0.22, 0.26, R() < 0.5 ? '#c0302a' : '#4f8a3a', 0, GEO.ball); }
+    }
     // лианы и мох
     if (style === 'jungle' && R() < 0.45) for (let k = 0; k < 3; k++) { const len = 0.8 + R() * Math.min(3, f.h - 0.5); put(plant, f, -0.6 + R() * 1.2, f.h - len / 2, 0.03, 0.07 + R() * 0.08, len, 0.05, R() < 0.5 ? '#3f6a2a' : '#557a35'); }
     // трубы вдоль стен
@@ -151,6 +161,24 @@ export function decorate(world, group, quality) {
       if (f.h <= 4 || hash(f.nx ? f.wi : f.wj, f.nx * 3 + f.nz) >= 0.3) continue;
       const tx = f.nz, tz = -f.nx;
       solid.add(GEO.cyl, mat4(f.x + f.nx * 0.18, f.base + 3.6, f.z + f.nz * 0.18, 0.09, CELL + 0.02, 0.09, Math.atan2(tx, tz), Math.PI / 2), hash(f.wi, 7) < 0.5 ? '#8a6a3a' : metal);
+    }
+  }
+
+  // ---------- кусты и горшки с растениями у стен ----------
+  {
+    const bushCols = { jungle: ['#3d6b2a', '#2f5a24', '#4f7f32'], park: ['#4f7a35', '#5f8a3e', '#46702f'], lake: ['#3f6f3a', '#4f7f42', '#2f5a2e'], inferno: ['#4a6e32', '#3e5e2a', '#5a7a3a'], egypt: ['#6a7a3a', '#7a8a4a'], dust: ['#7a7a42', '#8a8048', '#6a6a3a'] }[style];
+    if (bushCols) for (const f of faces) {
+      if (f.h < 1.2 || cells[f.j][f.i] === 'w' || hash(f.i * 5 + f.nx, f.j * 3 + f.nz) > 0.11 * dens) continue;
+      const tx = f.nz, tz = -f.nx, u = (hash(f.i, f.j) - 0.5) * 0.8, n = 2 + Math.floor(hash(f.j, f.i) * 3);
+      if (style === 'dust' || style === 'egypt' ? hash(f.i + 9, f.j) < 0.5 : hash(f.i + 9, f.j) < 0.25) {
+        // глиняный горшок с кустом
+        const x = f.x + tx * u + f.nx * 0.35, z = f.z + tz * u + f.nz * 0.35;
+        solid.add(GEO.cyl, mat4(x, f.base + 0.22, z, 0.24, 0.44, 0.24), style === 'inferno' ? '#a5502f' : '#9a6a3a');
+        plant.add(GEO.ball, mat4(x, f.base + 0.62, z, 0.36, 0.34, 0.36, R() * 6), pick(bushCols));
+      } else for (let k = 0; k < n; k++) {
+        const uu = u + (k - n / 2) * 0.32, d = 0.3 + R() * 0.15, sc = 0.28 + R() * 0.2;
+        plant.add(GEO.ball, mat4(f.x + tx * uu + f.nx * d, f.base + sc * 0.75, f.z + tz * uu + f.nz * d, sc * 1.2, sc, sc * 1.1, R() * 6), pick(bushCols));
+      }
     }
   }
 

@@ -252,6 +252,19 @@ export const SKINS = [
   S('gl_moto_boom', 'moto', 'Бум!', 'gold', 'splat', ['#1a1a1a', '#ffd23a', '#ff3a3a']),
   S('gl_spec_fade', 'specialist', 'Градиент', 'gold', 'fade', ['#ffd000', '#ff3cc8', '#3c64ff']),
   S('gl_spec_crimson', 'specialist', 'Кимоно', 'gold', 'tiger', ['#c21f2a', '#1a0505']),
+  // новые перчатки
+  S('gl_broken_jade', 'broken', 'Нефрит', 'gold', 'marble', ['#0a3a22', '#4ad68a', '#0e5a36']),
+  S('gl_broken_yellow', 'broken', 'Жёлтый полосатый', 'gold', 'tiger', ['#e0b020', '#1a1405']),
+  S('gl_broken_unhinged', 'broken', 'Безумие', 'gold', 'splat', ['#2a0a3a', '#ff3cc8', '#3cc8ff']),
+  S('gl_blood_snake', 'bloodhound', 'Змеиный укус', 'gold', 'scales', ['#0a1a04', '#4a8a1a', '#c8ff4a']),
+  S('gl_blood_charred', 'bloodhound', 'Обугленные', 'gold', 'carbon', ['#141414', '#ff5a2a', '#222222']),
+  S('gl_blood_bronzed', 'bloodhound', 'Бронза', 'gold', 'fade', ['#8a5a2a', '#e0a860', '#3a2410']),
+  S('gl_hydra_emerald', 'hydra', 'Изумруд', 'gold', 'scales', ['#04140a', '#1a8a4a', '#7aff9a']),
+  S('gl_hydra_rattler', 'hydra', 'Гремучник', 'gold', 'scales', ['#2a1a0a', '#8a6a3a', '#e0c890']),
+  S('gl_hydra_case', 'hydra', 'Закалка', 'gold', 'case', ['#3a5f9e', '#c9a13b', '#6f7a86']),
+  S('gl_tac_galaxy', 'tactical', 'Галактика', 'gold', 'galaxy', ['#0a0420', '#1a0a3a', '#ff2bd6', '#ffe680']),
+  S('gl_tac_circuit', 'tactical', 'Схема', 'gold', 'circuit', ['#0a0f1f', '#00e5ff', '#ff2bd6']),
+  S('gl_tac_sakura', 'tactical', 'Сакура', 'gold', 'sakura', ['#2a0a1a', '#ff9ad8', '#ffffff', '#2a1408']),
   // новые скины оружия
   S('ak_vulcan', 'ak47', 'Вулкан', 'covert', 'asiimov', ['#f2f2f2', '#2a7aff', '#111111']),
   S('ak_fire_serp', 'ak47', 'Огненный змей', 'covert', 'fire', ['#14200e', '#ff7a1a', '#ffe14a']),
@@ -290,6 +303,10 @@ export const GLOVES = {
   wraps: { name: '★ Обмотки рук' },
   moto: { name: '★ Мотоперчатки' },
   specialist: { name: '★ Перчатки специалиста' },
+  broken: { name: '★ Перчатки «Сломанный клык»' },
+  bloodhound: { name: '★ Перчатки «Гончая»' },
+  hydra: { name: '★ Перчатки «Гидра»' },
+  tactical: { name: '★ Тактические перчатки' },
 };
 export const skinById = Object.fromEntries(SKINS.map(s => [s.id, s]));
 export const weaponName = w => (WEAPONS[w] && WEAPONS[w].name) || (KNIVES[w] && KNIVES[w].name) || (GLOVES[w] && GLOVES[w].name) || w;
@@ -323,6 +340,9 @@ export const CASES = [
     items: ['retro_ak47_0', 'retro_usp_1', 'retro_awp_2', 'retro_m4a1s_3', 'retro_mac10_4', 'retro_deagle_5', 'retro_glock_6', 'retro_galil_7', 'retro_ssg08_8', 'retro_xm1014_9', 'kn_retro_gut', 'kn_retro_falchion'] },
   { id: 'sakura', name: 'Кейс «Сакура»', price: 400, col: ['#ff9ad8', '#3a0a2a'], emblem: 'flower',
     items: ['sakura_ak47_0', 'sakura_m4a1s_1', 'sakura_awp_2', 'sakura_usp_3', 'sakura_aug_4', 'sakura_mp7_5', 'sakura_fiveseven_6', 'sakura_p250_7', 'sakura_mac10_8', 'sakura_famas_9', 'kn_sakura_butterfly', 'kn_sakura_talon'] },
+  { id: 'grip', name: 'Кейс «Хватка»', price: 650, col: ['#4a8a6a', '#0a1a14'], emblem: 'glove',
+    items: ['cyber_ak47_0', 'galaxy_awp_0', 'ocean_m4a1s_0', 'dragon_deagle_3', 'retro_usp_1', 'sakura_aug_4', 'cyber_glock_6', 'ocean_p250_6', 'retro_galil_7', 'galaxy_ump45_8',
+      'gl_broken_jade', 'gl_broken_yellow', 'gl_broken_unhinged', 'gl_blood_snake', 'gl_blood_charred', 'gl_blood_bronzed', 'gl_hydra_emerald', 'gl_hydra_rattler', 'gl_hydra_case', 'gl_tac_galaxy', 'gl_tac_circuit', 'gl_tac_sakura'] },
 ];
 
 // Агенты: head — головной убор

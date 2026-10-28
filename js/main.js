@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793189321';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793189321';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793189321';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793189321';
-import { AgentModel } from './models.js?v=1793189321';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793189321';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793189321';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793189321';
-import { styleOf } from './decor.js?v=1793189321';
-import { Game } from './game.js?v=1793189321';
+import { MAPS, CELL } from './maps.js?v=1793194850';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793194850';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793194850';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793194850';
+import { AgentModel } from './models.js?v=1793194850';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793194850';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793194850';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793194850';
+import { styleOf } from './decor.js?v=1793194850';
+import { Game } from './game.js?v=1793194850';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -67,7 +67,7 @@ function pills(box, items, cur, onPick) {
   }
 }
 const MODES = [
-  ['casual', 'Обычный', 'Свои настройки: размер команд, длина матча, сторона.'],
+  ['casual', 'Обычный', 'Свои настройки: размер команд и длина матча. Команду выберете уже в матче.'],
   ['comp', 'Соревновательный', '5×5, до 13 побед, смена сторон после 12 раундов. Даёт звание.'],
   ['wing', 'Напарники', '2×2 на одной точке (B), до 9 побед, раунд 1:30. Своё звание.'],
   ['dm', 'Бой насмерть', 'Каждый сам за себя, 10 игроков, мгновенное возрождение, любое оружие бесплатно. 5 минут или до 30 убийств.'],
@@ -96,7 +96,7 @@ function renderPlay() {
   pills($('modes'), MODES.map(m => [m[0], m[1]]), save.last.mode || 'casual', v => { save.last.mode = v; renderPlay(); });
   const md = save.last.mode || 'casual';
   $('modeDesc').textContent = MODES.find(m => m[0] === md)[2];
-  $('rowSide').classList.toggle('hidden', md === 'dm');
+  $('rowSide').classList.add('hidden');   // команда выбирается уже в матче
   $('rowSize').classList.toggle('hidden', md !== 'casual');
   $("rowLen").classList.toggle('hidden', md !== 'casual');
   const mb = $('maps'); mb.innerHTML = '';
@@ -306,6 +306,8 @@ function wLoadout(team) {
     const pool = loPool(team, cat), n = Math.min(5, pool.length);
     const DEF = { T: { pistols: ['glock', 'p250', 'tec9', 'deagle'], mid: ['mac10', 'mp7', 'ump45', 'p90', 'nova'], rifles: ['galil', 'ak47', 'sg553', 'ssg08', 'awp'] }, CT: { pistols: ['usp', 'p250', 'fiveseven', 'deagle'], mid: ['mp9', 'mp7', 'ump45', 'p90', 'xm1014'], rifles: ['famas', 'm4a4', 'aug', 'ssg08', 'awp'] } };
     let list = (cur[cat] || DEF[team][cat]).filter(id => pool.includes(id));
+    // стартовый пистолет у команды фиксированный (Glock у T, USP-S у CT)
+    if (cat === 'pistols') { const st = team === 'T' ? 'glock' : 'usp'; list = [st, ...list.filter(id => id !== st)]; }
     for (const id of pool) { if (list.length >= n) break; if (!list.includes(id)) list.push(id); }
     out[cat] = list.slice(0, n);
   }
@@ -322,8 +324,9 @@ function renderWLoadout() {
     const row = el('div', 'wloRow', `<h5>${name}</h5>`), slots = el('div', 'wloSlots');
     lo[cat].forEach((id, i) => {
       const b = el('button', 'wloSlot', `${cat === 'pistols' && i === 0 ? '<i>стартовый</i>' : ''}<img src="${weaponIconURL(id, lo2[id] || null, 192, 72)}" alt=""><span>${esc(WEAPONS[id].name)}</span>`);
+      if (cat === 'pistols' && i === 0) { b.classList.add('locked'); b.onclick = () => play('tick'); slots.appendChild(b); return; }
       b.onclick = () => {
-        const pool = loPool(wloSide, cat);
+        const pool = loPool(wloSide, cat).filter(x => !(cat === 'pistols' && x === lo[cat][0]));
         const pk = el('div', 'wloPick'); pk.innerHTML = pool.map(x => `<button data-id="${x}" class="${x === id ? 'on' : lo[cat].includes(x) ? 'have' : ''}"><img src="${weaponIconURL(x, lo2[x] || null, 192, 72)}" alt=""><span>${esc(WEAPONS[x].name)}</span></button>`).join('');
         pk.onclick = e => { const t = e.target.closest('button'); if (!t) return; const j = lo[cat].indexOf(t.dataset.id); if (j >= 0) lo[cat][j] = lo[cat][i]; lo[cat][i] = t.dataset.id; save.wlo[wloSide] = lo; persist(); play('buy'); renderWLoadout(); };
         box.querySelectorAll('.wloPick').forEach(x => x.remove()); row.appendChild(pk);
@@ -904,7 +907,7 @@ const hud = {
     const it = cur.skin && statTrak(slot); if (it) { hud._stDirty = true; clearTimeout(hud._stT); hud._stT = setTimeout(persist, 1500); }
   },
   matchOver(g) { endMatch(g); },
-  menuOpen() { return !$('buy').classList.contains('hidden') || !$('pause').classList.contains('hidden') || !$('chatIn').classList.contains('hidden') || !$('vac').classList.contains('hidden'); },
+  menuOpen() { return !$('teamSel').classList.contains('hidden') || !$('buy').classList.contains('hidden') || !$('pause').classList.contains('hidden') || !$('chatIn').classList.contains('hidden') || !$('vac').classList.contains('hidden'); },
   pause() { openPause(); },
   openBuy() { openBuy(); },
 };
@@ -1093,6 +1096,31 @@ function renderBuy() {
 }
 
 // ---------- пауза / выход ----------
+// ---------- выбор команды в начале матча (как в CS) ----------
+let TS = null;
+function showTeamSelect() {
+  const g = game; if (!g) return;
+  const box = $('teamSel'), ag = t => agentById[save.agent[t]] || AGENTS.find(a => a.team === t);
+  const cnt = t => g.actors.filter(a => a.team === t).length;
+  box.innerHTML = `<div class="tsTitle">ВЫБЕРИТЕ КОМАНДУ</div><div class="tsSub">${esc(g.o.map.name)} · ${esc((MODES.find(m => m[0] === g.mode) || [])[1] || '')}</div>
+    <div class="tsCards">
+      <button class="tsCard t" data-t="T">${T_ICON}<b>ТЕРРОРИСТЫ</b><small>${esc(ag('T').name)}</small><span>игроков: ${cnt('T')}</span></button>
+      <button class="tsCard auto" data-t="auto"><svg viewBox="0 0 24 24"><path d="M4 7h11l-3-3 1.4-1.4L19.8 9l-6.4 6.4L12 14l3-3H4zm16 10H9l3 3-1.4 1.4L4.2 15l6.4-6.4L12 10l-3 3h11z"/></svg><b>АВТОВЫБОР</b><small>игра решит за вас</small><span id="tsTimer">15</span></button>
+      <button class="tsCard ct" data-t="CT">${CT_ICON}<b>СПЕЦНАЗ</b><small>${esc(ag('CT').name)}</small><span>игроков: ${cnt('CT')}</span></button>
+    </div>`;
+  box.classList.remove('hidden'); controls.unlock();
+  TS = { t: 15 };
+  const pick = v => {
+    if (!TS) return; TS = null; clearInterval(iv);
+    const team = v === 'auto' ? (Math.random() < 0.5 ? 'T' : 'CT') : v;
+    box.classList.add('hidden'); play('buy');
+    if (game) { game.chooseTeam(team); game.centerMsg(team === 'T' ? 'Вы за террористов' : 'Вы за спецназ', 2, team === 'T' ? '#e8b04a' : '#6aa8ff'); }
+    controls.edges.clear(); if (!touch) controls.lock();
+  };
+  box.querySelectorAll('[data-t]').forEach(b => b.onclick = () => pick(b.dataset.t));
+  const iv = setInterval(() => { if (!TS) { clearInterval(iv); return; } TS.t--; const el2 = $('tsTimer'); if (el2) el2.textContent = TS.t; if (TS.t <= 0) pick('auto'); }, 1000);
+}
+
 // ---------- меню паузы в стиле CS2 ----------
 let pTab = 'match';
 function openPause() { $('pAdmin').classList.toggle('hidden', !adminOk); $('pause').classList.remove('hidden'); controls.unlock(); renderPause(); }
@@ -1398,7 +1426,7 @@ function beginLoad() {
   const mode = save.last.mode || 'casual';
   const map = modeMap(mode);
   const diff = DIFFICULTIES.find(d => d.id === save.last.diff) || DIFFICULTIES[3];
-  const side = save.last.side === 'auto' || mode === 'dm' ? (Math.random() < 0.5 ? 'T' : 'CT') : save.last.side;
+  const side = Math.random() < 0.5 ? 'T' : 'CT';
   let size = +save.last.size, winTo = +save.last.winTo;
   if (mode === 'comp') { size = 5; winTo = 13; }
   if (mode === 'wing') { size = 2; winTo = 9; }
@@ -1413,7 +1441,7 @@ function beginLoad() {
   // даём оверлею отрисоваться, потом строим карту
   setTimeout(() => {
     try {
-      game = new Game(renderer, { startPistol: { T: wLoadout('T').pistols[0], CT: wLoadout('CT').pistols[0] }, nick: nick(), map, diff, side, size, winTo, mode, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
+      game = new Game(renderer, { nick: nick(), map, diff, side, size, winTo, mode, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
     } catch (e) { L.classList.add('hidden'); $('menu').classList.remove('hidden'); alert('Ошибка запуска: ' + e.message); console.error(e); return; }
     const g = game, cx = g.world.w * CELL / 2, cz = g.world.h * CELL / 2;
     const roster = t => g.actors.filter(a => a.team === t).map(a => `<div class="ldP${a === g.player ? ' me' : ''}"><span class="avatar" style="--av:${a === g.player ? AV_COLORS[save.avatar || 0] : t === 'T' ? '#a8823f' : '#41689c'};width:22px;height:22px;font-size:12px">${esc(a.name[0] || '?')}</span>${esc(a.name)}</div>`).join('');
@@ -1444,6 +1472,7 @@ function renderLoading(dt) {
 function finishLoad() {
   const lg = LOADING && LOADING.g; LOADING = null;
   if (!game || game !== lg) return;
+  if (!game.dm && !game.aimMode && !window.__fast) setTimeout(showTeamSelect, 50);
   startAmbience(styleOf(game.o.map));
   $('load').classList.add('hidden'); $('hud').classList.remove('hidden');
   $('touch').classList.toggle('hidden', !touch); applyTouchLayout();
@@ -1477,7 +1506,7 @@ function frame(now) {
   if (END) { renderEnd(dt); return; }
   if (LOADING) { renderLoading(dt); return; }
   if (!game) { if (!$('menu').classList.contains('hidden')) renderMenu3d(dt); return; }
-  const paused = !$('pause').classList.contains('hidden');
+  const paused = !$('pause').classList.contains('hidden') || !$('teamSel').classList.contains('hidden');
   if (!paused) game.update(dt);
   if (!game) return;
   game.render();
@@ -1511,4 +1540,4 @@ function renderInstall() {
   const b = $('installBtn'); if (b) b.onclick = async () => { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) { /* отмена */ } installEvt = null; renderInstall(); };
 }
 renderInstall();
-window.__cfs = { get game() { return game; }, get end() { return END; }, startGame, save, hud };
+window.__cfs = { get game() { return game; }, get end() { return END; }, startGame, save, hud, teamSel: () => showTeamSelect() };

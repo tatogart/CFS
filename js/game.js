@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793189321';
-import { World } from './world.js?v=1793189321';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793189321';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793189321';
-import { play, soundFor } from './sfx.js?v=1793189321';
-import { Bot, planRound } from './bots.js?v=1793189321';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793189321';
+import { CELL } from './maps.js?v=1793194850';
+import { World } from './world.js?v=1793194850';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793194850';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793194850';
+import { play, soundFor } from './sfx.js?v=1793194850';
+import { Bot, planRound } from './bots.js?v=1793194850';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793194850';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -317,14 +317,19 @@ export class Game {
     if (this.dm) for (const a of this.actors) if (a.brain) a.brain.onRoundStart();
     this.gmsg(this.ar ? `Гонка вооружений: ${AR_LADDER.length} уровней · убийство — новое оружие · победа — убийство золотым ножом` : this.dm ? `Бой насмерть: каждый сам за себя · до ${this.dmLimit} убийств · B — любое оружие` : this.aimMode ? 'Тренировка аима: стреляй по мишеням · B — другое оружие' : this.practice ? 'Тренировка: B — закупка, гранаты бесплатные' : (this.round === 1 ? 'Пистолетный раунд' : `Раунд ${this.round}`), 2.5);
   }
-  _swapSides() {
+  // выбор команды после входа в матч: меняем стороны и заново начинаем первый раунд
+  chooseTeam(team) {
+    if (team === this.player.team) return;
+    this._swapSides(true); this.round = 0; this.startRound(true);
+  }
+  _swapSides(silent) {
     for (const a of this.actors) { a.team = a.team === 'T' ? 'CT' : 'T'; a.money = 800; a.kills = a.kills; const ag = a.bot ? AGENTS.filter(x => x.team === a.team)[a.id % 5] : a.remote ? (agentById[a.agents && a.agents[a.team]] || AGENTS.find(x => x.team === a.team)) : agentById[this.o.agents[a.team]];
       this.scene.remove(a.model.root); a.agent = ag; a.model = new AgentModel(ag, 'knife'); if (a.skins.gloves) a.model.setGloves(a.skins.gloves); this._readable(a); this.scene.add(a.model.root); this.resetLoadout(a, true); }
     this.score = { T: this.score.CT, CT: this.score.T }; this.lossStreak = { T: 0, CT: 0 };
     this.playerSide = this.player.team;
     this._retag();
     this._buildViewmodel();
-    this.gmsg('Смена сторон!', 3);
+    if (!silent) this.gmsg('Смена сторон!', 3);
   }
   endRound(winner, reason) {
     if (this.state === 'end') return;

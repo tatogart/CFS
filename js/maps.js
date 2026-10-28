@@ -417,6 +417,7 @@ export const MAPS = [
       // поезда B
       R(56, 58, 16, 2, 'R'); R(54, 66, 18, 2, 'R');
       P('c', 31, 18, 60, 41, 25, 40, 64, 55, 74, 70, 10, 60, 40, 50);
+      S(20, 64, 8, 6, 'E', 1.5, 0.3);   // плавный спуск из спавна T к B
       P('1', 59, 15); P('2', 45, 26); P('3', 70, 44); P('4', 62, 70); P('5', 26, 50); P('6', 24, 38); P('7', 48, 47);
     }),
     nades: [N('T', 'A', 'smoke', '1', 'вход CT'), N('T', 'A', 'molotov', '2', 'между вагонов'), N('T', 'A', 'flash', '2', 'флешка A'),
@@ -608,4 +609,29 @@ function breakSpawnLOS(m) {
   }
   const out = g.map(r => r.join('')); out.elev = el; m.grid = out;
 }
-for (const m of MAPS) if (!m.aim) breakSpawnLOS(m);
+// Открытые площади: ставим ящики и стенки, чтобы карта не была «вся насквозь».
+// Проверяем, что всё остаётся проходимым.
+function addCover(m) {
+  const g = m.grid.map(r => r.split('')), H = g.length, W = g[0].length, el = m.grid.elev;
+  const walk = c => '.wTKAB123456789'.includes(c);
+  let seed = m.id.length * 7919 + m.id.charCodeAt(0) * 131; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const T = []; for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if (g[j][i] === 'T') { T.push([i, j]); break; }
+  let start = null; for (let j = 0; j < H && !start; j++) for (let i = 0; i < W; i++) if (g[j][i] === 'T') { start = [i, j]; break; }
+  const reach = () => { const seen = new Uint8Array(W * H), q = [start]; seen[start[1] * W + start[0]] = 1; let n = 1; while (q.length) { const [i, j] = q.pop(); for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= W || b >= H || seen[b * W + a] || !walk(g[b][a]) || Math.abs(el[b * W + a] - el[j * W + i]) > 0.5) continue; seen[b * W + a] = 1; n++; q.push([a, b]); } } return n; };
+  let base = reach(); const placed = [];
+  const open = (i, j, r) => { for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) { const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= W || b >= H || g[b][a] !== '.' || Math.abs(el[b * W + a] - el[j * W + i]) > 0.01) return false; } return true; };
+  const cand = []; for (let j = 3; j < H - 3; j++) for (let i = 3; i < W - 3; i++) if (open(i, j, 2)) cand.push([i, j]);
+  for (let k = cand.length - 1; k > 0; k--) { const r = Math.floor(rnd() * (k + 1)); [cand[k], cand[r]] = [cand[r], cand[k]]; }
+  const maxN = Math.min(14, Math.round(cand.length / 22) + 2);
+  for (const [i, j] of cand) {
+    if (placed.length >= maxN) break;
+    if (placed.some(([a, b]) => Math.abs(a - i) + Math.abs(b - j) < 8) || !open(i, j, 2)) continue;
+    const kind = rnd(), cells = kind < 0.45 ? [[0, 0, 'C'], [1, 0, 'C'], [0, 1, 'C'], [1, 1, 'C']] : kind < 0.7 ? [[0, 0, 'C'], [1, 0, 'C'], [2, 0, 'c']] : kind < 0.85 ? [[0, 0, '#'], [0, 1, '#'], [0, 2, '#']] : [[0, 0, '#'], [1, 0, '#'], [2, 0, '#']];
+    const old = cells.map(([a, b]) => g[j + b][i + a]);
+    cells.forEach(([a, b, c]) => g[j + b][i + a] = c);
+    const now = reach(); if (now < base - cells.length) { cells.forEach(([a, b], n) => g[j + b][i + a] = old[n]); continue; }
+    base = now; placed.push([i, j]);
+  }
+  const out = g.map(r => r.join('')); out.elev = el; m.grid = out;
+}
+for (const m of MAPS) if (!m.aim) { addCover(m); breakSpawnLOS(m); }

@@ -1,5 +1,5 @@
 // Процедурная графика: узоры скинов, миниатюры оружия, кейсов и карт
-import { skinById, WEAPONS, KNIVES, GLOVES } from './data.js?v=1793168869';
+import { skinById, WEAPONS, KNIVES, GLOVES } from './data.js?v=1793168991';
 
 export function rng(seed) {
   let a = seed >>> 0;
@@ -404,6 +404,8 @@ function emblem(g, type, cx, cy, s, col) {
   if (type === 'sun') {
     g.beginPath(); g.arc(0, 0, s * 0.42, 0, 7); g.fill();
     for (let a = 0; a < 12; a++) { g.save(); g.rotate(a / 12 * 6.283); g.beginPath(); g.moveTo(0, -s * 0.55); g.lineTo(s * 0.1, -s * 0.85); g.lineTo(-s * 0.1, -s * 0.85); g.fill(); g.restore(); }
+  } else if (type === 'star') {
+    g.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? s * 0.42 : s * 0.95; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.fill();
   } else if (type === 'bolt') {
     g.beginPath(); g.moveTo(s * 0.15, -s); g.lineTo(-s * 0.5, s * 0.1); g.lineTo(-s * 0.05, s * 0.1); g.lineTo(-s * 0.2, s); g.lineTo(s * 0.5, -s * 0.15); g.lineTo(s * 0.05, -s * 0.15); g.closePath(); g.fill();
   } else if (type === 'claw') {

@@ -1,5 +1,5 @@
 // Сохранение: монеты, инвентарь, экипировка, настройки
-import { SKINS, CASES, RARITY, skinById, GLOVES } from './data.js?v=1793168869';
+import { SKINS, CASES, RARITY, skinById, GLOVES } from './data.js?v=1793168991';
 
 const KEY = 'cfs_save_v1';
 const defaults = () => ({
@@ -64,7 +64,7 @@ export function loadout() {
 }
 // Ролл кейса по весам редкости
 export function rollCase(caseId) {
-  const cs = CASES.find(c => c.id === caseId);
+  const cs = typeof caseId === 'object' ? caseId : CASES.find(c => c.id === caseId);
   const byR = {}; for (const id of cs.items) { const r = skinById[id].rarity; (byR[r] = byR[r] || []).push(id); }
   const rs = Object.keys(byR), total = rs.reduce((s, r) => s + RARITY[r].w, 0);
   let x = Math.random() * total;

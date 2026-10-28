@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=1793168869">
+<link rel="stylesheet" href="css/style.css?v=1793168991">
 </head>
 <body>
 <canvas id="view"></canvas>
@@ -28,6 +28,7 @@
       <button data-tab="inv">Инвентарь</button>
       <button data-tab="cases">Кейсы</button>
       <button data-tab="agents">Агенты</button>
+      <button data-tab="armory" class="armTab">Armory ★</button>
     </nav>
     <div class="tright"><div class="coins" id="coins">0</div><button class="icon" data-tab="settings" aria-label="Настройки">⚙</button></div>
   </header>
@@ -70,6 +71,7 @@
       <div class="invtop"><span id="invCount"></span><select id="invSort"><option value="new">Сначала новые</option><option value="rar">По редкости</option><option value="w">По оружию</option></select></div>
       <div class="grid items" id="invList"></div>
     </section>
+    <section id="tab-armory" class="page panelPage"><div id="armoryBox"></div></section>
     <section id="tab-agents" class="page">
       <div class="stage" id="stage2"></div>
       <div class="agentPanel">
@@ -226,6 +228,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=1793168869"></script>
+<script type="module" src="js/main.js?v=1793168991"></script>
 </body>
 </html>

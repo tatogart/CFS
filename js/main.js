@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793168869';
-import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793168869';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793168869';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793168869';
-import { AgentModel } from './models.js?v=1793168869';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793168869';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793168869';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793168869';
-import { styleOf } from './decor.js?v=1793168869';
-import { Game } from './game.js?v=1793168869';
+import { MAPS, CELL } from './maps.js?v=1793168991';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793168991';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793168991';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793168991';
+import { AgentModel } from './models.js?v=1793168991';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793168991';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793168991';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793168991';
+import { styleOf } from './decor.js?v=1793168991';
+import { Game } from './game.js?v=1793168991';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -47,6 +47,7 @@ function showTab(tab) {
   document.querySelectorAll('#menu .page').forEach(p => p.classList.toggle('on', p.id === 'tab-' + tab));
   if (tab === 'inv') renderInv();
   if (tab === 'agents') renderAgentLists();
+  if (tab === 'armory') renderArmory();
   if (tab === 'settings') renderSettings();
   if (tab === 'home') renderHome();
   play('tick');
@@ -153,19 +154,21 @@ function openCaseScreen(cs) {
   box.appendChild(gold);
   resetStrip(); updOpenBtn(); play('tick');
 }
-const casePrice = () => (save.admin && save.admin.freeCases ? 0 : curCase.price);
-function updOpenBtn() { const b = $('openBtn'); b.textContent = `Открыть · ◈ ${casePrice()}`; b.disabled = save.coins < casePrice() || rolling; coins(); }
+const casePrice = () => (save.admin && save.admin.freeCases ? 0 : curCase.stars ? curCase.stars : curCase.price);
+const canPay = () => curCase.stars ? (pass().stars >= casePrice()) : save.coins >= casePrice();
+function updOpenBtn() { if (!curCase) { coins(); return; } const b = $('openBtn'); b.textContent = curCase.stars ? `Открыть · ${casePrice()} ★ (есть ${pass().stars})` : `Открыть · ◈ ${casePrice()}`; b.disabled = !canPay() || rolling; coins(); }
 function resetStrip() { const s = $('strip'); s.style.transition = 'none'; s.style.transform = 'translateX(0)'; s.innerHTML = ''; for (let i = 0; i < 12; i++) s.appendChild(itemCard(curCase.items[i % curCase.items.length])); }
-$('caseBack').onclick = () => { if (rolling) return; $('caseScreen').classList.add('hidden'); $('menu').classList.remove('hidden'); coins(); };
+$('caseBack').onclick = () => { if (rolling) return; $('caseScreen').classList.add('hidden'); $('menu').classList.remove('hidden'); coins(); if (curTab === 'armory') renderArmory(); };
 $('openBtn').onclick = () => {
-  if (rolling || save.coins < casePrice()) return;
+  if (rolling || !canPay()) return;
   initAudio();
-  save.coins -= casePrice(); save.stats.opened++; persist(); rolling = true; updOpenBtn();
-  const win = rollCase(curCase.id);
+  if (curCase.stars) pass().stars -= casePrice(); else save.coins -= casePrice();
+  save.stats.opened++; persist(); rolling = true; updOpenBtn();
+  const win = rollCase(curCase);
   const strip = $('strip'); strip.style.transition = 'none'; strip.style.transform = 'translateX(0)'; strip.innerHTML = '';
   const N = 56, WI = 47;
   for (let i = 0; i < N; i++) {
-    const id = i === WI ? win : rollCase(curCase.id);
+    const id = i === WI ? win : rollCase(curCase);
     const c = itemCard(id);
     if (i !== WI && skinById[id].rarity === 'gold') { c.querySelector('img').style.filter = 'brightness(0) drop-shadow(0 0 6px #e4ae39)'; }
     strip.appendChild(c);
@@ -255,6 +258,44 @@ function renderGraffiti() {
     box.appendChild(b);
   }
 }
+// ---------- Armory Pass: звёзды за опыт, коллекционный кейс и предметы за звёзды ----------
+const ARMORY_CASE = { id: 'armory', name: 'Коллекционный кейс «Арсенал CFS»', stars: 1, col: ['#e0a820', '#2a1a05'], emblem: 'star', items: ARMORY.caseItems };
+function pass() { return save.pass || (save.pass = { active: false, stars: 0, earned: 0, xpAcc: 0, bought: 0 }); }
+// начислить звёзды за опыт матча; вернуть сколько звёзд получено
+function armoryXP(xp) {
+  const P = pass(); if (!P.active || P.earned >= ARMORY.stars) return 0;
+  P.xpAcc += xp; let got = 0;
+  while (P.xpAcc >= ARMORY.xpPerStar && P.earned < ARMORY.stars) { P.xpAcc -= ARMORY.xpPerStar; P.earned++; P.stars++; got++; }
+  return got;
+}
+function renderArmory() {
+  const P = pass(), box = $('armoryBox'), done = P.earned >= ARMORY.stars;
+  const canBuy = !P.active || done;
+  box.innerHTML = `<div class="armHead"><div class="armTitle"><small>ARMORY PASS · сезон</small><b>«Арсенал CFS»</b><span>Новые скины и 5 новых ножей: Кукри, Боуи, Скелет, Стилет, Урсус</span></div>
+    <div class="armStars"><b>★ ${P.stars}</b><small>${P.active ? `заработано ${P.earned}/${ARMORY.stars}` : 'пасс не куплен'}</small>
+    ${P.active && !done ? `<div class="eBar"><i style="width:${P.xpAcc / ARMORY.xpPerStar * 100}%"></i></div><small>следующая звезда через ${ARMORY.xpPerStar - P.xpAcc} XP</small>` : ''}</div>
+    ${canBuy ? `<button class="playBig inline armBuy" id="armBuy"><span>КУПИТЬ ПАСС</span><small>◈ ${ARMORY.price} · сразу ${ARMORY.start} ★ и ещё ${ARMORY.stars - ARMORY.start} за опыт</small></button>` : ''}</div>
+    <div class="armCase"><img src="${caseIconURL(ARMORY_CASE)}" alt=""><div><b>${ARMORY_CASE.name}</b><span>Любой предмет коллекции, шанс на новый нож</span><button class="big go" id="armOpen" ${P.stars < 1 ? 'disabled' : ''}>Открыть · 1 ★</button></div></div>
+    <h3>Предметы коллекции за звёзды</h3><div class="grid items" id="armItems"></div>`;
+  const ab = $('armBuy'); if (ab) ab.onclick = () => {
+    if (save.coins < ARMORY.price) { alert('Не хватает монет'); return; }
+    save.coins -= ARMORY.price; P.active = true; P.earned = ARMORY.start; P.stars += ARMORY.start; P.xpAcc = 0; P.bought++; persist(); coins(); play('rare'); renderArmory();
+  };
+  $('armOpen').onclick = () => { if (P.stars >= 1) openCaseScreen(ARMORY_CASE); };
+  const grid = $('armItems');
+  const sorted = ARMORY.caseItems.slice().sort((a, b) => RARITY_ORDER.indexOf(skinById[b].rarity) - RARITY_ORDER.indexOf(skinById[a].rarity));
+  for (const id of sorted) {
+    const cost = ARMORY.cost[skinById[id].rarity];
+    const c = itemCard(id, `<div class="acts"><button class="s armGet" ${P.stars < cost ? 'disabled' : ''}>Получить · ${cost} ★</button></div>`);
+    c.querySelector('.armGet').onclick = () => {
+      if (P.stars < cost) return;
+      if (!confirm(`Получить ${weaponName(skinById[id].weapon)} | ${skinById[id].name} за ${cost} ★?`)) return;
+      P.stars -= cost; persist(); showDrop(id); renderArmory();
+    };
+    grid.appendChild(c);
+  }
+}
+
 // ---------- лоадаут как в CS2: в закупке только выбранное оружие ----------
 const LO_CATS = [['pistols', 'Пистолеты', t => t === 'pistol'], ['mid', 'Средний класс', t => t === 'smg' || t === 'shotgun' || t === 'mg'], ['rifles', 'Винтовки', t => t === 'rifle' || t === 'sniper']];
 const loPool = (team, cat) => { const f = LO_CATS.find(c => c[0] === cat)[2]; return Object.keys(WEAPONS).filter(id => f(WEAPONS[id].type) && (!WEAPONS[id].team || WEAPONS[id].team === team)); };
@@ -945,6 +986,7 @@ function endMatch(g) {
   const mdone = missionProgress({ kills: p.kills, hs: p.hs || 0, mvps: p.mvps || 0, plants: p.plants || 0, wins: won ? 1 : 0, m_comp: g.mode === 'comp' ? 1 : 0, w_wing: g.mode === 'wing' && won ? 1 : 0, w_ar: g.ar && won ? 1 : 0,
     k_sniper: kt.sniper || 0, k_pistol: kt.pistol || 0, k_knife: kt.knife || 0, k_smg: kt.smg || 0, k_rifle: kt.rifle || 0 });
   for (const m of mdone) { reward += m.c; xpGain += m.xp; }
+  const starsGot = armoryXP(xpGain);
   const xpFrom = save.xp || 0; save.xp = xpFrom + xpGain;
   save.lastMatch = { map: g.o.map.name, score: dm ? `#${place}` : `${my}:${th}`, won, k: p.kills, d: p.deaths };
   save.coins += reward; save.stats.matches++; if (won) save.stats.wins++; save.stats.kills += p.kills; save.stats.deaths += p.deaths; persist();
@@ -961,7 +1003,7 @@ function endMatch(g) {
     const w = a.weapons[1] || a.weapons[2];
     return { name: a.name, team: a.team, agent: a.agent, gun: w ? w.id : (a.team === 'T' ? 'ak47' : 'm4a4'), skin: w ? w.skin : null, gloves: a.skins && a.skins.gloves, k: a.kills, d: a.deaths, mvps: a.mvps || 0, hs: a.hs || 0, me: a === p, place: order.indexOf(a) + 1, badge: badges.get(a) || '' };
   });
-  const data = { dm, won, draw, place, total: order.length, my, th, team: p.team, map: g.o.map.name, mode: (MODES.find(m => m[0] === g.mode) || [])[1] || '', players, reward, xpFrom, xpGain, rank, mdone };
+  const data = { dm, won, draw, place, total: order.length, my, th, team: p.team, map: g.o.map.name, mode: (MODES.find(m => m[0] === g.mode) || [])[1] || '', players, reward, xpFrom, xpGain, rank, mdone, starsGot };
   game.dispose(); game = null; stopAmbience(2);
   controls.enabled = false; controls.reset(); closeBuy();
   $('hud').classList.add('hidden'); $('pause').classList.add('hidden');
@@ -1015,6 +1057,7 @@ function showEnd(d) {
     <div class="eRow"><span>Опыт</span><b>+${d.xpGain} XP</b></div>
     <div class="eLvl"><span class="eL">Ур. ${lvl(d.xpFrom)}</span><div class="eBar"><i></i></div></div>
     ${(d.mdone || []).map(m => `<div class="eMis">✔ ${esc(m.t)}</div>`).join('')}
+    ${d.starsGot ? `<div class="eMis eStar">★ +${d.starsGot} Armory Pass</div>` : ''}
     ${d.rank ? `<div class="eRank"><div class="eRm">${esc(d.rank.mode)} · ${d.rank.elo} <em class="${d.rank.delta >= 0 ? 'up' : 'down'}">${d.rank.delta >= 0 ? '+' : ''}${d.rank.delta}</em></div><img src="${rankURL(d.rank.before, 200)}" alt=""><div class="eRn">${d.rank.before < 0 ? 'Без звания' : esc(RANKS[d.rank.before])}</div></div>` : ''}`;
   scr.className = ''; scr.classList.toggle('lose', !d.won && !d.draw);
   END = { d, scene, cam, models, t: 0, coinsShown: 0, rankDone: false, lvlUp: false };

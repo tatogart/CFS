@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793197213';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793197213';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793197213';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793197213';
-import { AgentModel } from './models.js?v=1793197213';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793197213';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793197213';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793197213';
-import { styleOf } from './decor.js?v=1793197213';
-import { Game } from './game.js?v=1793197213';
+import { MAPS, CELL } from './maps.js?v=1793199126';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793199126';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793199126';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793199126';
+import { AgentModel } from './models.js?v=1793199126';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793199126';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793199126';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793199126';
+import { styleOf } from './decor.js?v=1793199126';
+import { Game } from './game.js?v=1793199126';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -116,18 +116,26 @@ function premBadge(rating, big, hidden) {
   return `<span class="prBadge${big ? ' big' : ''}" style="--pc:${c}"><i></i><b>${str}</b></span>`;
 }
 const premShown = () => prem().wins >= PREM_WINS;
-function premWorld(r) { return Math.max(1, Math.round(1800000 * Math.exp(-r / 4200))); }
+const PREM_TOP = ['s1mple', 'ZywOo', 'm0NESY', 'donk', 'NiKo', 'ropz', 'sh1ro', 'Ax1Le', 'jL', 'b1t', 'electroNic', 'Boombl4', 'Perfecto', 'Jame', 'iM']
+  .map((n, i) => ({ n, r: 33500 - i * 640 - (i * 137) % 300 }));
+// место в мире: выше нижней строчки топа — считаем прямо по таблице лидеров, ниже — по кривой распределения
+function premWorld(r) {
+  const above = PREM_TOP.filter(x => x.r > r).length;
+  if (above < PREM_TOP.length) return above + 1;
+  return Math.max(PREM_TOP.length + 1, Math.round(1800000 * Math.exp(-r / 2600)));
+}
 function premLeaders() {
-  const P = prem(), names = ['s1mple', 'ZywOo', 'm0NESY', 'donk', 'NiKo', 'ropz', 'sh1ro', 'Ax1Le', 'jL', 'b1t', 'electroNic', 'Boombl4', 'Perfecto', 'Jame', 'iM'];
-  const list = names.map((n, i) => ({ n, r: 33500 - i * 640 - (i * 137) % 300 }));
-  return { list, me: { n: nick(), r: P.rating, place: premWorld(P.rating) } };
+  const P = prem(), me = { n: nick(), r: P.rating, place: premWorld(P.rating), me: true };
+  const list = PREM_TOP.map(x => ({ ...x }));
+  if (premShown() && me.place <= list.length) list.splice(me.place - 1, 0, me);
+  return { list, me };
 }
 function rankData(m) { save.ranks = save.ranks || {}; return save.ranks[m] || (save.ranks[m] = { elo: 600, wins: 0, losses: 0, games: 0 }); }
 function renderPremBox() {
   const P = prem(), L = premLeaders(), shown = premShown(), [col, tname] = premTier(P.rating);
   $('premBox').innerHTML = `<div class="prCard" style="--pc:${shown ? col : '#6a7686'}"><div><small>PREMIER · СЕЗОН ${P.season}</small>${premBadge(P.rating, true, !shown)}<span>${shown ? `${tname} уровень · лучший ${String(P.best).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} · ~#${premWorld(P.rating).toLocaleString('ru')} в мире` : `Калибровка: побед до рейтинга ${Math.max(0, PREM_WINS - P.wins)} из ${PREM_WINS}`}</span><span>Побед ${P.wins} · поражений ${P.losses} · матчей ${P.games}</span></div>
     <div class="prPool"><small>Пул карт (вето перед матчем)</small><div>${POOLS.premier.map(id => `<img src="${mapThumbURL(MAPS.find(x => x.id === id), 2)}" title="${id}" alt="">`).join('')}</div></div></div>
-    <div class="prLead"><h3>Таблица лидеров · мир</h3>${L.list.slice(0, 8).map((x, i) => `<div class="prRow"><i>${i + 1}</i><span>${esc(x.n)}</span>${premBadge(x.r)}</div>`).join('')}<div class="prRow me"><i>${shown ? L.me.place.toLocaleString('ru') : '—'}</i><span>${esc(L.me.n)}</span>${premBadge(L.me.r, false, !shown)}</div></div>`;
+    <div class="prLead"><h3>Таблица лидеров · мир</h3>${L.list.slice(0, 8).map((x, i) => `<div class="prRow${x.me ? ' me' : ''}"><i>${i + 1}</i><span>${esc(x.n)}</span>${premBadge(x.r)}</div>`).join('')}${shown && L.me.place <= 8 ? '' : `<div class="prRow me"><i>${shown ? L.me.place.toLocaleString('ru') : '—'}</i><span>${esc(L.me.n)}</span>${premBadge(L.me.r, false, !shown)}</div>`}</div>`;
 }
 function renderPlay() {
   pills($('modes'), MODES.map(m => [m[0], m[1]]), save.last.mode || 'casual', v => { save.last.mode = v; renderPlay(); });
@@ -267,13 +275,17 @@ function updYt() {
 async function renderKits() {
   const box = $('kitList'); if (!box) return; box.innerHTML = '';
   const cur = save.musicKit || 'cfs';
-  for (const k of KITS) {
-    const c = el('div', 'kit' + (cur === k.id ? ' on' : ''), `<div class="kArt" style="--kc:${k.col}"><span>♫</span></div><div class="kName">${esc(k.name)}</div><div class="kAuth">${esc(k.author)} · ${k.bpm} BPM</div><div class="kBtns"><button class="pv">▶ Слушать</button><button class="eq">${cur === k.id ? '✔ Надет' : 'Надеть'}</button></div>`);
+  const secs = [[true, '🔊 Бассовые', '808, вобл и рис-бас — качает'], [false, '🎹 Мелодичные', 'без тяжёлого баса — спокойнее']];
+  const ordered = secs.flatMap(([bassy, h, sub]) => [{ head: h, sub }, ...KITS.filter(k => !!k.bassy === bassy)]);
+  for (const k of ordered) {
+    if (k.head) { box.appendChild(el('div', 'kitSec', `<b>${k.head}</b><small>${k.sub}</small>`)); continue; }
+    const c = el('div', 'kit' + (cur === k.id ? ' on' : ''), `<div class="kArt" style="--kc:${k.col}"><span>${k.bassy ? '♬' : '♫'}</span></div><div class="kName">${esc(k.name)}</div><div class="kAuth">${esc(k.author)} · ${k.bpm} BPM${k.bassy ? ' · <em class="kBass">BASS</em>' : ''}</div><div class="kBtns"><button class="pv">▶ Слушать</button><button class="eq">${cur === k.id ? '✔ Надет' : 'Надеть'}</button></div>`);
     c.querySelector('.pv').onclick = () => { initAudio(); playMusic('mvp', k.id); };
     c.querySelector('.eq').onclick = () => { save.musicKit = k.id; setKit(k.id); persist(); renderKits(); updYt(); playMusic('menu'); };
     box.appendChild(c);
   }
   // свой кит: треки игрока
+  box.appendChild(el('div', 'kitSec', '<b>★ Свой кит</b><small>свои треки или YouTube</small>'));
   const slots = [['menu', 'Меню (по кругу)'], ['start', 'Начало раунда'], ['mvp', 'MVP раунда']];
   const recs = await Promise.all(slots.map(([s]) => loadTrack(s)));
   const c = el('div', 'kit custom' + (cur === 'custom' ? ' on' : ''), `<div class="kArt" style="--kc:#3cf06a"><span>★</span></div>
@@ -688,6 +700,15 @@ function renderAdmin() {
   btn(r, 'Установить рейтинг', () => { const v = parseInt(pin.value, 10); if (v >= 0) { prem().rating = v; prem().best = Math.max(prem().best, v); } });
   btn(r, 'Открыть рейтинг (10 побед)', () => { prem().wins = Math.max(prem().wins, PREM_WINS); });
   btn(r, 'Сбросить Premier', () => { save.premier = null; });
+  r = group(`Накрутка побед · всего ${save.stats.wins} из ${save.stats.matches} матчей`);
+  const boost = n => () => {
+    const P = prem(); P.wins += n; P.games += n;
+    for (const m of ['comp', 'wing']) { const rd = rankData(m); rd.wins += n; rd.games += n; }
+    save.stats.wins += n; save.stats.matches += n;
+  };
+  btn(r, '+1 победа', boost(1)); btn(r, '+10 побед', boost(10)); btn(r, '+100 побед', boost(100));
+  const win = el('input'); win.type = 'number'; win.placeholder = 'Сколько побед'; r.appendChild(win);
+  btn(r, 'Накрутить', () => { const v = parseInt(win.value, 10); if (v > 0) boost(Math.min(v, 100000))(); });
   const P = pass();
   r = group(`Armory Pass: ${P.active ? 'активен' : 'не куплен'} · ★ ${P.stars} · заработано ${P.earned}/${ARMORY.stars}`);
   btn(r, 'Активировать бесплатно', () => { P.active = true; if (P.earned >= ARMORY.stars) P.earned = 0; }); btn(r, '+10 ★', () => P.stars += 10); btn(r, '+40 ★', () => P.stars += 40); btn(r, 'Сбросить пасс', () => save.pass = null);

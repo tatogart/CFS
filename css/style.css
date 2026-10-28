@@ -718,3 +718,8 @@ body.ingame #hp, body.ingame #ammo, body.ingame #topScore, body.ingame #money { 
 body.ingame #feed div { background: rgba(10,14,20,.78); }
 body.ingame .tb { background: rgba(16,22,32,.5); box-shadow: none; }
 body.ingame .modal { background: rgba(4,6,10,.82); }
+
+.kitSec { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; margin: 10px 2px 0; }
+.kitSec b { font-size: 15px; letter-spacing: .04em; }
+.kitSec small { color: var(--dim, #8a96a6); font-size: 12px; }
+.kBass { font-style: normal; font-weight: 800; font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #ff2a55; color: #fff; letter-spacing: .06em; }

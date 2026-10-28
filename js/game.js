@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793207997';
-import { World } from './world.js?v=1793207997';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793207997';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793207997';
-import { play, soundFor } from './sfx.js?v=1793207997';
-import { Bot, planRound } from './bots.js?v=1793207997';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793207997';
+import { CELL } from './maps.js?v=1793209863';
+import { World } from './world.js?v=1793209863';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793209863';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793209863';
+import { play, soundFor } from './sfx.js?v=1793209863';
+import { Bot, planRound } from './bots.js?v=1793209863';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793209863';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -140,13 +140,17 @@ function inspectKeyFor(inst) {
   return INSPECT[t] ? t : 'rifle';
 }
 const IK = ['rx', 'ry', 'rz', 'px', 'py', 'pz', 'sx', 'sy', 'sz', 'ty', 'fold', 'mag', 'lh', 'slide', 'lo'];
-const _pose = {};
+const _pose = {}, IK_SOFT = new Set(['fold', 'mag', 'lh', 'slide', 'lo', 'ty']);
 function inspectPose(key, u) {
   const keys = (INSPECT[key] || INSPECT.rifle).keys;
   let i = 0; while (i < keys.length - 2 && u > keys[i + 1][0]) i++;
   const [t0, a] = keys[i], [t1, b] = keys[i + 1];
-  let k = Math.max(0, Math.min(1, (u - t0) / Math.max(1e-4, t1 - t0))); k = k * k * k * (k * (k * 6 - 15) + 10);
-  for (const n of IK) { const x = a[n] || 0; _pose[n] = x + ((b[n] || 0) - x) * k; }
+  // лёгкий замах перед движением и перелёт с возвратом (easeInOutBack) — движения «сочнее», чем просто плавные
+  let k = Math.max(0, Math.min(1, (u - t0) / Math.max(1e-4, t1 - t0)));
+  const c = 0.9 * 1.525, ks = k * k * k * (k * (k * 6 - 15) + 10);
+  const kb = k < 0.5 ? (Math.pow(2 * k, 2) * ((c + 1) * 2 * k - c)) / 2 : (Math.pow(2 * k - 2, 2) * ((c + 1) * (k * 2 - 2) + c) + 2) / 2;
+  // руки и вращения — с перелётом, а магазин/затвор/складывание — без (иначе магазин «влезает» в оружие)
+  for (const n of IK) { const x = a[n] || 0, kk = IK_SOFT.has(n) ? ks : kb; _pose[n] = x + ((b[n] || 0) - x) * kk; }
   return _pose;
 }
 
@@ -1706,14 +1710,16 @@ export class Game {
       const sp = this.hspeed(view), bob = view.onGround ? sp / 6 : 0;
       this.bobT = (this.bobT || 0) + dt * sp * 1.6;
       this.vmKick = Math.max(0, (this.vmKick || 0) - dt * 9);
-      this.vmDraw = Math.max(0, (this.vmDraw || 0) - dt * 3.2);
+      this.vmDraw = Math.max(0, (this.vmDraw || 0) - dt * 2.6);
+      // доставание: оружие влетает снизу с разворотом и пружинит на месте (easeOutBack)
+      const dp = 1 - this.vmDraw, dr = this.vmDraw > 0 ? 1 - (1 + 2.2 * Math.pow(dp - 1, 3) + 1.2 * Math.pow(dp - 1, 2)) : 0;
       const rl = view.cur && WEAPONS[view.cur.id] ? WEAPONS[view.cur.id].reload : 1;
       const anim = !!this.vmMag;
       const reload = view.reloadT > 0 && !anim ? Math.sin(Math.min(1, view.reloadT / (rl || 1)) * Math.PI) : 0;
       const b = this.vmBase;
       const knifeT = view.cur && (view.cur.id === 'knife') ? this.vmKick : 0;
-      this.vmGun.position.set(b.x + Math.sin(this.bobT) * 0.012 * bob, b.y - Math.abs(Math.cos(this.bobT)) * 0.012 * bob - reload * 0.12 - this.vmDraw * 0.25 - view.crouchK * 0.01, b.z + this.vmKick * 0.05 * (knifeT ? -1.5 : 1));
-      this.vmGun.rotation.set(this.vmKick * 0.08 + reload * 0.7 - this.vmDraw * 0.6 - knifeT * 0.6, 0.05 + knifeT * 0.8, -reload * 0.3 + knifeT * 0.5);
+      this.vmGun.position.set(b.x + Math.sin(this.bobT) * 0.012 * bob, b.y - Math.abs(Math.cos(this.bobT)) * 0.012 * bob - reload * 0.12 - dr * 0.25 - view.crouchK * 0.01, b.z + this.vmKick * 0.05 * (knifeT ? -1.5 : 1));
+      this.vmGun.rotation.set(this.vmKick * 0.08 + reload * 0.7 - dr * 0.6 - knifeT * 0.6, 0.05 + knifeT * 0.8 + dr * 0.35, -reload * 0.3 + knifeT * 0.5 + dr * 0.55);
       if (this.vmModel) { this.vmModel.position.set(0, 0, 0); this.vmModel.rotation.set(0, 0, 0); }
       if (anim) this._vmReloadAnim(view, rl, dt);
       const isKnife = view.cur && view.cur.id === 'knife' && this.vmSpin, km = isKnife ? (view.cur.model || 'knife') : null;
@@ -1729,6 +1735,7 @@ export class Game {
         else ks.rotation.x -= d * d * Math.PI * 2 * (km === 'butterfly' ? 2 : 1);
       }
       // осмотр: ключевые кадры под каждый тип оружия и каждый нож (см. INSPECT), секретный — редкий вариант
+      if (this.vmL) this.vmL.visible = true;
       if (this.inspectT > 0 && view === p) {
         const dur = this.inspectDur || 3.2;
         this.inspectT = Math.max(0, this.inspectT - dt);
@@ -1756,6 +1763,7 @@ export class Game {
           // левая рука отпускает оружие на перевороте (иначе она крутится вместе с ним через весь экран)
           const lo = isKnife ? e : k.lo;
           if (this.vmL && lo) { this.vmL.position.y -= lo * 0.6; this.vmL.position.x -= lo * 0.12; this.vmL.position.z += lo * 0.15; }
+          if (this.vmL && !isKnife && lo > 0.45) this.vmL.visible = false;
           if (isKnife) {
             ks.rotation.x += k.sx; ks.rotation.y += k.sy; ks.rotation.z += k.sz; ks.position.y += k.ty || 0;
             if (fold) fold.rotation.x = -(k.fold || 0) * Math.PI * 0.95;
@@ -1785,7 +1793,7 @@ export class Game {
   }
   resize() { this.camera.aspect = this.vmCam.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.vmCam.updateProjectionMatrix(); }
   dispose() {
-    this.scene.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    this.scene.traverse(o => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
   }
   // находится ли камера в дыму
   camInSmoke() { const c = this.camera.position; for (const s of this.smokes) if (s.c.distanceTo(c) < s.r * 0.9) return Math.min(1, s.r / s.R); return 0; }

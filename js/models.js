@@ -1,7 +1,7 @@
 // 3D-модели: агенты (человечки с IK-руками), оружие
 import * as THREE from '../vendor/three.module.min.js';
-import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793207997';
-import { skinById, WEAPONS, KNIVES } from './data.js?v=1793207997';
+import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793209863';
+import { skinById, WEAPONS, KNIVES } from './data.js?v=1793209863';
 
 const matCache = new Map();
 export function mat(color, opts = {}) {
@@ -22,7 +22,8 @@ export function skinMaterial(skinId, fallback) {
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const geoCache = new Map();
-const G = (key, fn) => { if (!geoCache.has(key)) geoCache.set(key, fn()); return geoCache.get(key); };
+// общие (кэшированные) геометрии используются сразу несколькими моделями — меню, матчем, экраном итогов — их нельзя dispose()
+const G = (key, fn) => { if (!geoCache.has(key)) { const g = fn(); g.userData.shared = true; geoCache.set(key, g); } return geoCache.get(key); };
 
 // ---------- ОРУЖИЕ ----------
 // Ствол смотрит в -Z, начало координат — рукоять (место правой руки).

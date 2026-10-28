@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793207997';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793207997';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793207997';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793207997';
-import { AgentModel } from './models.js?v=1793207997';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793207997';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793207997';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793207997';
-import { styleOf } from './decor.js?v=1793207997';
-import { Game } from './game.js?v=1793207997';
+import { MAPS, CELL } from './maps.js?v=1793209863';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793209863';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793209863';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793209863';
+import { AgentModel } from './models.js?v=1793209863';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793209863';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793209863';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793209863';
+import { styleOf } from './decor.js?v=1793209863';
+import { Game } from './game.js?v=1793209863';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -1394,7 +1394,7 @@ function showEnd(d) {
 $('eOk').onclick = () => { if (!END) return; if (END.t < 4.5) { END.t = 4.5; return; } closeEnd(); };
 function closeEnd() {
   if (!END) return;
-  END.scene.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  END.scene.traverse(o => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
   END = null; $('endScr').className = 'hidden';
   quitGame();
 }
@@ -1625,6 +1625,7 @@ function quitGame() {
   stopAmbience();
   if (window.__updateReady) { location.reload(); return; }
   if (game) { game.dispose(); game = null; }
+  if (M.model) { M.scene.remove(M.model.root); M.model = null; } M.id = null;   // агент в меню пересобирается заново после матча
   document.body.classList.remove('ingame', 'mCancel');
   controls.enabled = false; controls.unlock(); controls.reset();
   $('hud').classList.add('hidden'); $('menu').classList.remove('hidden'); $('rotate').classList.add('hidden');

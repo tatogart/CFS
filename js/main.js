@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793196962';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793196962';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793196962';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793196962';
-import { AgentModel } from './models.js?v=1793196962';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793196962';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793196962';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793196962';
-import { styleOf } from './decor.js?v=1793196962';
-import { Game } from './game.js?v=1793196962';
+import { MAPS, CELL } from './maps.js?v=1793197213';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793197213';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793197213';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793197213';
+import { AgentModel } from './models.js?v=1793197213';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793197213';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793197213';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793197213';
+import { styleOf } from './decor.js?v=1793197213';
+import { Game } from './game.js?v=1793197213';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -28,9 +28,21 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
 function quality() { const q = save.settings.quality; return q === 'auto' ? (touch ? 1 : 2) : +q; }
+// динамическое разрешение: при просадке FPS в матче рендер мельчает, при запасе — возвращается
+let resScale = 1, arAcc = 0, arN = 0;
+function basePR() { const q = quality(); return Math.min(devicePixelRatio, q === 0 ? 1 : q === 1 ? 1.4 : 1.75); }
+function adaptRes(dt) {
+  arAcc += dt; arN++;
+  if (arAcc < 1.2) return;
+  const fps = arN / arAcc; arAcc = 0; arN = 0;
+  const prev = resScale;
+  if (fps < 50) resScale = Math.max(0.5, resScale - (fps < 35 ? 0.2 : 0.1));
+  else if (fps > 58 && resScale < 1) resScale = Math.min(1, resScale + 0.05);
+  if (prev !== resScale) { renderer.setPixelRatio(basePR() * resScale); renderer.setSize(innerWidth, innerHeight, false); }
+}
 function applyQuality() {
   const q = quality();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, q === 0 ? 1 : q === 1 ? 1.6 : 2));
+  renderer.setPixelRatio(basePR() * resScale);
   renderer.shadowMap.enabled = q >= 1; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setSize(innerWidth, innerHeight, false);
 }
@@ -1501,6 +1513,7 @@ function showVeto() {
   iv = setInterval(() => { if (step >= order.length) { clearInterval(iv); return; } if (order[step] !== 'me') return; timer--; const sub = box.querySelector('.vtSub b.me'); if (sub) sub.parentElement.innerHTML = `<b class="me">Ваша очередь</b>: забаньте карту · ${timer} с`; if (timer <= 0) { const l = left(); ban(l[Math.floor(Math.random() * l.length)], 'me'); } }, 1000);
 }
 function beginLoad() {
+  document.body.classList.add('ingame');
   const yb = $('ytBox'); yb.innerHTML = ''; yb.dataset.id = ''; yb.classList.add('hidden'); stopMusic(0.5);
   const mode = save.last.mode || 'casual';
   const map = modeMap(mode);
@@ -1566,6 +1579,7 @@ function quitGame() {
   stopAmbience();
   if (window.__updateReady) { location.reload(); return; }
   if (game) { game.dispose(); game = null; }
+  document.body.classList.remove('ingame');
   controls.enabled = false; controls.unlock(); controls.reset();
   $('hud').classList.add('hidden'); $('menu').classList.remove('hidden'); $('rotate').classList.add('hidden');
   closeBuy();
@@ -1577,7 +1591,7 @@ function checkRotate() { $('rotate').classList.toggle('hidden', !(game && touch 
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight, false); if (game) game.resize(); checkRotate(); });
 
 // ---------- цикл ----------
-let last = performance.now();
+let last = performance.now(), last0 = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
@@ -1589,6 +1603,8 @@ function frame(now) {
   if (!paused) game.update(dt);
   if (!game) return;
   game.render();
+  if (!paused && last0) adaptRes(Math.min(0.25, (now - last0) / 1000)); else { arAcc = 0; arN = 0; }
+  last0 = paused ? 0 : now;
   updateHud(game, dt);
 }
 requestAnimationFrame(frame);

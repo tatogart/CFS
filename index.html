@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=1793174571">
+<link rel="stylesheet" href="css/style.css?v=1793184313">
 </head>
 <body>
 <canvas id="view"></canvas>
@@ -21,16 +21,15 @@
 <!-- ===== Меню ===== -->
 <div id="menu" class="screen cs2">
   <header class="topbar">
-    <div class="logo" id="logo">CFS<span>STRIKE</span></div>
+    <div class="tleft"><div class="logo" id="logo">CFS<span>STRIKE</span></div><button class="tPlay" data-tab="play" id="topPlay"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg><span>ИГРАТЬ</span></button></div>
     <nav class="tabs" id="tabs">
-      <button data-tab="home" class="on">Главная</button>
-      <button data-tab="play">Играть</button>
-      <button data-tab="inv">Инвентарь</button>
-      <button data-tab="cases">Кейсы</button>
-      <button data-tab="agents">Агенты</button>
-      <button data-tab="armory" class="armTab">Armory ★</button>
+      <button data-tab="home" class="on"><svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8v10h-6v-6H9v6H3z"/></svg><span>Главная</span></button>
+      <button data-tab="inv"><svg viewBox="0 0 24 24"><path d="M8 6V4a4 4 0 0 1 8 0v2h3a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1zm2 0h4V4a2 2 0 0 0-4 0zm-2 6v2h8v-2z"/></svg><span>Инвентарь</span></button>
+      <button data-tab="cases"><svg viewBox="0 0 24 24"><path d="M3 8h18v12H3zM8 8V5h8v3h-2V7h-4v1zm2 4v3h4v-3z"/></svg><span>Магазин</span></button>
+      <button data-tab="agents"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-5 3.6-8 8-8s8 3 8 8z"/></svg><span>Агенты</span></button>
+      <button data-tab="armory" class="armTab"><svg viewBox="0 0 24 24"><path d="m12 2 2.9 6.6 7.1.6-5.4 4.7 1.6 7.1L12 17.3 5.8 21l1.6-7.1L2 9.2l7.1-.6z"/></svg><span>Armory</span></button>
     </nav>
-    <div class="tright"><div class="coins" id="coins">0</div><button class="icon" data-tab="settings" aria-label="Настройки">⚙</button></div>
+    <div class="tright"><div class="coins" id="coins">0</div><button class="topProf" id="topProf" aria-label="Профиль"></button><button class="icon" data-tab="settings" aria-label="Настройки"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.3 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L9 21h4l.3-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button></div>
   </header>
   <main class="pages">
     <section id="tab-home" class="page on">
@@ -186,14 +185,18 @@
 </div>
 
 <!-- ===== Пауза ===== -->
-<div id="pause" class="modal hidden">
-  <div class="panel small">
-    <h2>Пауза</h2>
-    <button class="big go" id="resume">Продолжить</button>
-    <label class="slider">Чувствительность <input type="range" id="pSens" min="0.2" max="3" step="0.05"></label>
-    <button class="big hidden" id="pAdmin">⚙ Админка</button>
-    <button class="big" id="quit">Выйти в меню</button>
-  </div>
+<div id="pause" class="hidden">
+  <header class="pTop">
+    <div class="tleft"><button class="tPlay" id="resume"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg><span>ПРОДОЛЖИТЬ</span></button></div>
+    <nav class="tabs pTabs" id="pTabs">
+      <button data-pt="match" class="on"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4zm0 6h16v4H4zm0 6h16v4H4z"/></svg><span>Матч</span></button>
+      <button data-pt="settings"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.3 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L9 21h4l.3-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg><span>Настройки</span></button>
+      <button data-pt="vote"><svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M4 4h16v16H4z" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>Голосование</span></button>
+      <button data-pt="admin" id="pAdmin" class="hidden"><svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg><span>Админка</span></button>
+    </nav>
+    <div class="tright"><span class="pInfo" id="pInfo"></span><button class="pQuit" id="quit">ОТКЛЮЧИТЬСЯ</button></div>
+  </header>
+  <div class="pBody" id="pBody"></div>
 </div>
 
 <!-- ===== Конец матча ===== -->
@@ -233,6 +236,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=1793174571"></script>
+<script type="module" src="js/main.js?v=1793184313"></script>
 </body>
 </html>

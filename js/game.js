@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793174571';
-import { World } from './world.js?v=1793174571';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793174571';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793174571';
-import { play, soundFor } from './sfx.js?v=1793174571';
-import { Bot, planRound } from './bots.js?v=1793174571';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793174571';
+import { CELL } from './maps.js?v=1793184313';
+import { World } from './world.js?v=1793184313';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793184313';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793184313';
+import { play, soundFor } from './sfx.js?v=1793184313';
+import { Bot, planRound } from './bots.js?v=1793184313';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793184313';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -276,6 +276,7 @@ export class Game {
     const half = this.o.winTo - 1;
     if (!first && !this.practice && this.round === half + 1) this._swapSides();
     this.state = this.practice ? 'live' : 'freeze'; this.stateT = this.practice ? 1e9 : FREEZE;
+    if (this.timeoutNext) { this.stateT += this.timeoutNext; this.timeoutNext = 0; setTimeout(() => this.gmsg('Тактический тайм-аут: 30 секунд', 3, '#ffd860'), 100); }
     this.roundTime = this.roundLen; this.bomb = null; this.defuser = null; this.dmgLog = {};
     if (this.dm) { this.state = 'live'; this.stateT = 1e9; }
     for (const n of this.nades) n.mesh && this.scene.remove(n.mesh); this.nades = [];
@@ -1009,6 +1010,24 @@ export class Game {
         if (Math.hypot(it.pos.x - a.pos.x, it.pos.z - a.pos.z) < 1.0 && Math.abs(it.pos.y - a.pos.y) < 1.2) { this.pickUp(a, it, false); break; }
       }
     }
+  }
+
+  // ---------- голосования ----------
+  surrender() {
+    const p = this.player, en = p.team === 'T' ? 'CT' : 'T';
+    if (this.dm || this.over) return;
+    this.score[en] = Math.max(this.score[en], this.o.winTo); this.over = true; this.ui.matchOver(this);
+  }
+  kick(a) {
+    if (!a || a === this.player) return;
+    this.say(a, 'был выгнан голосованием', true);
+    if (a.tag) this.scene.remove(a.tag); this.scene.remove(a.model.root);
+    if (a.hasBomb) { a.hasBomb = false; this.dropBomb(a.pos); }
+    this.actors.splice(this.actors.indexOf(a), 1);
+    for (const b of this.actors) if (b.brain) { if (b.brain.target === a) b.brain.target = null; if (b.brain.lastTarget === a) b.brain.lastTarget = null; }
+    if (this.spect === a) this.spect = null;
+    if (this.cheatBan && this.cheatBan.who === a) this.cheatBan = null;
+    this.checkWin();
   }
 
   // ---------- действия админки прямо в матче ----------

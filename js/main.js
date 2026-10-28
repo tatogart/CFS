@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793174571';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793174571';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793174571';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793174571';
-import { AgentModel } from './models.js?v=1793174571';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793174571';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793174571';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793174571';
-import { styleOf } from './decor.js?v=1793174571';
-import { Game } from './game.js?v=1793174571';
+import { MAPS, CELL } from './maps.js?v=1793184313';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793184313';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793184313';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793184313';
+import { AgentModel } from './models.js?v=1793184313';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793184313';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793184313';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793184313';
+import { styleOf } from './decor.js?v=1793184313';
+import { Game } from './game.js?v=1793184313';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -502,7 +502,15 @@ function missionProgress(stats) {
 function missionsHtml() {
   return missions().list.map(m => { const d = missionDef(m.id); return `<div class="mis${m.done ? ' done' : ''}"><span>${m.done ? '✔ ' : ''}${esc(d.t(m.n))}</span><small>${m.prog}/${m.n} · +${MISSION_XP} XP · ◈ ${MISSION_COINS}</small><div class="eBar"><i style="width:${m.prog / m.n * 100}%"></i></div></div>`; }).join('');
 }
+function renderTopProf() {
+  const b = $('topProf'); if (!b) return;
+  const lv = Math.floor((save.xp || 0) / XP_PER_LVL) + 1, xpk = ((save.xp || 0) % XP_PER_LVL) / XP_PER_LVL, ri = rankOf(rankData('comp'));
+  const C = 2 * Math.PI * 15;
+  b.innerHTML = `${avatarHtml(34)}<span class="tpTxt"><b>${esc(nick())}</b><small><img src="${rankURL(ri, 60)}" alt="">${ri < 0 ? 'Без звания' : esc(RANKS[ri])}</small></span><span class="tpLvl"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="3"/><circle cx="18" cy="18" r="15" fill="none" stroke="#5aa0ff" stroke-width="3" stroke-dasharray="${C * xpk} ${C}" transform="rotate(-90 18 18)"/></svg><i>${lv}</i></span>`;
+  b.onclick = () => { play('tick'); openProfile(); };
+}
 function renderProfileChip() {
+  renderTopProf();
   const lv = Math.floor((save.xp || 0) / XP_PER_LVL) + 1, wk = weekly(), ready = wk.taken.length < 2;
   $('profChip').innerHTML = `${avatarHtml(38)}<span class="pcTxt"><b>${esc(nick())}</b><small>Ур. ${lv}</small></span>${ready ? '<i class="pcDot" title="Еженедельный дроп"></i>' : ''}`;
 }
@@ -646,8 +654,8 @@ function renderAdmin() {
 }
 
 // ---------- настройки ----------
-function renderSettings() {
-  const s = save.settings, box = $('settingsBox'); box.innerHTML = '';
+function renderSettings(box = $('settingsBox'), inGame = false) {
+  const s = save.settings; box.innerHTML = '';
   const range = (key, label, min, max, step, fmt = v => v) => {
     const l = el('label', '', `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${s[key]}"><span class="val">${fmt(s[key])}</span>`);
     const inp = l.querySelector('input'); inp.oninput = () => { s[key] = +inp.value; l.querySelector('.val').textContent = fmt(s[key]); if (key === 'volume') setVolume(s[key]); if (key === 'music') setMusicVolume(s[key]); persist(); };
@@ -696,11 +704,12 @@ function renderSettings() {
     };
     draw();
   }
-  const te = el('button', 'big go', '📱 Настроить кнопки на экране'); te.onclick = openTouchEditor; box.appendChild(te);
+  if (!inGame) { const te = el('button', 'big go', '📱 Настроить кнопки на экране'); te.onclick = openTouchEditor; box.appendChild(te); }
   range('touchAlpha', 'Прозрачность кнопок', 0.2, 1, 0.05, v => Math.round(v * 100) + '%');
   box.appendChild(el('h3', '', 'Прочее'));
   check('invertY', 'Инверсия по вертикали');
   check('fps', 'Показывать FPS');
+  if (inGame) return;
   const ib = el('div', 'hcard installBox'); ib.id = 'installBox'; box.appendChild(ib); renderInstall();
   const reset = el('button', 'big', 'Сбросить прогресс'); reset.onclick = () => { if (confirm('Удалить все монеты, предметы и статистику?')) { localStorage.removeItem('cfs_save_v1'); location.reload(); } }; box.appendChild(reset);
   const st = save.stats;
@@ -1075,10 +1084,67 @@ function renderBuy() {
 }
 
 // ---------- пауза / выход ----------
-function openPause() { $('pAdmin').classList.toggle('hidden', !adminOk); $('pause').classList.remove('hidden'); $('pSens').value = touch ? save.settings.touchSens : save.settings.sens; controls.unlock(); }
-$('pSens').oninput = e => { if (touch) { save.settings.touchSens = +e.target.value; controls.touchSens = +e.target.value; } else save.settings.sens = +e.target.value; persist(); };
-$('resume').onclick = () => { $('pause').classList.add('hidden'); if (!touch) controls.lock(); };
-$('quit').onclick = () => { $('pause').classList.add('hidden'); quitGame(); };
+// ---------- меню паузы в стиле CS2 ----------
+let pTab = 'match';
+function openPause() { $('pAdmin').classList.toggle('hidden', !adminOk); $('pause').classList.remove('hidden'); controls.unlock(); renderPause(); }
+function closePause() {
+  $('pause').classList.add('hidden');
+  if (game) { game.baseFov = save.settings.fov; controls.touchSens = save.settings.touchSens; game.vmCam.fov = save.settings.vmfov || 62; game.vmCam.updateProjectionMatrix(); game.vm.scale.x = save.settings.hand === 'left' ? -1 : 1; }
+  controls.edges.clear();
+  if (!touch) controls.lock();
+}
+$('resume').onclick = closePause;
+$('pTabs').onclick = e => { const b = e.target.closest('[data-pt]'); if (!b) return; if (b.dataset.pt === 'admin') { openAdmin(); return; } pTab = b.dataset.pt; play('tick'); renderPause(); };
+function renderPause() {
+  const g = game; if (!g) return;
+  document.querySelectorAll('#pTabs [data-pt]').forEach(b => b.classList.toggle('on', b.dataset.pt === pTab));
+  const md = (MODES.find(m => m[0] === g.mode) || [])[1] || '';
+  $('pInfo').innerHTML = `<b>${esc(g.o.map.name)}</b><small>${esc(md)} · ${esc(g.diff.name)}</small>`;
+  const body = $('pBody'); body.innerHTML = '';
+  if (pTab === 'match') {
+    const p = g.player, sc = g.dm && !g.ar ? '' : `<div class="pmScore"><b class="${p.team === 'T' ? 't' : 'ct'}">${g.score[p.team]}</b><span>:</span><b class="${p.team === 'T' ? 'ct' : 't'}">${g.score[p.team === 'T' ? 'CT' : 'T']}</b></div>`;
+    const head = el('div', 'pmHead', `<img src="${mapThumbURL(g.o.map, 3)}" alt=""><div><small>${esc(md)}</small><b>${esc(g.o.map.name)}</b><span>${g.dm ? 'Бой идёт' : g.practice ? 'Тренировка' : 'Раунд ' + g.round + (g.o.winTo ? ' · до ' + g.o.winTo + ' побед' : '')} · вы за ${p.team === 'T' ? 'террористов' : 'спецназ'}</span></div>${sc}`);
+    body.appendChild(head);
+    const bd = el('div', 'pmBoard'); body.appendChild(bd);
+    renderBoard(g); bd.innerHTML = $('board').innerHTML;
+    const tips = el('div', 'pmTips', `<div><b>B</b> закупка</div><div><b>G</b> выбросить</div><div><b>F</b> осмотр</div><div><b>H</b> сменить руку</div><div><b>Y/U</b> чат</div><div><b>Tab</b> счёт</div>`);
+    if (!touch) body.appendChild(tips);
+  } else if (pTab === 'settings') {
+    const box = el('div', 'set pSet'); body.appendChild(box); renderSettings(box, true);
+  } else if (pTab === 'vote') {
+    const box = el('div', 'pVote'); body.appendChild(box);
+    const can = !g.dm && !g.practice;
+    const mates = g.actors.filter(a => a.bot && a.team === g.player.team);
+    box.innerHTML = `<h3>Голосование команды</h3>
+      <div class="vRow"><div><b>Сдаться</b><small>Матч засчитывается как поражение. Нужно согласие всей команды.</small></div><button class="big" data-v="surrender" ${can ? '' : 'disabled'}>Начать</button></div>
+      <div class="vRow"><div><b>Тактический тайм-аут</b><small>30 секунд на обсуждение перед следующим раундом.</small></div><button class="big" data-v="timeout" ${can && !g.timeoutUsed ? '' : 'disabled'}>${g.timeoutUsed ? 'Уже взят' : 'Начать'}</button></div>
+      <div class="vRow"><div><b>Выгнать игрока</b><small>Тиммейт будет удалён из матча.</small></div><select id="vKick">${mates.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select><button class="big" data-v="kick" ${mates.length ? '' : 'disabled'}>Начать</button></div>
+      <div class="vRes" id="vRes"></div>`;
+    box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => startVote(b.dataset.v, +($('vKick') || {}).value));
+  }
+}
+function startVote(kind, arg) {
+  const g = game; if (!g) return;
+  const voters = g.actors.filter(a => a.bot && a.team === g.player.team && !(kind === 'kick' && a.id === arg));
+  const res = $('vRes'); let yes = 1, no = 0, i = 0;
+  const want = kind === 'surrender' ? (g.score[g.player.team] < g.score[g.player.team === 'T' ? 'CT' : 'T'] ? 0.75 : 0.25) : kind === 'timeout' ? 0.9 : (voters.length ? 0.7 : 0);
+  const kickT = kind === 'kick' && g.actors.find(a => a.id === arg); const wantK = kickT && kickT.cheat ? 0.95 : want;
+  const label = { surrender: 'Сдаться', timeout: 'Тактический тайм-аут', kick: `Выгнать ${kickT ? kickT.name : ''}` }[kind];
+  const draw = () => { res.innerHTML = `<b>${esc(label)}</b> · за: <span class="yes">${yes}</span> · против: <span class="no">${no}</span> · ждём: ${voters.length - i}`; };
+  draw(); play('tick');
+  const step = () => {
+    if (i < voters.length) { if (Math.random() < wantK) yes++; else no++; i++; draw(); setTimeout(step, 450); return; }
+    const pass = no === 0 || yes / (yes + no) > (kind === 'surrender' ? 0.99 : 0.5);
+    res.innerHTML += pass ? ' — <span class="yes">ПРИНЯТО</span>' : ' — <span class="no">ОТКЛОНЕНО</span>';
+    for (const v of voters) if (Math.random() < 0.4) g.say(v, pass ? 'ок' : kind === 'surrender' ? 'не сдаёмся!' : 'нет', false);
+    if (!pass) return;
+    if (kind === 'surrender') { setTimeout(() => { closePause(); g.surrender(); }, 700); }
+    if (kind === 'timeout') { g.timeoutUsed = true; g.timeoutNext = 30; g.say(g.player, 'Тактический тайм-аут', false); }
+    if (kind === 'kick' && kickT) { g.kick(kickT); renderPause(); }
+  };
+  setTimeout(step, 500);
+}
+$('quit').onclick = () => { if (!confirm('Отключиться от матча? Матч будет засчитан как поражение.')) return; $('pause').classList.add('hidden'); quitGame(); };
 $('pAdmin').onclick = () => { if (adminOk) openAdmin(); };
 // ---------- конец матча: сцена как в CS2 ----------
 const XP_LVL = XP_PER_LVL;

@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793202419';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793202419';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793202419';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793202419';
-import { AgentModel } from './models.js?v=1793202419';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793202419';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793202419';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793202419';
-import { styleOf } from './decor.js?v=1793202419';
-import { Game } from './game.js?v=1793202419';
+import { MAPS, CELL } from './maps.js?v=1793203122';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793203122';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793203122';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793203122';
+import { AgentModel } from './models.js?v=1793203122';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793203122';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793203122';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793203122';
+import { styleOf } from './decor.js?v=1793203122';
+import { Game } from './game.js?v=1793203122';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -906,22 +906,34 @@ const hud = {
     box.appendChild(d); while (box.children.length > 5) box.firstChild.remove();
     setTimeout(() => d.classList.add('fade'), 7000); setTimeout(() => d.remove(), 8000);
   },
+  // отмена матча как в CS2 (VAC Live): картинка замирает и обесцвечивается, сверху выезжает плашка,
+  // ник читера зачёркивается штампом «ЗАБЛОКИРОВАН»; компенсации нет — матч просто не засчитывается
   vacBan(who, g) {
-    const comp = 150, xp = 200;
     recordMatch(g, 'cancel', { cheater: who.name });
-    save.coins += comp; save.xp = (save.xp || 0) + xp; save.stats.bans = (save.stats.bans || 0) + 1; persist();
-    hud.chat(null, `[CFAC] Игрок ${who.name} навсегда заблокирован. Матч отменён.`);
-    controls.unlock(); controls.enabled = false;
+    save.stats.bans = (save.stats.bans || 0) + 1; persist();
+    hud.chat(null, `[CFAC] Игрок ${who.name} заблокирован. Матч отменён.`);
+    closeBuy(); controls.unlock(); controls.enabled = false;
+    document.body.classList.add('mCancel');
     const box = $('vac');
-    box.innerHTML = `<div class="vacBox"><div class="vacLogo"><svg viewBox="0 0 64 64"><path d="M32 3 57 12v19c0 16-11 26-25 31C18 57 7 47 7 31V12z" fill="#2a0d0d" stroke="#ff4a3a" stroke-width="3"/><text x="32" y="40" font-size="17" font-weight="900" text-anchor="middle" fill="#ff4a3a" font-family="Arial">CFAC</text></svg></div>
-      <div class="vacT">МАТЧ ОТМЕНЁН</div>
-      <div class="vacP">Система <b>CFS Anti-Cheat (CFAC)</b> обнаружила стороннее ПО у игрока</div>
-      <div class="vacN">${esc(who.name)}</div>
-      <div class="vacP">Аккаунт заблокирован навсегда. Результаты матча не засчитываются в звание.</div>
-      <div class="vacR">Компенсация: ◈ ${comp} · +${xp} XP</div>
-      <button class="playBig inline" id="vacOk"><span>В МЕНЮ</span></button></div>`;
+    box.innerHTML = `<div class="mcBar"><div class="mcStripe"></div>
+        <div class="mcHead"><div class="vacLogo"><svg viewBox="0 0 64 64"><path d="M32 3 57 12v19c0 16-11 26-25 31C18 57 7 47 7 31V12z" fill="#2a0d0d" stroke="#ff4a3a" stroke-width="3"/><text x="32" y="40" font-size="17" font-weight="900" text-anchor="middle" fill="#ff4a3a" font-family="Arial">CFAC</text></svg><i class="mcScan"></i></div>
+        <div><div class="vacT">${[...'МАТЧ ОТМЕНЁН'].map((c, i) => `<span style="animation-delay:${0.45 + i * 0.04}s">${c === ' ' ? '&nbsp;' : c}</span>`).join('')}</div>
+        <div class="vacP">Система <b>CFS Anti-Cheat</b> обнаружила стороннее ПО у игрока этого матча</div></div></div></div>
+      <div class="mcBody">
+        <div class="mcPl"><span class="mcAv">${esc(who.name[0] || '?')}</span><span class="mcNm">${esc(who.name)}</span><span class="mcStamp">ЗАБЛОКИРОВАН</span></div>
+        <div class="mcList">
+          <div><b>Результат матча</b><span>не засчитан</span></div>
+          <div><b>${g.mode === 'premier' ? 'CS Rating' : 'Звание'}</b><span>без изменений</span></div>
+          <div><b>Компенсация</b><span class="no">не начисляется</span></div>
+        </div>
+        <div class="mcCd">Возврат в главное меню через <b id="mcSec">10</b></div>
+        <button class="playBig inline" id="vacOk"><span>В МЕНЮ</span></button>
+      </div>`;
     box.classList.remove('hidden'); play('lose');
-    $('vacOk').onclick = () => { box.classList.add('hidden'); quitGame(); };
+    let sec = 10;
+    const done = () => { clearInterval(tm); box.classList.add('hidden'); document.body.classList.remove('mCancel'); quitGame(); };
+    const tm = setInterval(() => { sec--; const e = $('mcSec'); if (e) e.textContent = sec; if (sec <= 0) done(); }, 1000);
+    $('vacOk').onclick = done;
   },
   openChat(all) {
     if (!game) return;
@@ -1603,7 +1615,7 @@ function quitGame() {
   stopAmbience();
   if (window.__updateReady) { location.reload(); return; }
   if (game) { game.dispose(); game = null; }
-  document.body.classList.remove('ingame');
+  document.body.classList.remove('ingame', 'mCancel');
   controls.enabled = false; controls.unlock(); controls.reset();
   $('hud').classList.add('hidden'); $('menu').classList.remove('hidden'); $('rotate').classList.add('hidden');
   closeBuy();

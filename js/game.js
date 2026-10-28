@@ -1,21 +1,21 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793202419';
-import { World } from './world.js?v=1793202419';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793202419';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793202419';
-import { play, soundFor } from './sfx.js?v=1793202419';
-import { Bot, planRound } from './bots.js?v=1793202419';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793202419';
+import { CELL } from './maps.js?v=1793203122';
+import { World } from './world.js?v=1793203122';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793203122';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793203122';
+import { play, soundFor } from './sfx.js?v=1793203122';
+import { Bot, planRound } from './bots.js?v=1793203122';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793203122';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
 const ROUND_TIME = 115, FREEZE = 6, BOMB_TIME = 40, END_TIME = 5, PLANT_TIME = 3.2;
 // правила раундов по режимам (как в CS2)
 const RULES = {
-  comp: { winTo: 13, half: 12, max: 24, ot: true, otHalf: 3, otMoney: 10000, roundLen: 115, freeze: 15, buy: 20, start: 800 },
-  premier: { winTo: 13, half: 12, max: 24, ot: true, otHalf: 3, otMoney: 10000, roundLen: 115, freeze: 15, buy: 20, start: 800 },
-  wing: { winTo: 9, half: 8, max: 16, ot: false, roundLen: 90, freeze: 10, buy: 20, start: 800 },
+  comp: { winTo: 13, half: 12, max: 24, ot: true, otHalf: 3, otMoney: 10000, roundLen: 115, freeze: 15, buy: 20, start: 800, ff: true },
+  premier: { winTo: 13, half: 12, max: 24, ot: true, otHalf: 3, otMoney: 10000, roundLen: 115, freeze: 15, buy: 20, start: 800, ff: true },
+  wing: { winTo: 9, half: 8, max: 16, ot: false, roundLen: 90, freeze: 10, buy: 20, start: 800, ff: true },
   casual: { winTo: 8, half: 7, max: 15, ot: false, roundLen: 135, freeze: 6, buy: 45, start: 1000, freeArmor: true },
 };
 const CHEAT_NAMES = ['CHEAT112', 'aimware.net', 'skeet.cc | Колян', 'NEVERLOSE.CC', 'ez-frags.tk', 'xX_WH_Xx', 'onetap.su', 'interium.ooo', 'Fatality.win', 'cheat228', 'MidnightCheat', 'ПРОДАМ ЧИТ', 'spinbot_2009', 'legit_player'];
@@ -68,6 +68,8 @@ export class Game {
     this.oneSite = opts.map.oneSite || (this.mode === 'wing' ? 'B' : null);
     this.rules = { ...(RULES[this.mode] || RULES.casual) };
     this.winTo = this.rules.winTo; this.maxRounds = this.rules.max; this.otN = 0;
+    // урон по союзникам как в CS2: в соревновательном, Premier и напарниках (пули ×0,33, гранаты и огонь ×0,85)
+    this.ff = !!this.rules.ff && !this.dm && !this.practice;
     this.roundLen = this.rules.roundLen || ROUND_TIME;
     this.dmTime = this.ar ? 480 : 600; this.dmLimit = this.ar ? AR_LADDER.length : 50;
     this.intel = { T: null, CT: null }; this.plan = { T: { site: 'A', execAt: 0, executing: true }, CT: {} };
@@ -615,7 +617,7 @@ export class Game {
     let best = null;
     for (const v of this.actors) {
       if (!v.alive || v === shooter) continue;
-      if (!this.isEnemy(v, shooter) && !this.practice) continue;
+      if (!this.isEnemy(v, shooter) && !this.practice && !(this.ff && !shooter.bot)) continue;
       const s = 1 - 0.3 * v.crouchK;
       // быстрый отсев
       const cx = v.pos.x - o.x, cz = v.pos.z - o.z, tc = cx * d.x + cz * d.z;
@@ -656,7 +658,7 @@ export class Game {
     this.ev({ e: 'fire', a: a.id, w: 'knife' });
     if (this.isView(a)) { this.vmKick = 1; play('knife'); } else { const [d, pan] = this.listen(a.pos); play('knife', d, pan); }
     for (const v of this.actors) {
-      if (!v.alive || v === a || (!this.isEnemy(v, a) && !this.practice)) continue;
+      if (!v.alive || v === a || (!this.isEnemy(v, a) && !this.practice && !(this.ff && !a.bot))) continue;
       const to = new THREE.Vector3(v.pos.x - o.x, v.pos.y + 1.2 - o.y, v.pos.z - o.z), d = to.length();
       if (d > 2.0) continue;
       to.normalize(); if (to.dot(dir) < 0.75) continue;
@@ -670,6 +672,11 @@ export class Game {
     if (!v.alive || this.isClient) return;
     if (v === this.player && this.admin.god) return;
     if (a === this.player && v !== a && this.admin.oneshot) raw *= 20;
+    const team = a && a !== v && !this.isEnemy(a, v) && !this.practice;
+    if (team) {
+      if (!this.ff) return;   // в обычном и бою насмерть по своим урона нет (и от молотова тоже)
+      raw *= def.icon === 'he' || def.icon === 'molotov' ? 0.85 : 0.33;
+    }
     let dmg = raw * mult;
     const pen = def.pen || 1;
     if (v.armor > 0 && zone !== 'legs' && (zone !== 'head' || v.helmet)) { const ad = dmg * (1 - pen) * 0.5; v.armor = Math.max(0, v.armor - ad); dmg *= pen; }
@@ -682,6 +689,7 @@ export class Game {
     }
     // статистика матча: урон (для ADR) и кто помогал в убийстве
     if (a && a !== v && this.isEnemy(a, v)) { const real = Math.min(Math.max(0, v.hp), dmg); a.dmgTotal = (a.dmgTotal || 0) + real; (v.dmgBy || (v.dmgBy = {}))[a.id] = (v.dmgBy[a.id] || 0) + real; }
+    if (team) this._teamHit(a, v, Math.min(Math.max(0, v.hp), dmg));
     if (v.bot && v.hp > 25 && v.hp - dmg <= 25 && v.hp - dmg > 0) this.radio(v, 'hurt');
     v.hp -= dmg; v.lastHurt = this.time; v.lastAttacker = a;
     if (v.brain) v.brain.onHurt(a, dir);
@@ -693,6 +701,24 @@ export class Game {
     v.vel.x *= 0.5; v.vel.z *= 0.5;
     if (v.hp <= 0) this.kill(v, a, def, zone === 'head', dir);
   }
+  // урон по своим: предупреждения, штраф за убийство союзника, кик за 3 тимкилла или 300+ урона по своим
+  _teamHit(a, v, dmg) {
+    a.teamDmg = (a.teamDmg || 0) + dmg;
+    if (a === this.player && this.time > (this._ffMsgT || 0)) { this._ffMsgT = this.time + 3; this.ui.chat && this.ui.chat(null, `Вы атаковали союзника ${v.name} (−${dmg} HP)`); }
+    if (v.bot && a === this.player && Math.random() < 0.5 && this.time > (this._ffReplyT || 0)) { this._ffReplyT = this.time + 5; this.say(v, ['эй, ты чего?!', 'по своим не стреляй', 'ты слепой?', 'я свой!!'][Math.floor(Math.random() * 4)], false); }
+    this._ffKick(a);
+  }
+  _ffKick(a) {
+    if (a !== this.player || this.over || !((a.tk || 0) >= 3 || a.teamDmg >= 300)) return false;
+    this.ui.chat && this.ui.chat(null, `Вы исключены из матча: ${a.tk >= 3 ? 'убийство союзников' : 'урон по союзникам'}`);
+    this.centerMsg('Вы исключены из матча за урон по союзникам', 4, '#ff5a4a');
+    this.surrender(); return true;
+  }
+  _teamKill(a, v) {
+    a.tk = (a.tk || 0) + 1; a.kills = Math.max(0, a.kills - 1); a.money = Math.max(0, a.money - 300);
+    if (this.ui.chat) this.ui.chat(null, `${a.name} убил союзника ${v.name} (−$300)`);
+    if (!this._ffKick(a) && a === this.player) this.centerMsg(`Вы убили союзника! (${a.tk}/3)`, 2.5, '#ff5a4a');
+  }
   kill(v, a, def, hs, dir) {
     v.hp = 0; v.alive = false; v.deaths++;
     const fwd = dir ? (-Math.sin(v.yaw) * dir.x - Math.cos(v.yaw) * dir.z) : 1;
@@ -702,6 +728,7 @@ export class Game {
     if (a && a !== v) {
       if (v.dmgBy) for (const id in v.dmgBy) { const h = this.actors[id]; if (h && h !== a && v.dmgBy[id] >= 41 && this.isEnemy(h, v)) h.assists = (h.assists || 0) + 1; }
       if (this.isEnemy(a, v) && def) { a.killTypes = a.killTypes || {}; a.killTypes[def.type] = (a.killTypes[def.type] || 0) + 1; }
+      if (!this.isEnemy(a, v) && this.ff) this._teamKill(a, v);
       if (this.isEnemy(a, v)) { a.kills++; a.roundKills++; if (hs) a.hs = (a.hs || 0) + 1; a.money = Math.min(16000, a.money + (def.kill || 300)); if (this.ar) this.arKill(a, v, def); }
       if (a === this.player && this.ui.onKill) this.ui.onKill(hs);
       if (a === this.player && this.aimMode) { this.aimStats.kills++; if (hs) this.aimStats.hs++; }
@@ -781,7 +808,7 @@ export class Game {
         const e = this.eyePos(v), dist = e.distanceTo(p); if (dist > 8) continue;
         if (!this.world.los(p.clone().setY(p.y + 0.3), new THREE.Vector3(v.pos.x, v.pos.y + 1, v.pos.z))) continue;
         let dmg = 98 * Math.max(0, 1 - dist / 8); if (v.armor > 0) { dmg *= 0.55; v.armor = Math.max(0, v.armor - dmg * 0.3); }
-        if (!this.isEnemy(v, n.owner) && v !== n.owner && !this.practice) continue;
+        if (!this.isEnemy(v, n.owner) && v !== n.owner && !this.practice && !this.ff) continue;
         this.damage(v, n.owner, dmg, 'chest', 1, { pen: 1, kill: 300, icon: 'he' }, new THREE.Vector3().subVectors(v.pos, p).normalize());
       }
     } else if (n.type === 'flash') {

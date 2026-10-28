@@ -723,3 +723,39 @@ body.ingame .modal { background: rgba(4,6,10,.82); }
 .kitSec b { font-size: 15px; letter-spacing: .04em; }
 .kitSec small { color: var(--dim, #8a96a6); font-size: 12px; }
 .kBass { font-style: normal; font-weight: 800; font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #ff2a55; color: #fff; letter-spacing: .06em; }
+
+/* отмена матча (как в CS2) */
+body.mCancel #view { filter: grayscale(1) brightness(.45) blur(2px); transition: filter 1.2s ease; }
+body.mCancel #hud { opacity: .25; transition: opacity .8s; }
+#vac:has(.mcBar) { background: rgba(0,0,0,.35); align-items: stretch; justify-content: flex-start; flex-direction: column; animation: mcFade .6s ease-out; }
+@keyframes mcFade { from { background: rgba(0,0,0,0); } }
+.mcBar { position: relative; overflow: hidden; background: linear-gradient(180deg, rgba(70,10,10,.96), rgba(28,6,6,.94)); border-bottom: 2px solid #ff4a3a; box-shadow: 0 10px 40px rgba(255,40,30,.25); padding: calc(14px + var(--safe-t, 0px)) 20px 14px; animation: mcDrop .55s cubic-bezier(.2,.9,.25,1.15) both; font-family: "Barlow Condensed", system-ui, sans-serif; }
+@keyframes mcDrop { from { transform: translateY(-110%); } }
+.mcStripe { position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, rgba(255,74,58,.08) 0 14px, transparent 14px 28px); animation: mcSlide 3s linear infinite; pointer-events: none; }
+@keyframes mcSlide { to { background-position: 80px 0; } }
+.mcHead { position: relative; display: flex; align-items: center; gap: 16px; max-width: 900px; margin: 0 auto; }
+.mcHead .vacLogo { position: relative; flex: none; }
+.mcHead .vacLogo svg { width: 72px; height: 72px; animation: mcPulse 1.6s ease-in-out infinite; }
+@keyframes mcPulse { 50% { filter: drop-shadow(0 0 26px rgba(255,74,58,.95)); transform: scale(1.05); } }
+.mcScan { position: absolute; left: 6px; right: 6px; height: 3px; top: 10%; background: #ff8a7a; box-shadow: 0 0 10px #ff4a3a; animation: mcScan 1.3s ease-in-out infinite alternate; border-radius: 2px; }
+@keyframes mcScan { to { top: 82%; } }
+.mcHead .vacT { text-align: left; font-size: 46px; line-height: 1; }
+.mcHead .vacT span { display: inline-block; animation: mcLetter .35s ease-out both; }
+@keyframes mcLetter { from { opacity: 0; transform: translateY(-14px) scale(1.4); filter: blur(4px); } }
+.mcHead .vacP { text-align: left; animation: mcIn .5s .9s both; }
+@keyframes mcIn { from { opacity: 0; transform: translateY(6px); } }
+.mcBody { margin: auto; text-align: center; width: min(460px, 92vw); display: flex; flex-direction: column; align-items: center; gap: 12px; font-family: "Barlow Condensed", system-ui, sans-serif; }
+.mcPl { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: rgba(12,14,18,.85); border: 1px solid rgba(255,255,255,.1); border-radius: 8px; animation: mcIn .5s 1.1s both; }
+.mcAv { width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; background: #3a1414; color: #ff8a7a; font-weight: 800; font-size: 22px; }
+.mcNm { font-size: 28px; font-weight: 800; color: #fff; position: relative; }
+.mcNm::after { content: ''; position: absolute; left: -4px; right: -4px; top: 52%; height: 3px; background: #ff4a3a; transform: scaleX(0); transform-origin: left; animation: mcStrike .4s 1.8s ease-out forwards; }
+@keyframes mcStrike { to { transform: scaleX(1); } }
+.mcStamp { position: absolute; right: -26px; top: -14px; padding: 2px 10px; border: 3px solid #ff4a3a; color: #ff4a3a; font-weight: 900; letter-spacing: 2px; font-size: 18px; transform: rotate(-12deg) scale(3); opacity: 0; animation: mcStamp .35s 2.1s cubic-bezier(.3,1.6,.5,1) forwards; background: rgba(20,4,4,.7); }
+@keyframes mcStamp { to { transform: rotate(-12deg) scale(1); opacity: 1; } }
+.mcList { width: 100%; display: grid; gap: 4px; animation: mcIn .5s 2.5s both; }
+.mcList div { display: flex; justify-content: space-between; padding: 7px 12px; background: rgba(12,14,18,.75); border-radius: 6px; font-size: 18px; color: #c4cfdb; }
+.mcList b { font-weight: 600; } .mcList span { color: #fff; font-weight: 700; } .mcList .no { color: #ff6a5a; }
+.mcCd { color: #8a96a6; font-family: system-ui, sans-serif; font-size: 14px; animation: mcIn .5s 2.8s both; }
+.mcCd b { color: #fff; }
+.mcBody #vacOk { animation: mcIn .5s 2.9s both; }
+@media (max-height: 460px) { .mcHead .vacT { font-size: 30px; } .mcHead .vacLogo svg { width: 48px; height: 48px; } .mcBody { gap: 6px; } .mcList div { padding: 4px 10px; font-size: 15px; } .mcNm { font-size: 22px; } }

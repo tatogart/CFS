@@ -193,6 +193,11 @@ export const SKINS = [
   S('kn_skel_slaughter', 'skeleton', 'Убийство', 'gold', 'slaughter', ['#8a1010', '#e04040', '#f0d0c0']),
   S('kn_stil_damascus', 'stiletto', 'Дамасская сталь', 'gold', 'damascus', ['#6f7680', '#c4ccd6']),
   S('kn_stil_night', 'stiletto', 'Ночь', 'gold', 'carbon', ['#0a0c10', '#3a4250', '#14181e']),
+  S('kn_dagger_night', 'dagger', 'Ночная полоса', 'gold', 'carbon', ['#16191d', '#5a6470', '#0c0e11']),
+  S('kn_dagger_fade', 'dagger', 'Градиент', 'gold', 'fade', ['#ffd000', '#ff3cc8', '#3c64ff']),
+  S('kn_dagger_slaughter', 'dagger', 'Убийство', 'gold', 'slaughter', ['#8a1010', '#e04040', '#f0d0c0']),
+  S('kn_dagger_case', 'dagger', 'Закалка', 'gold', 'case', ['#3a5f9e', '#c9a13b', '#6f7a86']),
+  S('kn_dagger_dama', 'dagger', 'Дамасская сталь', 'gold', 'damascus', ['#6f7680', '#c4ccd6']),
   S('kn_ursus_tiger', 'ursus', 'Зуб тигра', 'gold', 'fade', ['#ffd000', '#ff7a00']),
   S('kn_ursus_uv', 'ursus', 'Ультрафиолет', 'gold', 'fade', ['#2a0f3f', '#5a2a7a', '#1a0a26']),
   S('kn_bowie_web', 'bowie', 'Кровавая паутина', 'gold', 'web', ['#1a0505', '#e02020']),
@@ -296,6 +301,7 @@ export const KNIVES = {
   stiletto: { name: '★ Стилет' },
   ursus: { name: '★ Нож «Урсус»' },
   bowie: { name: '★ Нож Боуи' },
+  dagger: { name: '★ Кинжал «Тень»' },
 };
 export const GLOVES = {
   sport: { name: '★ Спортивные перчатки' },
@@ -315,9 +321,9 @@ export const CASES = [
   { id: 'dust', name: 'Кейс «Пустынный шторм»', price: 250, col: ['#c9893a', '#6b3f12'], emblem: 'sun',
     items: ['ak_sand', 'ak_redline', 'm4_desert', 'awp_dune', 'glock_sand', 'deagle_blaze', 'mp9_scorched', 'galil_sandstorm', 'usp_guardian', 'famas_dune', 'kn_bfly_tiger', 'kn_kar_jungle'] },
   { id: 'neon', name: 'Кейс «Неон»', price: 400, col: ['#c222c8', '#1e0b3a'], emblem: 'bolt',
-    items: ['ak_neon', 'm4_cyber', 'awp_neonoir', 'glock_vapor', 'usp_neon', 'mac_neon', 'mp9_hyper', 'famas_pulse', 'deagle_glow', 'kn_bay_neon', 'kn_kar_fade'] },
+    items: ['ak_neon', 'm4_cyber', 'awp_neonoir', 'glock_vapor', 'usp_neon', 'mac_neon', 'mp9_hyper', 'famas_pulse', 'deagle_glow', 'kn_bay_neon', 'kn_kar_fade', 'kn_dagger_fade'] },
   { id: 'predator', name: 'Кейс «Хищник»', price: 350, col: ['#3f7a1e', '#0f1f08'], emblem: 'claw',
-    items: ['ak_jungle', 'm4_howl', 'awp_asiimov', 'galil_viper', 'glock_fade', 'mac_croc', 'usp_kill', 'deagle_predator', 'mp9_viper', 'kn_bay_crimson', 'kn_bfly_tiger'] },
+    items: ['ak_jungle', 'm4_howl', 'awp_asiimov', 'galil_viper', 'glock_fade', 'mac_croc', 'usp_kill', 'deagle_predator', 'mp9_viper', 'kn_bay_crimson', 'kn_bfly_tiger', 'kn_dagger_night'] },
   { id: 'ice', name: 'Кейс «Ледяной»', price: 300, col: ['#3b8fd9', '#0b2244'], emblem: 'flake',
     items: ['ak_ice', 'm4_frost', 'awp_lightning', 'glock_arctic', 'usp_frozen', 'famas_ice', 'deagle_cobalt', 'mac_blizzard', 'galil_glacier', 'kn_bfly_ice', 'kn_kar_doppler'] },
   { id: 'gloves', name: 'Кейс «Перчатки»', price: 600, col: ['#7a7f87', '#1d2128'], emblem: 'glove',
@@ -396,6 +402,6 @@ export const AR_LADDER = ['m4a1s', 'ak47', 'aug', 'sg553', 'famas', 'galil', 'p9
 export const ARMORY = {
   price: 2000, stars: 40, start: 5, xpPerStar: 500,
   caseItems: ['ar_ak_kinetic', 'ar_m4_cyber', 'ar_awp_aurora', 'ar_deagle_lava', 'ar_m4s_ion', 'ar_usp_ghost', 'ar_mp9_star', 'ar_glock_candy', 'ar_aug_tsunami', 'ar_p90_retro', 'ar_famas_rapid', 'ar_galil_jade',
-    'kn_kukri_sapphire', 'kn_kukri_case', 'kn_skel_fade', 'kn_skel_slaughter', 'kn_stil_damascus', 'kn_stil_night', 'kn_ursus_tiger', 'kn_ursus_uv', 'kn_bowie_web', 'kn_bowie_marble'],
+    'kn_kukri_sapphire', 'kn_kukri_case', 'kn_skel_fade', 'kn_skel_slaughter', 'kn_stil_damascus', 'kn_stil_night', 'kn_ursus_tiger', 'kn_ursus_uv', 'kn_bowie_web', 'kn_bowie_marble', 'kn_dagger_night', 'kn_dagger_fade', 'kn_dagger_slaughter', 'kn_dagger_case', 'kn_dagger_dama'],
   cost: { milspec: 2, restricted: 4, classified: 8, covert: 14, gold: 30 },
 };

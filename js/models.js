@@ -1,7 +1,7 @@
 // 3D-модели: агенты (человечки с IK-руками), оружие
 import * as THREE from '../vendor/three.module.min.js';
-import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793206313';
-import { skinById, WEAPONS, KNIVES } from './data.js?v=1793206313';
+import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793207997';
+import { skinById, WEAPONS, KNIVES } from './data.js?v=1793207997';
 
 const matCache = new Map();
 export function mat(color, opts = {}) {
@@ -64,7 +64,7 @@ const W3D = {
   W3D.g3sg1 = P('galil', [[0, 0.12, -0.1, 0.034, 0.034, 0.28, 'd', 0, 'cyl'], [0, 0.12, -0.26, 0.048, 0.048, 0.05, 'd', 0, 'cyl']]);
   W3D.scar20 = P('m4a4', [[0, 0.13, -0.1, 0.034, 0.034, 0.28, 'd', 0, 'cyl'], [0, 0.13, -0.26, 0.048, 0.048, 0.05, 'd', 0, 'cyl']]);
 }
-for (const k of ['karambit', 'butterfly', 'bayonet', 'flip', 'gut', 'huntsman', 'falchion', 'talon', 'kukri', 'skeleton', 'stiletto', 'ursus', 'bowie']) W3D[k] = W3D.knife;
+for (const k of ['karambit', 'butterfly', 'bayonet', 'flip', 'gut', 'huntsman', 'falchion', 'talon', 'kukri', 'skeleton', 'stiletto', 'ursus', 'bowie', 'dagger']) W3D[k] = W3D.knife;
 const NADE_COLORS = { he: '#3d5a2a', flash: '#9aa0a6', smoke: '#5d6b74', molotov: '#4a7a3a', c4: '#6b5a3a' };
 
 export function buildWeapon(id, skinId) {
@@ -144,6 +144,18 @@ function buildKnife(id, blade, dark, grp, def) {
     add(rod(0.006, 0.028, 0.008), metal, 0, -0.002, 0.004);
     add(G('skring', () => new THREE.TorusGeometry(0.017, 0.004, 8, 18).rotateY(Math.PI / 2)), metal, 0, -0.002, 0.118).userData.ring = true;
     const cord = mat('#7a1a1a'); for (let k = 0; k < 5; k++) add(rod(0.008, 0.03, 0.006), cord, 0, -0.002, 0.03 + k * 0.016);
+  } else if (id === 'dagger') {
+    // кинжал: обоюдоострый клинок с отверстиями, кольцо-гарда, рукоять в обмотке паракордом и хвостовик с темляком
+    const cord = mat('#16181b'), cord2 = mat('#24272b'), hole = mat('#08090b');
+    add(bladeGeo(id, [[0, -0.012], [0.06, -0.0135], [0.152, 0], [0.06, 0.0135], [0, 0.012]], 0.004), blade).userData.blade = true;
+    // отверстия вдоль клинка (растут к основанию) — тёмные «пробоины» с обеих сторон
+    [[0.0022, 0.06], [0.0026, 0.045], [0.003, 0.03], [0.0034, 0.015]].forEach(([r, u]) =>
+      add(G('dh' + r, () => new THREE.CylinderGeometry(r, r, 0.0055, 10).rotateZ(Math.PI / 2)), hole, 0, 0.0035, -u));
+    add(G('dring', () => new THREE.TorusGeometry(0.016, 0.0045, 8, 22).rotateY(Math.PI / 2)), dark, 0, -0.001, 0.016).userData.ring = true;
+    add(rod(0.011, 0.02, 0.09), cord, 0, -0.002, 0.075);
+    for (let k = 0; k < 8; k++) add(rod(0.0135, 0.0225, 0.0075), k % 2 ? cord2 : cord, 0, -0.002, 0.038 + k * 0.0105);
+    add(rod(0.007, 0.015, 0.024), dark, 0, -0.003, 0.128);
+    add(G('dlan', () => new THREE.TorusGeometry(0.005, 0.0018, 6, 12).rotateY(Math.PI / 2)), metal, 0, -0.003, 0.142);
   } else if (id === 'stiletto' || id === 'ursus') {
     // складные: клинок на оси, может раскладываться
     const pts = id === 'stiletto' ? [[0, -0.007], [0.15, -0.004], [0.178, 0], [0.15, 0.005], [0, 0.007]] : [[0, -0.013], [0.11, -0.013], [0.135, -0.004], [0.152, 0.011], [0, 0.013]];

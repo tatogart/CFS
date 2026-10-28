@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793206313';
-import { World } from './world.js?v=1793206313';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793206313';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793206313';
-import { play, soundFor } from './sfx.js?v=1793206313';
-import { Bot, planRound } from './bots.js?v=1793206313';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793206313';
+import { CELL } from './maps.js?v=1793207997';
+import { World } from './world.js?v=1793207997';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793207997';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793207997';
+import { play, soundFor } from './sfx.js?v=1793207997';
+import { Bot, planRound } from './bots.js?v=1793207997';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793207997';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -56,6 +56,98 @@ function textSprite(text, color) {
   g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.8)'; g.strokeText(text, 128, 44); g.fillStyle = color; g.fillText(text, 128, 44);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, transparent: true }));
   sp.scale.set(1.6, 0.4, 1); sp.renderOrder = 10; return sp;
+}
+
+// ---------- осмотр оружия: ключевые кадры ----------
+// каждый кадр: [u, {rx, ry, rz — поворот рук с оружием; px, py, pz — смещение; sx, sy, sz — вращение ножа в пальцах;
+// fold — сложить нож/бабочку; mag — вынуть магазин; lh — левая рука к магазину; slide — затвор/цевьё}]
+const TAU = Math.PI * 2;
+const INSPECT = {
+  rifle: { dur: 5.4, clicks: [0.66, 0.84], keys: [[0, {}],
+    [0.1, { ry: 0.95, rz: 0.38, rx: 0.1, px: -0.075, py: 0.045, pz: 0.03 }], [0.3, { ry: 1.05, rz: 0.46, rx: 0.06, px: -0.085, py: 0.05, pz: 0.04 }],
+    [0.42, { lo: 1, ry: -0.42, rz: -0.71, rx: 0.26, px: -0.04, py: 0.07, pz: 0.02 }], [0.55, { lo: 1, ry: -0.5, rz: -0.76, rx: 0.3, px: -0.045, py: 0.075, pz: 0.025 }],
+    [0.64, { ry: 0.22, rz: -0.3, rx: -0.3, py: -0.01, pz: 0.05, lh: 1 }], [0.7, { ry: 0.24, rz: -0.32, rx: -0.32, py: -0.012, pz: 0.05, lh: 1, mag: 1 }],
+    [0.8, { ry: 0.26, rz: -0.34, rx: -0.34, py: -0.012, pz: 0.05, lh: 1, mag: 1 }], [0.86, { ry: 0.2, rz: -0.26, rx: -0.26, py: -0.006, pz: 0.04, lh: 1 }],
+    [0.93, { ry: 0.05, rz: -0.05, rx: 0.04, py: 0.01 }], [1, {}]] },
+  smg: { dur: 4.8, clicks: [0.62, 0.8], keys: [[0, {}],
+    [0.12, { ry: 1.0, rz: 0.5, rx: 0.08, px: -0.07, py: 0.05, pz: 0.03 }], [0.3, { ry: 1.1, rz: 0.56, px: -0.075, py: 0.055, pz: 0.035 }],
+    [0.4, { ry: 0.2, rz: -0.2, rx: 0.5, px: -0.03, py: 0.09, pz: 0.06 }], [0.5, { lo: 1, ry: -0.6, rz: -0.83, rx: 0.3, px: -0.035, py: 0.07, pz: 0.03 }],
+    [0.58, { ry: -0.62, rz: -0.86, rx: 0.32, px: -0.035, py: 0.072, pz: 0.03, lh: 0 }], [0.66, { ry: 0.15, rz: -0.2, rx: -0.25, pz: 0.04, lh: 1, mag: 1 }],
+    [0.78, { ry: 0.16, rz: -0.22, rx: -0.27, pz: 0.04, lh: 1, mag: 1 }], [0.86, { ry: 0.1, rz: -0.1, rx: -0.12, pz: 0.02, lh: 0.6 }], [1, {}]] },
+  sniper: { dur: 5.8, clicks: [0.72, 0.88], keys: [[0, {}],
+    [0.12, { ry: 0.7, rz: 0.3, rx: 0.12, px: -0.06, py: 0.05, pz: 0.05 }], [0.32, { ry: 0.78, rz: 0.36, rx: 0.1, px: -0.065, py: 0.055, pz: 0.055 }],
+    // смотрит в прицел сбоку: приподнять и придвинуть к лицу
+    [0.44, { lo: 1, ry: -0.2, rz: -0.4, rx: 0.42, px: -0.02, py: 0.1, pz: 0.09 }], [0.6, { lo: 1, ry: -0.25, rz: -0.43, rx: 0.46, px: -0.02, py: 0.105, pz: 0.095 }],
+    [0.7, { ry: 0.1, rz: -0.15, rx: -0.1, pz: 0.03, slide: 0.2 }], [0.78, { ry: 0.12, rz: -0.18, rx: -0.12, pz: 0.03, slide: 1 }],
+    [0.86, { ry: 0.08, rz: -0.1, rx: -0.06, pz: 0.02, slide: 0 }], [1, {}]] },
+  pistol: { dur: 4.4, clicks: [0.8], keys: [[0, {}],
+    [0.12, { ry: 1.15, rz: 0.3, rx: 0.05, px: -0.06, py: 0.05, pz: 0.05 }], [0.34, { ry: 1.25, rz: 0.38, px: -0.065, py: 0.055, pz: 0.05 }],
+    // переворот в ладони — показать другую сторону
+    [0.46, { lo: 1, ry: -0.55, rz: -0.9, rx: 0.2, px: -0.03, py: 0.07, pz: 0.05 }], [0.62, { lo: 1, ry: -0.62, rz: -0.94, rx: 0.24, px: -0.03, py: 0.072, pz: 0.05 }],
+    // проверка патронника: оттянуть затвор
+    [0.72, { ry: 0.2, rz: -0.12, rx: -0.15, py: 0.02, pz: 0.03, slide: 0.3 }], [0.8, { ry: 0.22, rz: -0.14, rx: -0.17, py: 0.02, pz: 0.03, slide: 1 }],
+    [0.86, { ry: 0.18, rz: -0.1, rx: -0.12, py: 0.015, pz: 0.025, slide: 0 }], [1, {}]] },
+  shotgun: { dur: 5.0, clicks: [0.72, 0.82], keys: [[0, {}],
+    [0.14, { ry: 0.9, rz: 0.42, rx: 0.08, px: -0.07, py: 0.04, pz: 0.03 }], [0.34, { ry: 1.0, rz: 0.48, px: -0.075, py: 0.045, pz: 0.035 }],
+    [0.48, { lo: 1, ry: -0.4, rz: -0.65, rx: 0.25, px: -0.04, py: 0.06, pz: 0.02 }], [0.62, { lo: 1, ry: -0.45, rz: -0.68, rx: 0.28, px: -0.04, py: 0.062, pz: 0.02 }],
+    // передёрнуть цевьё
+    [0.7, { ry: 0.1, rz: -0.25, rx: -0.1, pz: 0.03, slide: 0.1 }], [0.76, { ry: 0.1, rz: -0.27, rx: -0.12, pz: 0.03, slide: 1 }], [0.84, { ry: 0.08, rz: -0.2, rx: -0.08, pz: 0.025, slide: 0 }], [1, {}]] },
+  mg: { dur: 5.6, clicks: [0.7, 0.86], keys: [[0, {}],
+    [0.14, { ry: 0.7, rz: 0.3, rx: 0.06, px: -0.06, py: 0.035, pz: 0.03 }], [0.36, { ry: 0.78, rz: 0.35, px: -0.065, py: 0.04, pz: 0.035 }],
+    [0.5, { lo: 1, ry: -0.3, rz: -0.5, rx: 0.2, px: -0.035, py: 0.05, pz: 0.02 }], [0.62, { lo: 1, ry: -0.34, rz: -0.54, rx: 0.22, px: -0.035, py: 0.052, pz: 0.02 }],
+    [0.7, { ry: 0.15, rz: -0.25, rx: -0.22, pz: 0.04, lh: 1, mag: 1 }], [0.84, { ry: 0.16, rz: -0.27, rx: -0.24, pz: 0.04, lh: 1, mag: 1 }], [0.92, { ry: 0.05, rz: -0.05, lh: 0.4 }], [1, {}]] },
+  // ---- ножи ----
+  // базовый: показать плашмя, перекинуть в ладони, показать обух, крутануть и поймать
+  knife: { dur: 4.6, clicks: [0.5], keys: [[0, {}],
+    [0.12, { ry: 0.55, rz: 0.55, rx: 0.05, px: -0.03, py: 0.03, pz: 0.02 }], [0.32, { ry: 0.62, rz: 0.62, rx: 0.05, px: -0.032, py: 0.032, pz: 0.022 }],
+    [0.46, { ry: 0.6, rz: 0.6, px: -0.03, py: 0.04, pz: 0.02, sy: TAU }],
+    [0.6, { ry: -0.3, rz: -0.47, rx: 0.32, px: -0.02, py: 0.04, pz: 0.02, sy: TAU }], [0.74, { ry: -0.34, rz: -0.5, rx: 0.36, px: -0.02, py: 0.042, pz: 0.02, sy: TAU }],
+    [0.88, { ry: 0.05, rz: 0, rx: 0, py: 0.03, sy: TAU, sx: -TAU, ty: 0.03 }], [1, { sy: TAU, sx: -TAU }]] },
+  // керамбит / коготь: вращение на кольце, показ, ещё вращение
+  karambit: { dur: 4.4, clicks: [0.3, 0.8], keys: [[0, {}],
+    [0.1, { ry: 0.4, rz: 0.3, px: -0.02, py: 0.03 }], [0.3, { ry: 0.4, rz: 0.3, px: -0.02, py: 0.03, sx: -2 * TAU }],
+    [0.42, { ry: 0.85, rz: 0.6, rx: 0.1, px: -0.04, py: 0.04, pz: 0.02, sx: -2 * TAU }], [0.6, { ry: -0.35, rz: -0.47, rx: 0.3, px: -0.02, py: 0.045, pz: 0.02, sx: -2 * TAU }],
+    [0.68, { ry: -0.38, rz: -0.49, rx: 0.32, px: -0.02, py: 0.045, pz: 0.02, sx: -2 * TAU }], [0.86, { ry: 0.1, rz: 0.1, py: 0.02, sx: -3 * TAU }], [1, { sx: -3 * TAU }]] },
+  // скелет / кинжал: быстрые обороты вокруг кольца-гарды, «стук» по ладони
+  skeleton: { dur: 4.4, clicks: [0.38, 0.84], keys: [[0, {}],
+    [0.12, { ry: 0.7, rz: 0.5, px: -0.03, py: 0.035, pz: 0.02 }], [0.26, { ry: 0.75, rz: 0.55, px: -0.032, py: 0.037, pz: 0.02 }],
+    [0.4, { ry: 0.3, rz: 0.1, py: 0.04, sx: -3 * TAU, ty: 0.02 }], [0.56, { ry: -0.4, rz: -0.5, rx: 0.3, px: -0.02, py: 0.045, pz: 0.02, sx: -3 * TAU }],
+    [0.7, { ry: -0.42, rz: -0.52, rx: 0.32, px: -0.02, py: 0.045, pz: 0.02, sx: -3 * TAU }], [0.86, { ry: 0, rz: 0, py: 0.02, sx: -4 * TAU, sz: 0.3 }], [1, { sx: -4 * TAU }]] },
+  // бабочка: серия раскрытий-закрытий с вращением
+  butterfly: { dur: 4.8, clicks: [0.2, 0.42, 0.66, 0.9], keys: [[0, {}],
+    [0.1, { ry: 0.4, rz: 0.3, px: -0.02, py: 0.03, fold: 0 }], [0.2, { ry: 0.4, rz: 0.3, px: -0.02, py: 0.035, fold: 1, sz: TAU }],
+    [0.32, { ry: 0.5, rz: 0.4, px: -0.025, py: 0.04, fold: 0, sz: 2 * TAU }], [0.42, { ry: 0.3, rz: 0.2, py: 0.04, fold: 1, sz: 3 * TAU }],
+    [0.56, { ry: 0.85, rz: 0.6, px: -0.04, py: 0.04, fold: 0, sz: 4 * TAU }], [0.66, { ry: -0.3, rz: -0.4, rx: 0.3, py: 0.045, fold: 0, sz: 4 * TAU }],
+    [0.78, { ry: -0.32, rz: -0.43, rx: 0.32, py: 0.045, fold: 1, sz: 5 * TAU }], [0.9, { ry: 0, rz: 0, py: 0.02, fold: 0, sz: 6 * TAU }], [1, { sz: 6 * TAU }]] },
+  // складные (стилет, урсус): закрыть, крутануть, раскрыть щелчком
+  fold: { dur: 4.4, clicks: [0.24, 0.66], keys: [[0, {}],
+    [0.12, { ry: 0.6, rz: 0.45, px: -0.03, py: 0.03, pz: 0.02 }], [0.24, { ry: 0.6, rz: 0.45, px: -0.03, py: 0.03, pz: 0.02, fold: 1 }],
+    [0.44, { ry: 0.2, rz: 0.2, py: 0.04, fold: 1, sy: TAU, sz: 0.6 }], [0.58, { ry: 0.3, rz: 0.3, py: 0.04, fold: 1, sy: TAU }],
+    [0.66, { ry: 0.5, rz: 0.4, px: -0.03, py: 0.04, fold: 0, sy: TAU }], [0.82, { ry: -0.3, rz: -0.43, rx: 0.3, py: 0.04, sy: TAU }], [1, { sy: TAU }]] },
+  // тяжёлые (кукри, боуи): весомый переворот через обух и показ лезвия
+  heavy: { dur: 4.8, clicks: [0.5], keys: [[0, {}],
+    [0.14, { ry: 0.7, rz: 0.5, rx: 0.06, px: -0.035, py: 0.03, pz: 0.02 }], [0.34, { ry: 0.76, rz: 0.55, px: -0.037, py: 0.032, pz: 0.022 }],
+    [0.5, { ry: 0.3, rz: 0.9, py: 0.06, sx: -TAU, ty: 0.03 }], [0.54, { ry: 0.3, rz: 0.85, py: 0.02, sx: -TAU }],
+    [0.7, { ry: -0.35, rz: -0.43, rx: 0.3, px: -0.02, py: 0.035, pz: 0.02, sx: -TAU }], [0.84, { ry: -0.38, rz: -0.46, rx: 0.32, px: -0.02, py: 0.035, pz: 0.02, sx: -TAU }], [1, { sx: -TAU }]] },
+};
+function inspectKeyFor(inst) {
+  if (!inst) return 'rifle';
+  if (inst.id === 'knife') {
+    const m = inst.model || 'knife';
+    return m === 'karambit' || m === 'talon' ? 'karambit' : m === 'skeleton' || m === 'dagger' ? 'skeleton' : m === 'butterfly' ? 'butterfly' : m === 'stiletto' || m === 'ursus' ? 'fold' : m === 'kukri' || m === 'bowie' ? 'heavy' : 'knife';
+  }
+  const t = WEAPONS[inst.id] && WEAPONS[inst.id].type;
+  return INSPECT[t] ? t : 'rifle';
+}
+const IK = ['rx', 'ry', 'rz', 'px', 'py', 'pz', 'sx', 'sy', 'sz', 'ty', 'fold', 'mag', 'lh', 'slide', 'lo'];
+const _pose = {};
+function inspectPose(key, u) {
+  const keys = (INSPECT[key] || INSPECT.rifle).keys;
+  let i = 0; while (i < keys.length - 2 && u > keys[i + 1][0]) i++;
+  const [t0, a] = keys[i], [t1, b] = keys[i + 1];
+  let k = Math.max(0, Math.min(1, (u - t0) / Math.max(1e-4, t1 - t0))); k = k * k * k * (k * (k * 6 - 15) + 10);
+  for (const n of IK) { const x = a[n] || 0; _pose[n] = x + ((b[n] || 0) - x) * k; }
+  return _pose;
 }
 
 export class Game {
@@ -1284,7 +1376,7 @@ export class Game {
     if (c.edge('prev')) this.act(p, 'cycle', -1);
     if (c.edge('nade')) { if (p.nades.length) this.act(p, 'slot', 4); else this.centerMsg('Нет гранат', 1); }
     if (c.edge('aim')) this.act(p, 'aim');
-    if (c.edge('inspect') && !p.scope && p.reloadT <= 0) { this.inspectT = 3.2; this.inspectVar = Math.random() < 0.22 ? 1 : 0; if (this.inspectVar && this.ui.center) this.centerMsg('✦ Секретный осмотр', 1, '#ffd860'); }
+    if (c.edge('inspect') && !p.scope && p.reloadT <= 0) { this.inspectKey = inspectKeyFor(p.cur); this.inspectDur = this.inspectT = INSPECT[this.inspectKey].dur; this._inspClick = 0; this.inspectVar = Math.random() < 0.04 ? 1 : 0; if (this.inspectVar) this.inspectDur = this.inspectT = 3.2; if (this.inspectVar && this.ui.center) this.centerMsg('✦ Секретный осмотр', 1, '#ffd860'); }
     if (c.edge('useP') && p.alive && !this.ar) { const it = this.lookWeapon(p); const B = this.bomb; const busy = (p.hasBomb && this.plantSite(p.pos.x, p.pos.z)) || (B && B.planted && !B.done && p.pos.distanceTo(B.pos) < 1.6); if (it && !busy) this.pickUp(p, it, true); }
     if (c.edge('chatAll') && this.ui.openChat) this.ui.openChat(true);
     if (c.edge('chatTeam') && this.ui.openChat) this.ui.openChat(false);
@@ -1636,51 +1728,49 @@ export class Game {
         else if (km === 'kukri' || km === 'bowie') { ks.rotation.x -= d * d * Math.PI * 2; this.vmGun.position.y += d * (1 - d) * 0.2; }
         else ks.rotation.x -= d * d * Math.PI * 2 * (km === 'butterfly' ? 2 : 1);
       }
-      // осмотр: поворачиваем оружие к себе, крутим и возвращаем
+      // осмотр: ключевые кадры под каждый тип оружия и каждый нож (см. INSPECT), секретный — редкий вариант
       if (this.inspectT > 0 && view === p) {
+        const dur = this.inspectDur || 3.2;
         this.inspectT = Math.max(0, this.inspectT - dt);
-        const u = 1 - this.inspectT / 3.2, e = Math.sin(Math.min(1, u * 4) * Math.PI / 2) * Math.sin(Math.min(1, (1 - u) * 4) * Math.PI / 2);
-        const su = Math.max(0, Math.min(1, (u - 0.18) / 0.62)), spin = su * su * (3 - 2 * su);
+        const u = 1 - this.inspectT / dur, e = Math.sin(Math.min(1, u * 4) * Math.PI / 2) * Math.sin(Math.min(1, (1 - u) * 4) * Math.PI / 2);
+        const G = this.vmGun;
         if (isKnife && this.inspectVar) {
           // секретный осмотр: подброс над рукой, три оборота и ловля
           const t = Math.max(0, Math.min(1, (u - 0.15) / 0.55)), air = Math.sin(t * Math.PI);
-          this.vmGun.rotation.y += e * 0.35; this.vmGun.position.x -= e * 0.03;
+          G.rotation.y += e * 0.35; G.position.x -= e * 0.03;
           ks.position.y += air * 0.22; ks.position.z -= air * 0.04; ks.rotation.x -= t * Math.PI * 6; ks.rotation.y += air * 0.6;
           if (fold) fold.rotation.x = -Math.sin(Math.min(1, u * 1.4) * Math.PI) * Math.PI * 0.95;
-          if (u > 0.68 && u < 0.76) this.vmGun.position.y -= (0.76 - u) * 0.3;
-        } else if (isKnife) {
-          // рука слегка поворачивает нож к себе, сам нож крутится в пальцах
-          this.vmGun.rotation.y += e * 0.35; this.vmGun.position.x -= e * 0.03; this.vmGun.position.y += e * 0.02;
-          if (km === 'karambit' || km === 'talon' || km === 'skeleton') ks.rotation.x -= spin * Math.PI * (km === 'skeleton' ? 6 : 4);
-          else if (fold) {
-            // складной: закрыть, крутануть в пальцах и раскрыть щелчком
-            const c1 = Math.max(0, Math.min(1, (u - 0.15) / 0.15)), c2 = Math.max(0, Math.min(1, (u - 0.62) / 0.08));
-            fold.rotation.x = -(c1 - c2) * Math.PI * 0.95;
-            ks.rotation.z += Math.sin(Math.max(0, Math.min(1, (u - 0.3) / 0.32)) * Math.PI) * 0.9; ks.rotation.y += spin * Math.PI * 2;
-          } else if (km === 'kukri') {
-            // кукри: тяжёлый переворот через обух
-            ks.rotation.x -= spin * Math.PI * 2; ks.rotation.z += Math.sin(spin * Math.PI) * 0.8; this.vmGun.position.y += Math.sin(spin * Math.PI) * 0.03;
-          } else if (km === 'bowie') {
-            // боуи: плоский оборот в ладони и показ клинка
-            ks.rotation.y += spin * Math.PI * 2; ks.rotation.z -= Math.sin(spin * Math.PI) * 0.7;
-          }
-          else if (km === 'butterfly') {
-            ks.rotation.z += spin * Math.PI * 4;
-            kn.children.forEach(h => { if (h.userData.handle) h.rotation.x = Math.abs(Math.sin(spin * Math.PI * 3)) * Math.PI * 0.95 * h.userData.handle; });
-          } else { ks.rotation.y += spin * Math.PI * 2; ks.rotation.x += Math.sin(spin * Math.PI) * 0.5; }
-        } else if (this.inspectVar) {
-          // секретный осмотр оружия: оборот вокруг ствола и прокрутка
+          if (u > 0.68 && u < 0.76) G.position.y -= (0.76 - u) * 0.3;
+        } else if (!isKnife && this.inspectVar) {
+          // секретный осмотр оружия: оборот вокруг ствола и прокрутка на пальце
           const t = Math.max(0, Math.min(1, (u - 0.2) / 0.5)), tt = t * t * (3 - 2 * t);
-          // крутится только оружие на пальце, руки остаются на месте; левая рука отходит в сторону
-          this.vmGun.rotation.y += e * 0.5; this.vmGun.position.x -= e * 0.05; this.vmGun.position.y += e * 0.04;
+          G.rotation.y += e * 0.5; G.position.x -= e * 0.05; G.position.y += e * 0.04;
           if (this.vmModel) { if (this.vmType === 'pistol') { this.vmModel.position.set(0, 0, 0.03); this.vmModel.rotation.x = -tt * Math.PI * 2; this.vmModel.translateZ(-0.03); } else this.vmModel.rotation.z = -tt * Math.PI * 2; }
           if (this.vmL) this.vmL.position.y -= Math.sin(Math.min(1, u * 1.5) * Math.PI) * 0.18 * (u < 0.8 ? 1 : 0);
         } else {
-          const ph = u < 0.5 ? 0 : (u - 0.5) * 2;
-          this.vmGun.rotation.y += e * (0.9 + Math.sin(ph * Math.PI) * 0.7);
-          this.vmGun.rotation.z += e * (0.5 - Math.sin(ph * Math.PI) * 1.1);
-          this.vmGun.rotation.x += e * 0.15;
-          this.vmGun.position.x -= e * 0.07; this.vmGun.position.y += e * 0.04; this.vmGun.position.z += e * 0.03;
+          const k = inspectPose(this.inspectKey, u), T = this.time;
+          // живое дыхание поверх ключевых кадров
+          const br = e * 0.006;
+          G.rotation.x += k.rx + Math.sin(T * 2.1) * br; G.rotation.y += k.ry + Math.sin(T * 1.7) * br; G.rotation.z += k.rz;
+          G.position.x += k.px; G.position.y += k.py + Math.sin(T * 2.6) * br * 0.5; G.position.z += k.pz;
+          // левая рука отпускает оружие на перевороте (иначе она крутится вместе с ним через весь экран)
+          const lo = isKnife ? e : k.lo;
+          if (this.vmL && lo) { this.vmL.position.y -= lo * 0.6; this.vmL.position.x -= lo * 0.12; this.vmL.position.z += lo * 0.15; }
+          if (isKnife) {
+            ks.rotation.x += k.sx; ks.rotation.y += k.sy; ks.rotation.z += k.sz; ks.position.y += k.ty || 0;
+            if (fold) fold.rotation.x = -(k.fold || 0) * Math.PI * 0.95;
+            if (km === 'butterfly') kn.children.forEach(h => { if (h.userData.handle) h.rotation.x = (k.fold || 0) * Math.PI * 0.95 * h.userData.handle; });
+          } else {
+            const M = this.vmMag, L = this.vmL, LB = this.vmLBase;
+            // проверка магазина: левая рука тянет магазин вниз и защёлкивает обратно
+            if (M && k.mag && !M.syn && this.vmType !== 'shotgun') { M.grp.visible = true; M.grp.position.y -= k.mag * 0.055; M.grp.rotation.x += k.mag * 0.18; }
+            if (L && LB && k.lh) { const c = M ? M.c : LB; L.position.x += (c.x - 0.01 - LB.x) * k.lh; L.position.y += (c.y - 0.05 - k.mag * 0.05 - LB.y) * k.lh; L.position.z += (c.z + 0.02 - LB.z) * k.lh; }
+            // затвор / цевьё: рука оттягивает, оружие чуть дёргается
+            if (L && LB && k.slide) { const pistol = this.vmType === 'pistol', sh = this.vmType === 'shotgun'; const tx = sh ? LB.x : pistol ? 0 : -0.045, ty = sh ? LB.y : pistol ? 0.07 : 0.06, tz = (sh ? LB.z : pistol ? 0.05 : -0.06) + k.slide * 0.07; L.position.x += (tx - LB.x) * Math.min(1, k.slide * 2); L.position.y += (ty - LB.y) * Math.min(1, k.slide * 2); L.position.z += (tz - LB.z) * Math.min(1, k.slide * 2); G.position.z += k.slide * 0.008; }
+          }
+          // щелчки на ключевых моментах осмотра
+          for (const c of (INSPECT[this.inspectKey] || {}).clicks || []) if (u >= c && (this._inspClick || 0) < c) { play('reload', 0, 0, 0.25); }
+          this._inspClick = u;
         }
       }
       this.vmGun.updateMatrixWorld();

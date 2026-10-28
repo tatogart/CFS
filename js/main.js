@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793194850';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793194850';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793194850';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793194850';
-import { AgentModel } from './models.js?v=1793194850';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793194850';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793194850';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793194850';
-import { styleOf } from './decor.js?v=1793194850';
-import { Game } from './game.js?v=1793194850';
+import { MAPS, CELL } from './maps.js?v=1793196291';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793196291';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793196291';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793196291';
+import { AgentModel } from './models.js?v=1793196291';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793196291';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793196291';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793196291';
+import { styleOf } from './decor.js?v=1793196291';
+import { Game } from './game.js?v=1793196291';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -67,10 +67,10 @@ function pills(box, items, cur, onPick) {
   }
 }
 const MODES = [
-  ['casual', 'Обычный', 'Свои настройки: размер команд и длина матча. Команду выберете уже в матче.'],
-  ['comp', 'Соревновательный', '5×5, до 13 побед, смена сторон после 12 раундов. Даёт звание.'],
-  ['wing', 'Напарники', '2×2 на одной точке (B), до 9 побед, раунд 1:30. Своё звание.'],
-  ['dm', 'Бой насмерть', 'Каждый сам за себя, 10 игроков, мгновенное возрождение, любое оружие бесплатно. 5 минут или до 30 убийств.'],
+  ['casual', 'Обычный', 'До 8 побед (15 раундов), смена сторон после 7. Бронежилет, шлем и набор сапёра бесплатно, старт $1000, раунд 2:15. Команду выбираете в матче.'],
+  ['comp', 'Соревновательный', '5×5, MR12: до 13 побед, смена сторон после 12 раундов. При 12:12 — овертайм MR3 по $10 000. Команду назначает игра. Даёт звание.'],
+  ['wing', 'Напарники', '2×2 на одной точке (B), до 9 побед, смена сторон после 8 раундов, при 8:8 — ничья. Раунд 1:30. Команду назначает игра. Своё звание.'],
+  ['dm', 'Бой насмерть', 'Каждый сам за себя, 10 игроков, мгновенное возрождение, любое оружие бесплатно. 10 минут или 50 убийств.'],
   ['ar', 'Гонка вооружений', '5×5 с возрождением. Каждое убийство — следующее оружие, 21 уровень. Побеждает команда того, кто первым убьёт золотым ножом.'],
 ];
 // у каждого режима свой набор карт
@@ -98,7 +98,7 @@ function renderPlay() {
   $('modeDesc').textContent = MODES.find(m => m[0] === md)[2];
   $('rowSide').classList.add('hidden');   // команда выбирается уже в матче
   $('rowSize').classList.toggle('hidden', md !== 'casual');
-  $("rowLen").classList.toggle('hidden', md !== 'casual');
+  $("rowLen").classList.add('hidden');   // длина матча задана правилами режима
   const mb = $('maps'); mb.innerHTML = '';
   const curMap = modeMap(md); save.last.map = curMap.id;
   for (const id of poolOf(md)) {
@@ -1140,7 +1140,7 @@ function renderPause() {
   const body = $('pBody'); body.innerHTML = '';
   if (pTab === 'match') {
     const p = g.player, sc = g.dm && !g.ar ? '' : `<div class="pmScore"><b class="${p.team === 'T' ? 't' : 'ct'}">${g.score[p.team]}</b><span>:</span><b class="${p.team === 'T' ? 'ct' : 't'}">${g.score[p.team === 'T' ? 'CT' : 'T']}</b></div>`;
-    const head = el('div', 'pmHead', `<img src="${mapThumbURL(g.o.map, 3)}" alt=""><div><small>${esc(md)}</small><b>${esc(g.o.map.name)}</b><span>${g.dm ? 'Бой идёт' : g.practice ? 'Тренировка' : 'Раунд ' + g.round + (g.o.winTo ? ' · до ' + g.o.winTo + ' побед' : '')} · вы за ${p.team === 'T' ? 'террористов' : 'спецназ'}</span></div>${sc}`);
+    const head = el('div', 'pmHead', `<img src="${mapThumbURL(g.o.map, 3)}" alt=""><div><small>${esc(md)}</small><b>${esc(g.o.map.name)}</b><span>${g.dm ? 'Бой идёт' : g.practice ? 'Тренировка' : 'Раунд ' + g.round + (g.winTo ? ' · до ' + g.winTo + ' побед' + (g.otN ? ' · овертайм ' + g.otN : '') : '')} · вы за ${p.team === 'T' ? 'террористов' : 'спецназ'}</span></div>${sc}`);
     body.appendChild(head);
     const bd = el('div', 'pmBoard'); body.appendChild(bd);
     renderBoard(g); bd.innerHTML = $('board').innerHTML;
@@ -1472,7 +1472,7 @@ function renderLoading(dt) {
 function finishLoad() {
   const lg = LOADING && LOADING.g; LOADING = null;
   if (!game || game !== lg) return;
-  if (!game.dm && !game.aimMode && !window.__fast) setTimeout(showTeamSelect, 50);
+  if ((game.mode === 'casual' || game.ar) && !game.aimMode && !window.__fast) setTimeout(showTeamSelect, 50);
   startAmbience(styleOf(game.o.map));
   $('load').classList.add('hidden'); $('hud').classList.remove('hidden');
   $('touch').classList.toggle('hidden', !touch); applyTouchLayout();

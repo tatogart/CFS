@@ -1,16 +1,22 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793194850';
-import { World } from './world.js?v=1793194850';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793194850';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793194850';
-import { play, soundFor } from './sfx.js?v=1793194850';
-import { Bot, planRound } from './bots.js?v=1793194850';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793194850';
+import { CELL } from './maps.js?v=1793196291';
+import { World } from './world.js?v=1793196291';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793196291';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793196291';
+import { play, soundFor } from './sfx.js?v=1793196291';
+import { Bot, planRound } from './bots.js?v=1793196291';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793196291';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
 const ROUND_TIME = 115, FREEZE = 6, BOMB_TIME = 40, END_TIME = 5, PLANT_TIME = 3.2;
+// правила раундов по режимам (как в CS2)
+const RULES = {
+  comp: { winTo: 13, half: 12, max: 24, ot: true, otHalf: 3, otMoney: 10000, roundLen: 115, freeze: 15, buy: 20, start: 800 },
+  wing: { winTo: 9, half: 8, max: 16, ot: false, roundLen: 90, freeze: 10, buy: 20, start: 800 },
+  casual: { winTo: 8, half: 7, max: 15, ot: false, roundLen: 135, freeze: 6, buy: 45, start: 1000, freeArmor: true },
+};
 const CHEAT_NAMES = ['CHEAT112', 'aimware.net', 'skeet.cc | Колян', 'NEVERLOSE.CC', 'ez-frags.tk', 'xX_WH_Xx', 'onetap.su', 'interium.ooo', 'Fatality.win', 'cheat228', 'MidnightCheat', 'ПРОДАМ ЧИТ', 'spinbot_2009', 'legit_player'];
 const CHEAT_SPAM = ['BUY AIMWARE.NET', 'skeet.cc owns me and all', 'ez', '1', 'Купи чит — cheat112 точка ру', 'HvH кто?', 'вы все боты', 'я просто хорошо играю', 'не репорть плиз', 'нет у меня читов, это игровая мышка', 'neverlose.cc > all', 'изи катка', 'сервер лагает, не я'];
 const BOT_NAMES = ['Кирпич', 'Тень', 'Шрам', 'Волк', 'Сокол', 'Гром', 'Лис', 'Боцман', 'Призрак', 'Рыжий', 'Седой', 'Бархан', 'Ястреб', 'Кобра', 'Мангуст'];
@@ -59,8 +65,10 @@ export class Game {
     this.ar = this.mode === 'ar' && !opts.map.aim;
     this.dm = (this.mode === 'dm' || this.ar) && !opts.map.aim;
     this.oneSite = opts.map.oneSite || (this.mode === 'wing' ? 'B' : null);
-    this.roundLen = this.mode === 'wing' ? 90 : ROUND_TIME;
-    this.dmTime = this.ar ? 480 : 300; this.dmLimit = this.ar ? AR_LADDER.length : 30;
+    this.rules = { ...(RULES[this.mode] || RULES.casual) };
+    this.winTo = this.rules.winTo; this.maxRounds = this.rules.max; this.otN = 0;
+    this.roundLen = this.rules.roundLen || ROUND_TIME;
+    this.dmTime = this.ar ? 480 : 600; this.dmLimit = this.ar ? AR_LADDER.length : 50;
     this.intel = { T: null, CT: null }; this.plan = { T: { site: 'A', execAt: 0, executing: true }, CT: {} };
     this.net = opts.net || null;
     this.isHost = !!(this.net && this.net.role === 'host'); this.isClient = !!(this.net && this.net.role === 'client');
@@ -260,7 +268,7 @@ export class Game {
     a.weapons = { 1: null, 2: null, 3: null }; a.nades = []; a.armor = 0; a.helmet = false; a.kit = false;
     const sp = a === this.player && this.o.startPistol && this.o.startPistol[a.team];
     this.give(a, 'knife'); this.give(a, sp || (a.team === 'T' ? 'glock' : 'usp'));
-    if (full) a.money = 800;
+    if (full) a.money = this.rules ? this.rules.start : 800;
   }
   spawnPos(team, k) {
     const list = this.world.spawns[team].filter(([i, j]) => this.world.walk(i, j));
@@ -273,9 +281,15 @@ export class Game {
   startRound(first) {
     this.round++;
     if (!first && this._cheatBanCheck()) return;
-    const half = this.o.winTo - 1;
-    if (!first && !this.practice && this.round === half + 1) this._swapSides();
-    this.state = this.practice ? 'live' : 'freeze'; this.stateT = this.practice ? 1e9 : FREEZE;
+    const R = this.rules, half = R.half;
+    // смена сторон в перерыве и в овертайме (MR3: 3 раунда за каждую сторону, по $10 000)
+    let pistolRound = first, otMoney = 0;
+    if (!first && !this.practice && !this.dm) {
+      if (this.round === half + 1) { this._swapSides(); pistolRound = true; }
+      const r = this.round - R.max;
+      if (R.ot && r > 0) { const k = (r - 1) % (R.otHalf * 2); if (k === 0) { otMoney = R.otMoney; this.gmsg(`Овертайм ${this.otN}!`, 3, '#ffd860'); } else if (k === R.otHalf) { this._swapSides(); otMoney = R.otMoney; } }
+    }
+    this.state = this.practice ? 'live' : 'freeze'; this.stateT = this.practice ? 1e9 : (R.freeze || FREEZE);
     if (this.timeoutNext) { this.stateT += this.timeoutNext; this.timeoutNext = 0; setTimeout(() => this.gmsg('Тактический тайм-аут: 30 секунд', 3, '#ffd860'), 100); }
     this.roundTime = this.roundLen; this.bomb = null; this.defuser = null; this.dmgLog = {};
     if (this.dm) { this.state = 'live'; this.stateT = 1e9; }
@@ -287,8 +301,9 @@ export class Game {
     if (this.c4mesh) { this.scene.remove(this.c4mesh); this.c4mesh = null; }
     const counts = { T: 0, CT: 0 };
     for (const a of this.actors) {
-      const pistolRound = first || (this.round === half + 1);
-      if (!a.alive || pistolRound) this.resetLoadout(a, pistolRound);
+      if (!a.alive || pistolRound || otMoney) this.resetLoadout(a, pistolRound);
+      if (otMoney) a.money = otMoney;
+      if (R.freeArmor && !this.dm) { a.armor = 100; a.helmet = true; if (a.team === 'CT') a.kit = true; }
       for (const sl of [1, 2]) { const w = a.weapons[sl]; if (w && WEAPONS[w.id] && WEAPONS[w.id].mag) { w.mag = WEAPONS[w.id].mag; w.reserve = WEAPONS[w.id].reserve; } }
       a.alive = true; a.hp = 100; a.blind = 0; a.plantT = 0; a.defuseT = 0; a.scope = 0; a.roundKills = 0; a.reloadT = 0; a.switchT = 0;
       a.vel.set(0, 0, 0); a.pos.copy(this.dm ? this.dmSpawnPos(a) : this.spawnPos(a.team, counts[a.team]++)); a.crouchK = 0;
@@ -323,7 +338,7 @@ export class Game {
     this._swapSides(true); this.round = 0; this.startRound(true);
   }
   _swapSides(silent) {
-    for (const a of this.actors) { a.team = a.team === 'T' ? 'CT' : 'T'; a.money = 800; a.kills = a.kills; const ag = a.bot ? AGENTS.filter(x => x.team === a.team)[a.id % 5] : a.remote ? (agentById[a.agents && a.agents[a.team]] || AGENTS.find(x => x.team === a.team)) : agentById[this.o.agents[a.team]];
+    for (const a of this.actors) { a.team = a.team === 'T' ? 'CT' : 'T'; a.money = this.rules ? this.rules.start : 800; a.kills = a.kills; const ag = a.bot ? AGENTS.filter(x => x.team === a.team)[a.id % 5] : a.remote ? (agentById[a.agents && a.agents[a.team]] || AGENTS.find(x => x.team === a.team)) : agentById[this.o.agents[a.team]];
       this.scene.remove(a.model.root); a.agent = ag; a.model = new AgentModel(ag, 'knife'); if (a.skins.gloves) a.model.setGloves(a.skins.gloves); this._readable(a); this.scene.add(a.model.root); this.resetLoadout(a, true); }
     this.score = { T: this.score.CT, CT: this.score.T }; this.lossStreak = { T: 0, CT: 0 };
     this.playerSide = this.player.team;
@@ -387,7 +402,7 @@ export class Game {
   canBuy(a) {
     if (this.ar) return false;
     if (this.practice || this.dm) return true;
-    if (!(this.state === 'freeze' || (this.state === 'live' && this.roundLen - this.roundTime < 20))) return false;
+    if (!(this.state === 'freeze' || (this.state === 'live' && this.roundLen - this.roundTime < (this.rules.buy || 20)))) return false;
     return this.world.inSpawn(a.pos.x, a.pos.z, a.team);
   }
   priceOf(a, id) {
@@ -1021,7 +1036,7 @@ export class Game {
   surrender() {
     const p = this.player, en = p.team === 'T' ? 'CT' : 'T';
     if (this.dm || this.over) return;
-    this.score[en] = Math.max(this.score[en], this.o.winTo); this.over = true; this.ui.matchOver(this);
+    this.score[en] = Math.max(this.score[en], this.winTo); this.over = true; this.ui.matchOver(this);
   }
   kick(a) {
     if (!a || a === this.player) return;
@@ -1041,7 +1056,7 @@ export class Game {
     if (kind === 'killEnemies') for (const e of this.actors) if (e.alive && this.isEnemy(p, e)) this.kill(e, p, WEAPONS.ak47, true, null);
     if (kind === 'killAll') for (const e of this.actors) if (e.alive && e !== p) this.kill(e, p, WEAPONS.ak47, true, null);
     if (kind === 'winRound' && !this.dm && !this.practice) this.endRound(p.team, 'elim');
-    if (kind === 'winMatch') { if (this.ar) this.arWinner = p; else if (this.dm) p.kills = Math.max(p.kills, this.dmLimit); else this.score[p.team] = this.o.winTo; this.over = true; this.ui.matchOver(this); }
+    if (kind === 'winMatch') { if (this.ar) this.arWinner = p; else if (this.dm) p.kills = Math.max(p.kills, this.dmLimit); else this.score[p.team] = this.winTo; this.over = true; this.ui.matchOver(this); }
     if (kind === 'give' && WEAPONS[v]) { const sl = WEAPONS[v].slot; this.give(p, v); this.selectSlot(p, sl); }
     if (kind === 'nades') p.nades = ['he', 'flash', 'smoke', 'molotov'];
     if (kind === 'heal') { p.hp = 100; p.armor = 100; p.helmet = true; }
@@ -1384,8 +1399,12 @@ export class Game {
       if (this.state === 'freeze' && this.stateT <= 0) { this.state = 'live'; this.gmsg('Вперёд!', 1); play('round'); this.ev({ e: 'snd', s: 'round' }); }
       else if (this.state === 'live') { this.roundTime -= dt; if (this.roundTime <= 0) this.endRound('CT', 'time'); }
       else if (this.state === 'end' && this.stateT <= 0) {
-        const max = (this.o.winTo - 1) * 2;
-        if (this.score.T >= this.o.winTo || this.score.CT >= this.o.winTo || this.round >= max) { this.over = true; this.ui.matchOver(this); return; }
+        if (this.score.T >= this.winTo || this.score.CT >= this.winTo) { this.over = true; this.ui.matchOver(this); return; }
+        if (this.round >= this.maxRounds) {
+          // ничья после основного времени: в соревновательном — овертайм, иначе матч заканчивается
+          if (this.rules.ot && this.score.T === this.score.CT) { this.otN++; this.winTo = this.score.T + this.rules.otHalf + 1; this.maxRounds += this.rules.otHalf * 2; }
+          else { this.over = true; this.ui.matchOver(this); return; }
+        }
         this.startRound(false);
       }
     }

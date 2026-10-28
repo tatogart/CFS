@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793194850';
-import { WEAPONS } from './data.js?v=1793194850';
+import { CELL } from './maps.js?v=1793196291';
+import { WEAPONS } from './data.js?v=1793196291';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -50,7 +50,7 @@ export class Bot {
   // ---------- закупка ----------
   buy() {
     const g = this.g, a = this.a, T = a.team === 'T';
-    const half = g.o.winTo - 1, pistol = g.round === 1 || g.round === half + 1;
+    const half = g.rules.half, pistol = g.round === 1 || g.round === half + 1;
     const nadeSkill = this.d.nades;
     const tryB = id => g.buy(a, id);
     const pick = arr => arr[Math.floor(Math.random() * arr.length)];

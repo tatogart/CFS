@@ -1,6 +1,6 @@
 // Сервис-воркер: игра сохраняется на устройстве и запускается без интернета.
-const VERSION = '1793199243';
-const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "vendor/three.module.min.js", "css/style.css?v=1793199243", "js/art.js?v=1793199243", "js/bots.js?v=1793199243", "js/controls.js?v=1793199243", "js/data.js?v=1793199243", "js/decor.js?v=1793199243", "js/game.js?v=1793199243", "js/main.js?v=1793199243", "js/maps.js?v=1793199243", "js/models.js?v=1793199243", "js/music.js?v=1793199243", "js/sfx.js?v=1793199243", "js/store.js?v=1793199243", "js/world.js?v=1793199243"];
+const VERSION = '1793199446';
+const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "vendor/three.module.min.js", "css/style.css?v=1793199446", "js/art.js?v=1793199446", "js/bots.js?v=1793199446", "js/controls.js?v=1793199446", "js/data.js?v=1793199446", "js/decor.js?v=1793199446", "js/game.js?v=1793199446", "js/main.js?v=1793199446", "js/maps.js?v=1793199446", "js/models.js?v=1793199446", "js/music.js?v=1793199446", "js/sfx.js?v=1793199446", "js/store.js?v=1793199446", "js/world.js?v=1793199446"];
 const CACHE = 'cfs-' + VERSION;
 
 self.addEventListener('install', e => {
@@ -15,7 +15,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   // страница: сначала сеть (чтобы приходили обновления), без сети — из кэша
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); return r; }).catch(() => caches.match('index.html')));
+    e.respondWith(fetch(req.url, { cache: 'no-store', credentials: 'same-origin' }).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); return r; }).catch(() => caches.match('index.html')));
     return;
   }
   // файлы игры и шрифты: из кэша, иначе из сети с сохранением

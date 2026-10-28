@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793171228';
-import { World } from './world.js?v=1793171228';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793171228';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793171228';
-import { play, soundFor } from './sfx.js?v=1793171228';
-import { Bot, planRound } from './bots.js?v=1793171228';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793171228';
+import { CELL } from './maps.js?v=1793171803';
+import { World } from './world.js?v=1793171803';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793171803';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793171803';
+import { play, soundFor } from './sfx.js?v=1793171803';
+import { Bot, planRound } from './bots.js?v=1793171803';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793171803';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;

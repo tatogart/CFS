@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793171228';
-import { WEAPONS } from './data.js?v=1793171228';
+import { CELL } from './maps.js?v=1793171803';
+import { WEAPONS } from './data.js?v=1793171803';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();

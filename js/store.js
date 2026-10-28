@@ -1,5 +1,5 @@
 // Сохранение: монеты, инвентарь, экипировка, настройки
-import { SKINS, CASES, RARITY, skinById, GLOVES } from './data.js?v=1793203411';
+import { SKINS, CASES, RARITY, skinById, GLOVES } from './data.js?v=1793205236';
 
 const KEY = 'cfs_save_v1';
 const defaults = () => ({

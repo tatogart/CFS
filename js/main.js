@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793203411';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793203411';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793203411';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793203411';
-import { AgentModel } from './models.js?v=1793203411';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793203411';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793203411';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793203411';
-import { styleOf } from './decor.js?v=1793203411';
-import { Game } from './game.js?v=1793203411';
+import { MAPS, CELL } from './maps.js?v=1793205236';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793205236';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793205236';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793205236';
+import { AgentModel } from './models.js?v=1793205236';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793205236';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793205236';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793205236';
+import { styleOf } from './decor.js?v=1793205236';
+import { Game } from './game.js?v=1793205236';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -910,34 +910,15 @@ const hud = {
     box.appendChild(d); while (box.children.length > 5) box.firstChild.remove();
     setTimeout(() => d.classList.add('fade'), 7000); setTimeout(() => d.remove(), 8000);
   },
-  // отмена матча как в CS2 (VAC Live): картинка замирает и обесцвечивается, сверху выезжает плашка,
-  // ник читера зачёркивается штампом «ЗАБЛОКИРОВАН»; компенсации нет — матч просто не засчитывается
+  // отмена матча как в CS2 (VAC Live): игра замирает и сереет, затем экран конца матча со строем команды
+  // и красной плашкой «Обнаружен читер» сверху; компенсации нет — матч просто не засчитывается
   vacBan(who, g) {
     recordMatch(g, 'cancel', { cheater: who.name });
     save.stats.bans = (save.stats.bans || 0) + 1; persist();
     hud.chat(null, `[CFAC] Игрок ${who.name} заблокирован. Матч отменён.`);
     closeBuy(); controls.unlock(); controls.enabled = false;
-    document.body.classList.add('mCancel');
-    const box = $('vac');
-    box.innerHTML = `<div class="mcBar"><div class="mcStripe"></div>
-        <div class="mcHead"><div class="vacLogo"><svg viewBox="0 0 64 64"><path d="M32 3 57 12v19c0 16-11 26-25 31C18 57 7 47 7 31V12z" fill="#2a0d0d" stroke="#ff4a3a" stroke-width="3"/><text x="32" y="40" font-size="17" font-weight="900" text-anchor="middle" fill="#ff4a3a" font-family="Arial">CFAC</text></svg><i class="mcScan"></i></div>
-        <div><div class="vacT">${[...'МАТЧ ОТМЕНЁН'].map((c, i) => `<span style="animation-delay:${0.45 + i * 0.04}s">${c === ' ' ? '&nbsp;' : c}</span>`).join('')}</div>
-        <div class="vacP">Система <b>CFS Anti-Cheat</b> обнаружила стороннее ПО у игрока этого матча</div></div></div></div>
-      <div class="mcBody">
-        <div class="mcPl"><span class="mcAv">${esc(who.name[0] || '?')}</span><span class="mcNm">${esc(who.name)}</span><span class="mcStamp">ЗАБЛОКИРОВАН</span></div>
-        <div class="mcList">
-          <div><b>Результат матча</b><span>не засчитан</span></div>
-          <div><b>${g.mode === 'premier' ? 'CS Rating' : 'Звание'}</b><span>без изменений</span></div>
-          <div><b>Компенсация</b><span class="no">не начисляется</span></div>
-        </div>
-        <div class="mcCd">Возврат в главное меню через <b id="mcSec">10</b></div>
-        <button class="playBig inline" id="vacOk"><span>В МЕНЮ</span></button>
-      </div>`;
-    box.classList.remove('hidden'); play('lose');
-    let sec = 10;
-    const done = () => { clearInterval(tm); box.classList.add('hidden'); document.body.classList.remove('mCancel'); quitGame(); };
-    const tm = setInterval(() => { sec--; const e = $('mcSec'); if (e) e.textContent = sec; if (sec <= 0) done(); }, 1000);
-    $('vacOk').onclick = done;
+    document.body.classList.add('mCancel'); play('lose');
+    setTimeout(() => { if (game === g) cancelEnd(g, who); }, 1600);
   },
   openChat(all) {
     if (!game) return;
@@ -1312,18 +1293,15 @@ function endMatch(g) {
   save.lastMatch = { map: g.o.map.name, score: dm ? `#${place}` : `${my}:${th}`, won, k: p.kills, d: p.deaths };
   recordMatch(g, dm ? 'place' : draw ? 'draw' : won ? 'win' : 'lose', { place, rankDelta: rank ? rank.delta : premier && premier.shown ? premier.delta : null });
   save.coins += reward; save.stats.matches++; if (won) save.stats.wins++; save.stats.kills += p.kills; save.stats.deaths += p.deaths; persist();
-  // кто стоит на сцене: своя команда (или топ-5 в бою насмерть), лучший — в центре
-  const pool = (dm ? order : order.filter(a => a.team === p.team)).slice(0, 5);
-  if (!pool.includes(p)) pool[pool.length - 1] = p;
   const kd = a => a.kills / Math.max(1, a.deaths);
-  const top = (f) => { let b = null; for (const a of pool) if (f(a) > 0 && (!b || f(a) > f(b))) b = a; return b; };
-  const badges = new Map();
-  const give = (a, t) => { if (a && !badges.has(a)) badges.set(a, t); };
-  if (g.arWinner && pool.includes(g.arWinner)) give(g.arWinner, 'Золотой нож');
-  give(top(a => a.mvps || 0), 'MVP матча'); give(top(a => a.kills), 'Больше всех убийств'); give(top(a => a.hs || 0), 'Мастер хедшотов'); give(top(kd), 'Лучший K/D');
-  const players = pool.map(a => {
-    const w = a.weapons[1] || a.weapons[2];
-    return { name: a.name, team: a.team, agent: a.agent, gun: w ? w.id : (a.team === 'T' ? 'ak47' : 'm4a4'), skin: w ? w.skin : null, gloves: a.skins && a.skins.gloves, k: a.kills, d: a.deaths, mvps: a.mvps || 0, hs: a.hs || 0, me: a === p, place: order.indexOf(a) + 1, badge: badges.get(a) || '' };
+  const players = lineup(g, order, dm, (a, pool) => {
+    if (!pool.badges) {
+      const top = (f) => { let b = null; for (const x of pool) if (f(x) > 0 && (!b || f(x) > f(b))) b = x; return b; };
+      const m = pool.badges = new Map(), give = (x, t) => { if (x && !m.has(x)) m.set(x, t); };
+      if (g.arWinner && pool.includes(g.arWinner)) give(g.arWinner, 'Золотой нож');
+      give(top(x => x.mvps || 0), 'MVP матча'); give(top(x => x.kills), 'Больше всех убийств'); give(top(x => x.hs || 0), 'Мастер хедшотов'); give(top(kd), 'Лучший K/D');
+    }
+    return pool.badges.get(a) || '';
   });
   const data = { dm, won, draw, place, total: order.length, my, th, team: p.team, map: g.o.map.name, mode: (MODES.find(m => m[0] === g.mode) || [])[1] || '', players, reward, xpFrom, xpGain, rank, premier, mdone, starsGot };
   game.dispose(); game = null; stopAmbience(2);
@@ -1334,10 +1312,31 @@ function endMatch(g) {
   if (won) setTimeout(() => { if (END) playMusic('mvp'); }, 900);
 }
 
+// строй на экране конца матча: своя команда (или топ-5 в бою насмерть), лучший — в центре
+function lineup(g, order, dm, badges) {
+  const p = g.player, pool = (dm ? order : order.filter(a => a.team === p.team)).slice(0, 5);
+  if (!pool.includes(p)) pool[pool.length - 1] = p;
+  return pool.map(a => {
+    const w = a.weapons[1] || a.weapons[2];
+    return { name: a.name, team: a.team, agent: a.agent, gun: w ? w.id : (a.team === 'T' ? 'ak47' : 'm4a4'), skin: w ? w.skin : null, gloves: a.skins && a.skins.gloves, k: a.kills, d: a.deaths, mvps: a.mvps || 0, hs: a.hs || 0, me: a === p, place: order.indexOf(a) + 1, badge: badges ? badges(a, pool) : '', banned: a === g.cheatBanned };
+  });
+}
+function cancelEnd(g, who) {
+  const p = g.player, order = g.actors.slice().sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+  const players = lineup(g, order, g.dm && !g.ar);
+  const my = g.score[p.team], th = g.score[p.team === 'T' ? 'CT' : 'T'];
+  const data = { cancel: { name: who.name, mine: who.team === p.team }, dm: g.dm && !g.ar, won: false, draw: false, my, th, team: p.team, map: g.o.map.name, mode: (MODES.find(m => m[0] === g.mode) || [])[1] || '', players, reward: 0, xpFrom: save.xp || 0, xpGain: 0, premier: g.mode === 'premier' ? 1 : 0 };
+  game.dispose(); game = null; stopAmbience(2);
+  document.body.classList.remove('mCancel');
+  controls.enabled = false; controls.reset();
+  $('hud').classList.add('hidden'); $('pause').classList.add('hidden');
+  showEnd(data);
+}
+
 let END = null;
 function showEnd(d) {
   const scene = new THREE.Scene();
-  const col = d.draw ? '#8a96a6' : d.won ? (d.dm ? '#e8c050' : d.team === 'T' ? '#e8a640' : '#5aa0ff') : '#d04848';
+  const col = d.cancel ? '#c82020' : d.draw ? '#8a96a6' : d.won ? (d.dm ? '#e8c050' : d.team === 'T' ? '#e8a640' : '#5aa0ff') : '#d04848';
   const bg = document.createElement('canvas'); bg.width = bg.height = 512; const c = bg.getContext('2d');
   const gr = c.createRadialGradient(256, 300, 10, 256, 256, 400); gr.addColorStop(0, col); gr.addColorStop(0.35, '#1a2230'); gr.addColorStop(1, '#05070a');
   c.fillStyle = gr; c.fillRect(0, 0, 512, 512);
@@ -1368,21 +1367,28 @@ function showEnd(d) {
   const scr = $('endScr');
   const title = d.dm ? (d.place === 1 ? 'ПЕРВОЕ МЕСТО' : `МЕСТО ${d.place}`) : d.draw ? 'НИЧЬЯ' : d.won ? 'ПОБЕДА' : 'ПОРАЖЕНИЕ';
   const sub = d.dm ? `из ${d.total} · ${esc(d.map)}` : `<b class="${d.team === 'T' ? 't' : 'ct'}">${d.my}</b> : <b class="${d.team === 'T' ? 'ct' : 't'}">${d.th}</b>`;
+  $('eTitle').classList.toggle('hidden', !!d.cancel);
+  $('eCancel').classList.toggle('hidden', !d.cancel);
+  if (d.cancel) $('eCancel').innerHTML = `<b>Обнаружен читер</b><span>Этот матч был отменён системой CFAC Live · игрок ${esc(d.cancel.name)} заблокирован</span>`;
   $('eTitle').innerHTML = `<div class="eMode">${esc(d.mode)}${d.dm ? '' : ' · ' + esc(d.map)}</div><h1>${title}</h1><div class="eScore">${sub}</div>`;
   $('eTitle').style.setProperty('--ec', col);
   $('eCards').innerHTML = models.map(o => `<div class="eCard${o.pl.me ? ' me' : ''} ${o.pl.team === 'T' ? 't' : 'ct'}">
-    ${o.pl.badge ? `<div class="eBadge">★ ${esc(o.pl.badge)}</div>` : '<div class="eBadge none"></div>'}
+    ${o.pl.banned ? '<div class="eBadge ban">ЗАБЛОКИРОВАН</div>' : o.pl.badge ? `<div class="eBadge">★ ${esc(o.pl.badge)}</div>` : '<div class="eBadge none"></div>'}
     <div class="eName">${d.dm ? `<i>#${o.pl.place}</i> ` : ''}${esc(o.pl.name)}</div>
     <div class="eStats"><span><b>${o.pl.k}</b>У</span><span><b>${o.pl.d}</b>С</span><span><b>${o.pl.mvps}</b>★</span><span><b>${o.pl.k ? Math.round(o.pl.hs / o.pl.k * 100) : 0}%</b>ГОЛ</span></div></div>`).join('');
   const lvl = x => Math.floor(x / XP_LVL) + 1;
-  $('eRew').innerHTML = `<div class="eRow"><span>Награда</span><b class="eCoins">◈ 0</b></div>
+  $('eRew').innerHTML = d.cancel ? `<div class="eRm eCnl">Матч отменён</div>
+    <div class="eRow"><span>Счёт</span><b>${d.my} : ${d.th}</b></div>
+    <div class="eRow"><span>Результат</span><b>не засчитан</b></div>
+    <div class="eRow"><span>${d.premier ? 'Рейтинг' : 'Звание'}</span><b>±0</b></div>
+    <div class="eRow"><span>Компенсация</span><b class="no">нет</b></div>` : `<div class="eRow"><span>Награда</span><b class="eCoins">◈ 0</b></div>
     <div class="eRow"><span>Опыт</span><b>+${d.xpGain} XP</b></div>
     <div class="eLvl"><span class="eL">Ур. ${lvl(d.xpFrom)}</span><div class="eBar"><i></i></div></div>
     ${(d.mdone || []).map(m => `<div class="eMis">✔ ${esc(m.t)}</div>`).join('')}
     ${d.starsGot ? `<div class="eMis eStar">★ +${d.starsGot} Armory Pass</div>` : ''}
     ${d.premier ? `<div class="eRank ePrem"><div class="eRm">Premier · CS Rating</div><div id="ePremB">${premBadge(d.premier.before, true, !d.premier.shownBefore)}</div><div class="eRn" id="ePremT">${d.premier.shown ? '' : `Калибровка: побед до рейтинга ${d.premier.left}`}</div></div>` : ''}
     ${d.rank ? `<div class="eRank"><div class="eRm">${esc(d.rank.mode)} · ${d.rank.elo} <em class="${d.rank.delta >= 0 ? 'up' : 'down'}">${d.rank.delta >= 0 ? '+' : ''}${d.rank.delta}</em></div><img src="${rankURL(d.rank.before, 200)}" alt=""><div class="eRn">${d.rank.before < 0 ? 'Без звания' : esc(RANKS[d.rank.before])}</div></div>` : ''}`;
-  scr.className = ''; scr.classList.toggle('lose', !d.won && !d.draw);
+  scr.className = ''; scr.classList.toggle('lose', !d.won && !d.draw); scr.classList.toggle('cancel', !!d.cancel);
   END = { d, scene, cam, models, t: 0, coinsShown: 0, rankDone: false, lvlUp: false };
   renderer.setSize(innerWidth, innerHeight, false);
 }
@@ -1439,6 +1445,7 @@ function renderEnd(dt) {
   // награды: монеты, опыт, звание
   const rw = $('eRew'), ra = ease((t - 2.6) / 0.5);
   rw.style.opacity = ra; rw.style.transform = `translateX(${(1 - ra) * 40}px)`;
+  if (d.cancel) { $('eCancel').style.transform = `translateY(${(1 - ease(t / 0.6)) * -110}%)`; $('eOk').style.opacity = ease((t - 2) / 0.5); return; }
   const ck = ease((t - 2.9) / 1.2), cn = Math.round(d.reward * ck);
   if (cn !== E.coinsShown) { E.coinsShown = cn; rw.querySelector('.eCoins').textContent = '◈ ' + cn; }
   const xp = d.xpFrom + d.xpGain * ease((t - 3.2) / 1.4), lv = Math.floor(xp / XP_LVL) + 1;

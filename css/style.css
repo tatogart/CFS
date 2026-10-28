@@ -759,3 +759,17 @@ body.mCancel #hud { opacity: .25; transition: opacity .8s; }
 .mcCd b { color: #fff; }
 .mcBody #vacOk { animation: mcIn .5s 2.9s both; }
 @media (max-height: 460px) { .mcHead .vacT { font-size: 30px; } .mcHead .vacLogo svg { width: 48px; height: 48px; } .mcBody { gap: 6px; } .mcList div { padding: 4px 10px; font-size: 15px; } .mcNm { font-size: 22px; } }
+
+/* экран отмены матча: красная плашка сверху, как «Cheater Detected» в CS2 */
+#eCancel { position: absolute; left: 0; right: 0; top: 0; z-index: 3; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: linear-gradient(180deg, #e01818, #b80f0f); box-shadow: 0 6px 30px rgba(220,20,20,.45); text-align: center; transform: translateY(-110%); }
+#eCancel b { display: block; font-size: clamp(26px, 5vw, 44px); font-style: italic; font-weight: 800; letter-spacing: 1px; line-height: 1.05; }
+#eCancel span { display: block; font-family: system-ui, sans-serif; font-size: clamp(11px, 1.6vw, 14px); opacity: .92; }
+#endScr.cancel #eRew { top: calc(92px + env(safe-area-inset-top)); }
+#eRew .eCnl { color: #ff5a4a; font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; }
+#eRew .no { color: #ff6a5a; }
+.eBadge.ban { background: #c81818; color: #fff; }
+#endScr.cancel #eRew { width: auto; min-width: 200px; }
+#endScr.cancel #eRew .eRow { gap: 14px; }
+#endScr.cancel #eRew .eRow b { font-size: 15px; white-space: nowrap; }
+#endScr.cancel #eRew .eRow span { white-space: nowrap; }
+@media (max-height: 460px) { #endScr.cancel #eRew { top: calc(88px + env(safe-area-inset-top)); } #endScr.cancel #eRew .eRow b { font-size: 13px; } }

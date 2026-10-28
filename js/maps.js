@@ -562,3 +562,39 @@ export const MAPS = [
     nades: [],
   },
 ];
+
+// Со спавна не должно быть видно вражеский спавн через мид: ставим на линии
+// прострела две стены «змейкой» со смещёнными проходами (пройти можно, простреливать — нет)
+function breakSpawnLOS(m) {
+  const g = m.grid.map(r => r.split('')), H = g.length, W = g[0].length, el = m.grid.elev;
+  const block = c => c === '#' || c === 'C' || c === 'R';
+  const walk = c => '.wTKAB123456789'.includes(c);
+  const T = [], K = [];
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { if (g[j][i] === 'T') T.push([i, j]); if (g[j][i] === 'K') K.push([i, j]); }
+  const ray = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], n = Math.ceil(Math.hypot(dx, dy) * 3), out = []; for (let s = 1; s < n; s++) { const x = Math.floor(a[0] + 0.5 + dx * s / n), y = Math.floor(a[1] + 0.5 + dy * s / n); if (block(g[y][x])) return null; out.push([x, y]); } return out; };
+  const findPair = () => { for (let p = 0; p < T.length; p += 2) for (let q = 0; q < K.length; q += 2) { const r = ray(T[p], K[q]); if (r) return { r, a: T[p], b: K[q] }; } return null; };
+  const reach = () => { const seen = new Set([T[0].join()]), q = [T[0]]; while (q.length) { const [i, j] = q.shift(); for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= W || b >= H || !walk(g[b][a]) || Math.abs(el[b * W + a] - el[j * W + i]) > 0.5) continue; const k = a + ',' + b; if (!seen.has(k)) { seen.add(k); q.push([a, b]); } } } let n = 0; for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if (walk(g[j][i]) && !seen.has(i + ',' + j)) n++; return n; };
+  const base = reach();
+  for (let it = 0; it < 12; it++) {
+    const P = findPair(); if (!P) break;
+    const horiz = Math.abs(P.b[1] - P.a[1]) >= Math.abs(P.b[0] - P.a[0]);   // линия идёт вертикально → стена поперёк (по строке)
+    // клетки луча от середины к краям
+    const mid = P.r.length / 2, order = P.r.map((c, k) => [c, Math.abs(k - mid)]).sort((x, y) => x[1] - y[1]).map(x => x[0]);
+    let done = false;
+    for (const [cx, cy] of order) {
+      const free = c => c === '.' || c === 'w';
+      if (!free(g[cy][cx])) continue;
+      const span = (x, y) => { let a = 0, b = 0; if (horiz) { while (x - a - 1 >= 0 && free(g[y][x - a - 1])) a++; while (x + b + 1 < W && free(g[y][x + b + 1])) b++; return [x - a, x + b]; } while (y - a - 1 >= 0 && free(g[y - a - 1][x])) a++; while (y + b + 1 < H && free(g[y + b + 1][x])) b++; return [y - a, y + b]; };
+      const [s0, s1] = span(cx, cy); if (s1 - s0 + 1 < 4 || s1 - s0 + 1 > 18) continue;
+      const set = [], put = (u, v) => { const x = horiz ? u : v, y = horiz ? v : u; if (g[y] && free(g[y][x])) { set.push([x, y, g[y][x]]); g[y][x] = '#'; } };
+      const line = horiz ? cy : cx, line2 = line + 3;
+      for (let u = s0 + 2; u <= s1; u++) put(u, line);          // проход у одного края
+      for (let u = s0; u <= s1 - 2; u++) put(u, line2);         // проход у другого края
+      if (reach() > base || findPair() && findPair().r === P.r) { for (const [x, y, c] of set) g[y][x] = c; continue; }
+      done = true; break;
+    }
+    if (!done) break;
+  }
+  const out = g.map(r => r.join('')); out.elev = el; m.grid = out;
+}
+for (const m of MAPS) if (!m.aim) breakSpawnLOS(m);

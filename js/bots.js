@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793199446';
-import { WEAPONS } from './data.js?v=1793199446';
+import { CELL } from './maps.js?v=1793202419';
+import { WEAPONS } from './data.js?v=1793202419';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -251,7 +251,9 @@ export class Bot {
     if (a.team === 'CT' && this.mode === 'retake' && B && B.planted && !B.done) {
       const d = a.pos.distanceTo(B.pos);
       const tLeft = B.timer, need = a.kit ? 5 : 10;
-      if (d < 1.3 && tLeft > need - 0.3) this.defusing = true;
+      const taken = B.defBy && B.defBy !== a && B.defBy.alive;   // бомбу уже разминирует другой — прикрываем его
+      if (d < 1.3 && tLeft > need - 0.3 && !taken) this.defusing = true;
+      else if (taken) { if (!this.path && d > 6) this.setGoal(B.pos); }
       else if (!this.path) this.setGoal(B.pos);
     }
     // охота за звуками, если нечего делать
@@ -397,7 +399,7 @@ export class Bot {
     // ---- закладка / разминирование ----
     if (this.planting && a.hasBomb && g.plantSite(a.pos.x, a.pos.z) && g.state === 'live') { inp.mx = inp.mz = 0; inp.use = true; inp.crouch = true; this.idleLook(dt); return; }
     this.planting = false;
-    if (this.defusing && g.bomb && g.bomb.planted && !g.bomb.done && a.pos.distanceTo(g.bomb.pos) < 1.5) { inp.mx = inp.mz = 0; inp.use = true; this.idleLook(dt); return; }
+    if (this.defusing && g.bomb && g.bomb.planted && !g.bomb.done && (!g.bomb.defBy || g.bomb.defBy === a || !g.bomb.defBy.alive) && a.pos.distanceTo(g.bomb.pos) < 1.5) { inp.mx = inp.mz = 0; inp.use = true; this.idleLook(dt); return; }
     this.defusing = false;
     // ---- гранаты ----
     if (this.nadeQueue.length && !g.inFire(a.pos)) {

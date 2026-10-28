@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793199446';
-import { World } from './world.js?v=1793199446';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793199446';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793199446';
-import { play, soundFor } from './sfx.js?v=1793199446';
-import { Bot, planRound } from './bots.js?v=1793199446';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793199446';
+import { CELL } from './maps.js?v=1793202419';
+import { World } from './world.js?v=1793202419';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793202419';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793202419';
+import { play, soundFor } from './sfx.js?v=1793202419';
+import { Bot, planRound } from './bots.js?v=1793202419';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793202419';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -251,6 +251,23 @@ export class Game {
   _retag() {
     for (const a of this.actors) { if (a.tag) { this.scene.remove(a.tag); a.tag = null; } }
     for (const a of this.actors) if ((!this.dm || this.ar) && a !== this.player && a.team === this.player.team) { a.tag = textSprite(a.name, a.bot ? '#7ee08a' : '#ffd36a'); this.scene.add(a.tag); }
+    const outline = this.o.settings.allyOutline !== false;
+    for (const a of this.actors) this._allyOutline(a, outline && (!this.dm || this.ar) && a !== this.player && a.team === this.player.team);
+  }
+  // рамка союзника: обводка цветом команды (инвертированная оболочка вокруг каждой детали модели)
+  _allyOutline(a, on) {
+    if (a.outline) { for (const h of a.outline) if (h.parent) h.parent.remove(h); a.outline = null; }
+    if (!on) return;
+    const mats = this._olMat || (this._olMat = {
+      T: new THREE.MeshBasicMaterial({ color: 0xffb43c, side: THREE.BackSide, fog: false }),
+      CT: new THREE.MeshBasicMaterial({ color: 0x5aa8ff, side: THREE.BackSide, fog: false }),
+    });
+    const meshes = []; a.model.root.traverse(o => { if (o.isMesh && o.geometry && !o.userData.outline) meshes.push(o); });
+    a.outline = [];
+    for (const o of meshes) {
+      const h = new THREE.Mesh(o.geometry, mats[a.team]); h.userData.outline = true; h.scale.setScalar(1.16); h.castShadow = false; h.receiveShadow = false;
+      o.add(h); a.outline.push(h);
+    }
   }
   _botSkins(b) {
     if (Math.random() < 0.5) for (const s of SKINS) if (WEAPONS[s.weapon] && Math.random() < 0.12) b.skins[s.weapon] = s.id;
@@ -1380,11 +1397,16 @@ export class Game {
       a.plantT += dt; if (a.plantT >= (this.admin.fastBomb && a === this.player ? 0.4 : PLANT_TIME)) { a.plantT = 0; this.plant(a); }
     } else a.plantT = 0;
     const B = this.bomb;
-    if (!T && B && B.planted && !B.done && a.in.use && a.pos.distanceTo(B.pos) < 1.6) {
+    // разминировать бомбу может только один игрок: остальные ждут, пока он не отпустит или не погибнет
+    if (B && B.defBy && (!B.defBy.alive || B.defBy.defuseT <= 0 && B.defBy !== a)) B.defBy = null;
+    const busy = B && B.defBy && B.defBy !== a;
+    if (busy && a === this.player && a.in.use && !T && B.planted && !B.done && a.pos.distanceTo(B.pos) < 1.6 && this.time > (this._busyMsgT || 0)) { this._busyMsgT = this.time + 2; this.centerMsg(`Бомбу уже разминирует ${B.defBy.name}`, 1.5); }
+    if (!T && B && B.planted && !B.done && !busy && a.in.use && a.pos.distanceTo(B.pos) < 1.6) {
+      B.defBy = a;
       if (a.defuseT === 0) { const [d, pan] = this.listen(a.pos); play('defuse', d, pan); }
       a.defuseT += dt;
       if (a.defuseT >= (this.admin.fastBomb && a === this.player ? 0.4 : a.kit ? 5 : 10)) { this.defuser = a; B.done = true; a.defuseT = 0; a.money += 300; this.endRound('CT', 'defuse'); }
-    } else a.defuseT = 0;
+    } else { a.defuseT = 0; if (B && B.defBy === a) B.defBy = null; }
   }
 
   // ---------- главный цикл ----------

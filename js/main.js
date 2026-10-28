@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793199446';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793199446';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793199446';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793199446';
-import { AgentModel } from './models.js?v=1793199446';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793199446';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793199446';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793199446';
-import { styleOf } from './decor.js?v=1793199446';
-import { Game } from './game.js?v=1793199446';
+import { MAPS, CELL } from './maps.js?v=1793202419';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793202419';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793202419';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793202419';
+import { AgentModel } from './models.js?v=1793202419';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793202419';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793202419';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793202419';
+import { styleOf } from './decor.js?v=1793202419';
+import { Game } from './game.js?v=1793202419';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -28,17 +28,19 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
 function quality() { const q = save.settings.quality; return q === 'auto' ? (touch ? 1 : 2) : +q; }
-// динамическое разрешение: при просадке FPS в матче рендер мельчает, при запасе — возвращается
-let resScale = 1, arAcc = 0, arN = 0;
+// динамическое разрешение: если FPS долго проседает, рендер один раз мельчает (не чаще раза в 10 с, только вниз —
+// смена размера холста на телефоне даёт чёрный кадр, поэтому туда-обратно не качаем)
+let resScale = 1, arAcc = 0, arN = 0, arLow = 0, arNext = 0;
 function basePR() { const q = quality(); return Math.min(devicePixelRatio, q === 0 ? 1 : q === 1 ? 1.4 : 1.75); }
-function adaptRes(dt) {
+function adaptRes(dt, now) {
   arAcc += dt; arN++;
-  if (arAcc < 1.2) return;
+  if (arAcc < 2) return;
   const fps = arN / arAcc; arAcc = 0; arN = 0;
-  const prev = resScale;
-  if (fps < 50) resScale = Math.max(0.5, resScale - (fps < 35 ? 0.2 : 0.1));
-  else if (fps > 58 && resScale < 1) resScale = Math.min(1, resScale + 0.05);
-  if (prev !== resScale) { renderer.setPixelRatio(basePR() * resScale); renderer.setSize(innerWidth, innerHeight, false); }
+  arLow = fps < 45 ? arLow + 1 : 0;
+  if (arLow < 2 || now < arNext || resScale <= 0.6) return;
+  arLow = 0; arNext = now + 10000;
+  resScale = Math.max(0.6, resScale - 0.15);
+  renderer.setPixelRatio(basePR() * resScale); renderer.setSize(innerWidth, innerHeight, false);
 }
 function applyQuality() {
   const q = quality();
@@ -788,6 +790,7 @@ function renderSettings(box = $('settingsBox'), inGame = false) {
   box.appendChild(el('h3', '', 'Прочее'));
   check('invertY', 'Инверсия по вертикали');
   check('fps', 'Показывать FPS');
+  check('allyOutline', 'Рамка (обводка) союзников');
   if (inGame) return;
   const ib = el('div', 'hcard installBox'); ib.id = 'installBox'; box.appendChild(ib); renderInstall();
   const reset = el('button', 'big', 'Сбросить прогресс'); reset.onclick = () => { if (confirm('Удалить все монеты, предметы и статистику?')) { localStorage.removeItem('cfs_save_v1'); location.reload(); } }; box.appendChild(reset);
@@ -1623,9 +1626,10 @@ function frame(now) {
   const paused = !$('pause').classList.contains('hidden') || !$('teamSel').classList.contains('hidden');
   if (!paused) game.update(dt);
   if (!game) return;
-  game.render();
-  if (!paused && last0) adaptRes(Math.min(0.25, (now - last0) / 1000)); else { arAcc = 0; arN = 0; }
+  // размер холста меняем до отрисовки кадра, иначе на экран уходит пустой (чёрный) кадр
+  if (!paused && last0) adaptRes(Math.min(0.25, (now - last0) / 1000), now); else { arAcc = 0; arN = 0; }
   last0 = paused ? 0 : now;
+  game.render();
   updateHud(game, dt);
 }
 requestAnimationFrame(frame);

@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793131993';
-import { World } from './world.js?v=1793131993';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793131993';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793131993';
-import { play, soundFor } from './sfx.js?v=1793131993';
-import { Bot, planRound } from './bots.js?v=1793131993';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793131993';
+import { CELL } from './maps.js?v=1793168011';
+import { World } from './world.js?v=1793168011';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793168011';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793168011';
+import { play, soundFor } from './sfx.js?v=1793168011';
+import { Bot, planRound } from './bots.js?v=1793168011';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793168011';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -107,7 +107,7 @@ export class Game {
     this.flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: softSprite(), color: '#ffcc66', blending: THREE.AdditiveBlending, depthTest: false, transparent: true }));
     this.flash.scale.setScalar(0.22); this.flash.visible = false; this.vmScene.add(this.flash);
 
-    this.dmgLog = {}; this.radioT = {}; this.actors = []; this.nades = []; this.smokes = []; this.fires = []; this.fx = []; this.decals = [];
+    this.dmgLog = {}; this.radioT = {}; this.ground = []; this.actors = []; this.nades = []; this.smokes = []; this.fires = []; this.fx = []; this.decals = [];
     this.time = 0; this.score = { T: 0, CT: 0 }; this.round = 0; this.lossStreak = { T: 0, CT: 0 };
     this.feed = []; this.bomb = null; this.state = 'freeze'; this.stateT = 0;
     this.playerSide = opts.side;
@@ -214,6 +214,7 @@ export class Game {
     this.roundTime = this.roundLen; this.bomb = null; this.defuser = null; this.dmgLog = {};
     if (this.dm) { this.state = 'live'; this.stateT = 1e9; }
     for (const n of this.nades) n.mesh && this.scene.remove(n.mesh); this.nades = [];
+    for (const it of this.ground) this.scene.remove(it.mesh); this.ground = [];
     for (const s of this.smokes) this.scene.remove(s.grp); this.smokes = [];
     for (const f of this.fires) this.scene.remove(f.grp); this.fires = [];
     for (const d of this.decals) this.scene.remove(d); this.decals = [];
@@ -328,7 +329,7 @@ export class Game {
     if (this.isClient && a === this.player) { if (!this.canBuy(a) || !this.canTeam(a, id) || a.money < this.priceOf(a, id)) return false; this.net.toHost({ t: 'cmd', c: 'buy', v: id }); play('buy'); return true; }
     if (!this.canBuy(a) || !this.canTeam(a, id)) return false;
     const price = this.priceOf(a, id); if (a.money < price && !this.practice && !this.dm) return false;
-    if (WEAPONS[id]) { const def = WEAPONS[id]; const cur = a.weapons[def.slot]; if (cur && cur.id === id) { cur.reserve = def.reserve; if (!this.practice) return false; } this.give(a, id); this.selectSlot(a, def.slot); }
+    if (WEAPONS[id]) { const def = WEAPONS[id]; const cur = a.weapons[def.slot]; if (cur && cur.id === id) { cur.reserve = def.reserve; if (!this.practice) return false; } else if (cur && !this.dm && !this.practice) this.dropWeapon(a, def.slot, true); this.give(a, id); this.selectSlot(a, def.slot); }
     else if (NADES[id]) { const cnt = a.nades.filter(n => n === id).length; if (cnt >= NADES[id].max || a.nades.length >= 4) return false; a.nades.push(id); }
     else if (id === 'vest') { if (a.armor >= 100) return false; a.armor = 100; }
     else if (id === 'vesthelm') { if (a.armor >= 100 && a.helmet) return false; a.armor = 100; a.helmet = true; }
@@ -540,6 +541,8 @@ export class Game {
     }
     if (v === this.player && this.ui.damageReport && !this.aimMode) this.ui.damageReport(this.dmgLog, a, def);
     if (!this.dm || this.ar) { if (v.team === this.player.team && v !== this.player) this.radio(null, 'down', { v, a, def }); else if (a === this.player && this.isEnemy(a, v) && Math.random() < 0.25) this.radio(null, 'nice'); }
+    // оружие выпадает из рук убитого (лучшее из имеющегося)
+    if (!this.dm && !this.aimMode && !v.target) { const sl = v.weapons[1] ? 1 : v.weapons[2] ? 2 : 0; if (sl) this.dropWeapon(v, sl, false); }
     // бомба выпадает
     if (v.hasBomb) { v.hasBomb = false; this.dropBomb(v.pos); }
     const wid = def ? (def === WEAPONS.knife && a && a.cur && a.cur.model ? a.cur.model : Object.keys(WEAPONS).find(k => WEAPONS[k] === def) || def.icon) : 'skull';
@@ -825,6 +828,60 @@ export class Game {
     }
   }
 
+  // ---------- оружие на земле: выбросить, подобрать, выпадает с убитых ----------
+  dropWeapon(a, slot, thrown) {
+    const inst = a.weapons[slot]; if (!inst || inst.id === 'knife') return null;
+    a.weapons[slot] = null;
+    const d = this.aimDir(a, new THREE.Vector3()), e = this.eyePos(a);
+    const pos = thrown ? e.clone().addScaledVector(d, 0.5).add(new THREE.Vector3(0, -0.25, 0)) : a.pos.clone().setY(a.pos.y + 0.9);
+    const vel = thrown ? new THREE.Vector3(d.x * 5.5 + a.vel.x, 2.2 + d.y * 3, d.z * 5.5 + a.vel.z) : new THREE.Vector3((Math.random() - 0.5) * 2, 1.5, (Math.random() - 0.5) * 2);
+    const mesh = buildWeapon(inst.model || inst.id, inst.skin); mesh.position.copy(pos); mesh.rotation.set(0, Math.random() * 6.28, 0); this.scene.add(mesh);
+    const it = { inst, pos, vel, mesh, spin: (Math.random() - 0.5) * 8, rest: false, noPickBy: a, noPickT: this.time + 1.2 };
+    this.ground.push(it);
+    if (a.cur === inst) { a.cur = null; const ns = a.weapons[1] ? 1 : a.weapons[2] ? 2 : 3; this.selectSlot(a, ns); }
+    if (thrown && this.isView(a)) play('throw');
+    return it;
+  }
+  pickUp(a, it, swap) {
+    const def = WEAPONS[it.inst.id]; if (!def) return;
+    if (a.weapons[def.slot]) { if (!swap) return; this.dropWeapon(a, def.slot, true); }
+    a.weapons[def.slot] = it.inst;
+    // скин у поднятого оружия остаётся прежним (как в CS)
+    this.scene.remove(it.mesh); this.ground.splice(this.ground.indexOf(it), 1);
+    if (swap || a.slot === 3 || !a.cur) this.selectSlot(a, def.slot);
+    if (this.isView(a)) play('draw');
+  }
+  // ближайшее оружие, на которое смотрит игрок (для E)
+  lookWeapon(a) {
+    let best = null, bd = 1e9; const e = this.eyePos(a), d = this.aimDir(a, new THREE.Vector3());
+    for (const it of this.ground) { const v = it.pos.clone().sub(e), dist = v.length(); if (dist > 2.6) continue; const dot = v.dot(d) / dist; if (dot < 0.75) continue; if (dist < bd) { bd = dist; best = it; } }
+    return best;
+  }
+  _updateGround(dt) {
+    for (const it of this.ground) {
+      if (!it.rest) {
+        it.vel.y -= 14 * dt;
+        const nx = it.pos.x + it.vel.x * dt, nz = it.pos.z + it.vel.z * dt, top = this.world.hAtPos(nx, nz);
+        if (top > it.pos.y - 0.05 || top >= 90) { it.vel.x *= -0.3; it.vel.z *= -0.3; } else { it.pos.x = nx; it.pos.z = nz; }
+        it.pos.y += it.vel.y * dt;
+        const fl = Math.max(0, this.world.hAtPos(it.pos.x, it.pos.z)) + 0.04;
+        if (it.pos.y <= fl) { it.pos.y = fl; if (Math.abs(it.vel.y) > 2) { it.vel.y *= -0.25; it.vel.x *= 0.5; it.vel.z *= 0.5; } else { it.rest = true; it.vel.set(0, 0, 0); } }
+        it.mesh.position.copy(it.pos); it.mesh.rotation.y += it.spin * dt;
+        it.mesh.rotation.z = it.rest ? Math.PI / 2 : it.mesh.rotation.z + it.spin * dt * 0.5;
+        if (it.rest) { it.mesh.rotation.x = 0; it.mesh.position.y = it.pos.y + 0.02; }
+      }
+    }
+    // автоподбор, если слот пустой
+    for (const a of this.actors) {
+      if (!a.alive || this.ar) continue;
+      for (const it of this.ground) {
+        if (it.noPickBy === a && this.time < it.noPickT) continue;
+        const def = WEAPONS[it.inst.id]; if (!def || a.weapons[def.slot]) continue;
+        if (Math.hypot(it.pos.x - a.pos.x, it.pos.z - a.pos.z) < 1.0 && Math.abs(it.pos.y - a.pos.y) < 1.2) { this.pickUp(a, it, false); break; }
+      }
+    }
+  }
+
   // ---------- радио: реплики ботов-союзников в чате команды ----------
   radio(who, kind, x = {}) {
     if (!this.ui.chat || this.practice || (this.dm && !this.ar)) return;
@@ -1001,6 +1058,8 @@ export class Game {
     if (c.edge('nade')) { if (p.nades.length) this.act(p, 'slot', 4); else this.centerMsg('Нет гранат', 1); }
     if (c.edge('aim')) this.act(p, 'aim');
     if (c.edge('inspect') && !p.scope && p.reloadT <= 0) this.inspectT = 3.2;
+    if (c.edge('useP') && p.alive && !this.ar) { const it = this.lookWeapon(p); const B = this.bomb; const busy = (p.hasBomb && this.plantSite(p.pos.x, p.pos.z)) || (B && B.planted && !B.done && p.pos.distanceTo(B.pos) < 1.6); if (it && !busy) this.pickUp(p, it, true); }
+    if (c.edge('hand')) { this.settings.hand = this.settings.hand === 'left' ? 'right' : 'left'; this.vm.scale.x = this.settings.hand === 'left' ? -1 : 1; this.centerMsg(this.settings.hand === 'left' ? 'Оружие в левой руке' : 'Оружие в правой руке', 1); if (this.ui.onHand) this.ui.onHand(this.settings.hand); }
     if (p.in.fire || p.reloadT > 0) this.inspectT = 0;
     if (c.edge('spray')) this.act(p, 'spray', this.o.graffiti);
     if (c.edge('bomb')) this.act(p, 'slot', 5);
@@ -1024,7 +1083,7 @@ export class Game {
       case 'spray': this.spray(a, v); break;
       case 'buy': this.buy(a, v); break;
       case 'drop':
-        if (!a.hasBomb) break;
+        if (!(a.hasBomb && a.slot === 5)) { if (a.cur && (a.slot === 1 || a.slot === 2) && !this.ar) this.dropWeapon(a, a.slot, true); break; }
         a.hasBomb = false; { const d = this.aimDir(a); this.dropBomb(new THREE.Vector3(a.pos.x + d.x * 1.5, 0, a.pos.z + d.z * 1.5)); }
         this.bomb.noPick = this.time + 1.5; this.bomb.noPickBy = a; if (a.slot === 5) this.selectSlot(a, a.weapons[1] ? 1 : 2);
         break;
@@ -1181,6 +1240,7 @@ export class Game {
     this._separate();
     for (const a of this.actors) this._weapons(a, dt);
     this._updNades(dt);
+    this._updateGround(dt);
     this._updBomb(dt);
     this._effects(dt);
     this.checkWin();

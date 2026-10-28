@@ -489,3 +489,5 @@ body.touch #chat { bottom: calc(150px + var(--safe-b)); left: calc(180px + var(-
 .mis.done span { color: #7cf08a; } .mis.done .eBar i { background: #4cd07a; }
 .misList.small .mis span { font-size: 12px; } .misList.small .mis small { display: none; }
 .eMis { font-size: 13px; color: #7cf08a; margin-top: 3px; }
+.tb.hand { right: calc(344px + var(--safe-r)); font-size: 14px; }
+.tb.drop { right: calc(392px + var(--safe-r)); font-size: 14px; }

@@ -140,10 +140,10 @@ function build() {
     for (let i = 0; i < n; i++) { const t = i / SR, x = Math.random() * 2 - 1; a += kk * (x - a); d[i] += a * 2.5 * Math.min(1, t / 0.15) * Math.exp(-t / 0.7) + x * 0.4 * Math.exp(-t / 0.01); }
   })];
   B.bounce = [ring(0.12, [[1450, 0.6, 0.03], [2650, 0.3, 0.02]], 0.4, 0.001), ring(0.12, [[1250, 0.6, 0.03], [2300, 0.3, 0.02]], 0.4, 0.001)];
-  B.beep = [tones([[1950, 0, 0.11, 0.6]], 0.14, 0.4)];
+  B.beep = [tones([[1040, 0, 0.09, 0.35], [2080, 0, 0.05, 0.06]], 0.12, 0.9)];
   B.plant = [tones([[1400, 0, 0.07, 0.5], [1650, 0.12, 0.07, 0.5], [1400, 0.24, 0.07, 0.5], [2100, 0.4, 0.12, 0.6]], 0.6, 0.3)];
   B.defuse = [mkbuf(0.4, (d, n, SR) => { clickAt(d, SR, 0, [2500, 3700], 0.6, 0.008); clickAt(d, SR, 0.15, [2200, 3300], 0.6, 0.008); clickAt(d, SR, 0.3, [2700, 4000], 0.6, 0.008); })];
-  B.tick = [mkbuf(0.04, (d, n, SR) => clickAt(d, SR, 0, [1800, 2700], 1, 0.004))];
+  B.tick = [mkbuf(0.03, (d, n, SR) => clickAt(d, SR, 0, [900, 1400], 0.35, 0.003))];
   B.ui = [tones([[880, 0, 0.06, 0.4]], 0.08, 0)];
   B.buy = [tones([[740, 0, 0.08, 0.4], [1110, 0.06, 0.12, 0.35]], 0.22, 0)];
   B.win = [tones([[523, 0, 0.35, 0.35], [659, 0.1, 0.35, 0.35], [784, 0.2, 0.4, 0.35], [1047, 0.32, 0.7, 0.4]], 1.1)];
@@ -157,7 +157,7 @@ const REV = { ak47: 0.5, rifle: 0.5, smg: 0.45, pistol: 0.45, deagle: 0.55, shot
 const VARY = new Set(['ak47', 'rifle', 'smg', 'pistol', 'deagle', 'shotgun', 'awp', 'silenced', 'step', 'knife', 'bounce', 'hit']);
 // громкость по типам
 const GAIN = { ak47: 0.95, rifle: 0.9, smg: 0.8, pistol: 0.8, deagle: 0.95, shotgun: 1.0, awp: 1.0, silenced: 0.5, step: 0.45, knife: 0.5, throw: 0.4, reload: 0.5, draw: 0.4, empty: 0.5,
-  hit: 0.55, head: 0.6, hurt: 0.6, he: 1.0, boom: 1.0, flash: 0.9, ring: 0.35, smoke: 0.5, fire: 0.7, bounce: 0.4, beep: 0.45, plant: 0.5, defuse: 0.5,
+  hit: 0.55, head: 0.6, hurt: 0.6, he: 1.0, boom: 1.0, flash: 0.9, ring: 0.2, smoke: 0.5, fire: 0.7, bounce: 0.4, beep: 0.45, plant: 0.5, defuse: 0.5,
   tick: 0.25, ui: 0.3, spray: 0.5, buy: 0.4, win: 0.5, lose: 0.5, rare: 0.5, round: 0.4 };
 // d — дистанция, pan — стерео (-1..1), k — множитель громкости
 export function play(name, d = 0, pan = 0, k = 1) {
@@ -211,24 +211,6 @@ export function startAmbience(style) {
   src.connect(lp); lp.connect(g); g.connect(master); src.start();
   const nodes = [src, lfo], timers = [];
   if (indoor) { for (const f of [60, 120]) { const o = ctx.createOscillator(), og = ctx.createGain(); o.frequency.value = f; og.gain.value = f === 60 ? 0.012 : 0.005; o.connect(og); og.connect(g); o.start(); nodes.push(o); } }
-  // птицы на открытых картах
-  const birds = { dust: 1, inferno: 1, jungle: 2, lake: 2, park: 1, egypt: 1 }[style] || 0;
-  if (birds) {
-    const chirp = () => {
-      if (!amb || amb.g !== g) return;
-      const t0 = ctx.currentTime + 0.05, n = 2 + Math.floor(Math.random() * 4), base = 2600 + Math.random() * 1800, pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-      const out = ctx.createGain(); out.gain.value = 0.025 + Math.random() * 0.02;
-      if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; out.connect(pan); pan.connect(master); } else out.connect(master);
-      for (let k = 0; k < n; k++) {
-        const o = ctx.createOscillator(), e = ctx.createGain(), t = t0 + k * (0.09 + Math.random() * 0.06);
-        o.type = 'sine'; o.frequency.setValueAtTime(base, t); o.frequency.exponentialRampToValueAtTime(base * (1.2 + Math.random() * 0.4), t + 0.05);
-        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(1, t + 0.01); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
-        o.connect(e); e.connect(out); o.start(t); o.stop(t + 0.09);
-      }
-      timers.push(setTimeout(chirp, (2500 + Math.random() * 7000) / birds));
-    };
-    timers.push(setTimeout(chirp, 1500));
-  }
   amb = { g, nodes, timers };
 }
 export function stopAmbience(fade = 1) {

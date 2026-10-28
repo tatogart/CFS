@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793131993';
-import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793131993';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793131993';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793131993';
-import { AgentModel } from './models.js?v=1793131993';
-import { Controls, isTouch } from './controls.js?v=1793131993';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793131993';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793131993';
-import { styleOf } from './decor.js?v=1793131993';
-import { Game } from './game.js?v=1793131993';
+import { MAPS, CELL } from './maps.js?v=1793168011';
+import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793168011';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793168011';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793168011';
+import { AgentModel } from './models.js?v=1793168011';
+import { Controls, isTouch } from './controls.js?v=1793168011';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793168011';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793168011';
+import { styleOf } from './decor.js?v=1793168011';
+import { Game } from './game.js?v=1793168011';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -615,6 +615,7 @@ const hud = {
     } catch (e) { /* нет синтеза речи */ }
   },
   onRoundEnd() {},
+  onHand(h) { save.settings.hand = h; persist(); },
   onKill() {
     const g = game; if (!g || !g.player.cur) return;
     const cur = g.player.cur, slot = cur.id === 'knife' ? 'knife' : cur.id;
@@ -732,6 +733,7 @@ function updateHud(g, dt) {
   if (p.alive && p.team === 'CT' && B && B.planted && !B.done && p.pos.distanceTo(B.pos) < 1.6) hint = 'Удерживайте E — разминировать' + (p.kit ? ' (набор сапёра)' : '');
   if (p.plantT > 0) { prog = p.plantT / 3.2; progT = 'Закладка…'; }
   if (p.defuseT > 0) { prog = p.defuseT / (p.kit ? 5 : 10); progT = 'Разминирование…'; }
+  if (!hint && p.alive && g.ground && g.ground.length) { const it = g.lookWeapon(p); if (it) hint = `E — подобрать ${WEAPONS[it.inst.id] ? WEAPONS[it.inst.id].name : ''}`; }
   if (g.state === 'freeze' && g.canBuy(p)) hint = touch ? 'Нажмите $ — закупка' : 'B — закупка';
   if (!touch && !controls.locked) hint = 'Кликните по экрану, чтобы управлять мышью';
   set('hint', hint);
@@ -970,7 +972,7 @@ function renderEnd(dt) {
   const rw = $('eRew'), ra = ease((t - 2.6) / 0.5);
   rw.style.opacity = ra; rw.style.transform = `translateX(${(1 - ra) * 40}px)`;
   const ck = ease((t - 2.9) / 1.2), cn = Math.round(d.reward * ck);
-  if (cn !== E.coinsShown) { E.coinsShown = cn; rw.querySelector('.eCoins').textContent = '◈ ' + cn; if (cn % 7 === 0 && ck < 1) play('step'); }
+  if (cn !== E.coinsShown) { E.coinsShown = cn; rw.querySelector('.eCoins').textContent = '◈ ' + cn; }
   const xp = d.xpFrom + d.xpGain * ease((t - 3.2) / 1.4), lv = Math.floor(xp / XP_LVL) + 1;
   rw.querySelector('.eBar i').style.width = ((xp % XP_LVL) / XP_LVL * 100) + '%';
   const lvEl = rw.querySelector('.eL'); const txt = 'Ур. ' + lv;
@@ -1027,7 +1029,7 @@ function startGame() {
       const left = 20 - (MM.t - MM.acceptT);
       $('accBar').style.width = Math.max(0, left / 20 * 100) + '%';
       // боты принимают по одному
-      if (MM.accepted && MM.bots < MM.total - 1 && MM.t >= MM.nextBot) { MM.bots++; MM.nextBot = MM.t + 0.15 + Math.random() * 0.7; play('tick'); renderAccSlots(); }
+      if (MM.accepted && MM.bots < MM.total - 1 && MM.t >= MM.nextBot) { MM.bots++; MM.nextBot = MM.t + 0.15 + Math.random() * 0.7; renderAccSlots(); }
       if (MM.accepted && MM.bots >= MM.total - 1 && !MM.done) { MM.done = true; $('accTitle').textContent = 'ВСЕ ИГРОКИ ПРИНЯЛИ МАТЧ'; setTimeout(() => { $('accept').classList.add('hidden'); MM = null; beginLoad(); }, 900); }
       if (left <= 0 && !MM.accepted) { $('accept').classList.add('hidden'); MM = null; alert('Вы не приняли матч'); return; }
     }

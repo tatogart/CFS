@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793131993';
-import { WEAPONS } from './data.js?v=1793131993';
+import { CELL } from './maps.js?v=1793168011';
+import { WEAPONS } from './data.js?v=1793168011';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -322,7 +322,15 @@ export class Bot {
     inp.fire = false; inp.use = false; inp.jump = false; inp.walk = false; inp.crouch = false;
     if (frozen) { inp.mx = inp.mz = 0; this.idleLook(dt); return; }
     this.thinkT -= dt;
-    if (this.thinkT <= 0) { this.thinkT = 0.12 + Math.random() * 0.06; this.think(); }
+    if (this.thinkT <= 0) {
+      this.thinkT = 0.12 + Math.random() * 0.06; this.think();
+      // без основного оружия — подобрать лежащее рядом
+      if (!a.weapons[1] && !this.target && g.ground && g.ground.length && g.time > (this.lootT || 0)) {
+        this.lootT = g.time + 2;
+        let best = null, bd = 12; for (const it of g.ground) { const d = it.pos.distanceTo(a.pos); if (d < bd && it.rest && g.world.los(g.eyePos(a), it.pos.clone().setY(it.pos.y + 0.3))) { bd = d; best = it; } }
+        if (best) this.setGoal(best.pos.clone());
+      }
+    }
     const T = this.target;
     // ---- бой ----
     if (T && T.alive) {

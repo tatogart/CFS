@@ -32,7 +32,7 @@ export class Controls {
     this.s.score = k.has('Tab');
   }
   _bind() {
-    const map = { KeyR: 'reload', Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', KeyQ: 'last', KeyB: 'buy', Escape: 'pause', KeyG: 'drop', KeyF: 'inspect', KeyT: 'spray', Space: 'jumpP' };
+    const map = { KeyR: 'reload', Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', KeyQ: 'last', KeyB: 'buy', Escape: 'pause', KeyG: 'drop', KeyF: 'inspect', KeyT: 'spray', KeyH: 'hand', KeyE: 'useP', Space: 'jumpP' };
     addEventListener('keydown', e => {
       if (!this.enabled) return;
       if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
@@ -69,7 +69,7 @@ export class Controls {
           if (a === 'fire') { this.fireIds.add(t.identifier); this.s.fire = true; this.press('fireP'); this._lastLook = this._lastLook || {}; this._lastLook[t.identifier] = [t.clientX, t.clientY]; }
           else if (a === 'jump') { this.s.jump = true; this.press('jumpP'); this._hold = this._hold || {}; this._hold[t.identifier] = b; }
           else if (a === 'crouch') { this.crouchToggle = !this.crouchToggle; this.s.crouch = this.crouchToggle; b.classList.toggle('lit', this.crouchToggle); }
-          else if (a === 'use') { this.s.use = true; this._hold = this._hold || {}; this._hold[t.identifier] = b; }
+          else if (a === 'use') { this.s.use = true; this.press('useP'); this._hold = this._hold || {}; this._hold[t.identifier] = b; }
           else if (a === 'score') { this.s.score = !this.s.score; }
           else this.press(a);
           if (a !== 'fire' && a !== 'jump' && a !== 'use') setTimeout(() => b.classList.remove('on'), 120);

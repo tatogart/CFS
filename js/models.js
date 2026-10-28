@@ -1,7 +1,7 @@
 // 3D-модели: агенты (человечки с IK-руками), оружие
 import * as THREE from '../vendor/three.module.min.js';
-import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793168011';
-import { skinById, WEAPONS, KNIVES } from './data.js?v=1793168011';
+import { patternCanvas, DEFAULT_PAT } from './art.js?v=1793168241';
+import { skinById, WEAPONS, KNIVES } from './data.js?v=1793168241';
 
 const matCache = new Map();
 export function mat(color, opts = {}) {
@@ -85,6 +85,8 @@ export function buildWeapon(id, skinId) {
     else geo = G(`b${w}_${h}_${d}`, () => box(w, h, d));
     const m = new THREE.Mesh(geo, k === 'd' ? dark : k === 'w' ? woodMat : bodyMat);
     m.position.set(x, y, z); m.rotation.x = rot; grp.add(m);
+    // магазин: деталь под ствольной коробкой перед рукояткой (для анимации перезарядки)
+    if (k !== 'w' && y < -0.035 && z < -0.03 && z > -0.42 && h >= 0.05 && w <= 0.06) m.userData.mag = true;
   }
   grp.userData.fore = new THREE.Vector3(...def.fore);
   grp.userData.muzzle = new THREE.Vector3(...def.muzzle);

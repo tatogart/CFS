@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793171803';
-import { World } from './world.js?v=1793171803';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793171803';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793171803';
-import { play, soundFor } from './sfx.js?v=1793171803';
-import { Bot, planRound } from './bots.js?v=1793171803';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793171803';
+import { CELL } from './maps.js?v=1793172504';
+import { World } from './world.js?v=1793172504';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793172504';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793172504';
+import { play, soundFor } from './sfx.js?v=1793172504';
+import { Bot, planRound } from './bots.js?v=1793172504';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793172504';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -396,7 +396,7 @@ export class Game {
       if (inst.rack) { this.vmRack = 1; inst.rack = false; }
     }
     g.scale.setScalar(0.62);
-    this.vmGun = g; this.vmMuzzle = gun.userData.muzzle.clone();
+    this.vmGun = g; this.vmModel = inst.id === 'knife' ? null : gun; this.vmMuzzle = gun.userData.muzzle.clone();
     this.vm.add(g);
     this.vm.scale.x = this.settings.hand === 'left' ? -1 : 1;
     this.vmCam.fov = this.settings.vmfov || 62; this.vmCam.updateProjectionMatrix();
@@ -1462,6 +1462,7 @@ export class Game {
       const knifeT = view.cur && (view.cur.id === 'knife') ? this.vmKick : 0;
       this.vmGun.position.set(b.x + Math.sin(this.bobT) * 0.012 * bob, b.y - Math.abs(Math.cos(this.bobT)) * 0.012 * bob - reload * 0.12 - this.vmDraw * 0.25 - view.crouchK * 0.01, b.z + this.vmKick * 0.05 * (knifeT ? -1.5 : 1));
       this.vmGun.rotation.set(this.vmKick * 0.08 + reload * 0.7 - this.vmDraw * 0.6 - knifeT * 0.6, 0.05 + knifeT * 0.8, -reload * 0.3 + knifeT * 0.5);
+      if (this.vmModel) { this.vmModel.position.set(0, 0, 0); this.vmModel.rotation.set(0, 0, 0); }
       if (anim) this._vmReloadAnim(view, rl, dt);
       const isKnife = view.cur && view.cur.id === 'knife' && this.vmSpin, km = isKnife ? (view.cur.model || 'knife') : null;
       const ks = this.vmSpin, kn = this.vmKnife;
@@ -1510,7 +1511,10 @@ export class Game {
         } else if (this.inspectVar) {
           // секретный осмотр оружия: оборот вокруг ствола и прокрутка
           const t = Math.max(0, Math.min(1, (u - 0.2) / 0.5)), tt = t * t * (3 - 2 * t);
-          this.vmGun.rotation.z -= e * 0.3 + tt * Math.PI * 2; this.vmGun.rotation.y += e * 0.7; this.vmGun.position.x -= e * 0.06; this.vmGun.position.y += e * 0.05 + Math.sin(t * Math.PI) * 0.04;
+          // крутится только оружие на пальце, руки остаются на месте; левая рука отходит в сторону
+          this.vmGun.rotation.y += e * 0.5; this.vmGun.position.x -= e * 0.05; this.vmGun.position.y += e * 0.04;
+          if (this.vmModel) { if (this.vmType === 'pistol') { this.vmModel.position.set(0, 0, 0.03); this.vmModel.rotation.x = -tt * Math.PI * 2; this.vmModel.translateZ(-0.03); } else this.vmModel.rotation.z = -tt * Math.PI * 2; }
+          if (this.vmL) this.vmL.position.y -= Math.sin(Math.min(1, u * 1.5) * Math.PI) * 0.18 * (u < 0.8 ? 1 : 0);
         } else {
           const ph = u < 0.5 ? 0 : (u - 0.5) * 2;
           this.vmGun.rotation.y += e * (0.9 + Math.sin(ph * Math.PI) * 0.7);

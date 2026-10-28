@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793173618';
-import { World } from './world.js?v=1793173618';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793173618';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793173618';
-import { play, soundFor } from './sfx.js?v=1793173618';
-import { Bot, planRound } from './bots.js?v=1793173618';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793173618';
+import { CELL } from './maps.js?v=1793174571';
+import { World } from './world.js?v=1793174571';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793174571';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793174571';
+import { play, soundFor } from './sfx.js?v=1793174571';
+import { Bot, planRound } from './bots.js?v=1793174571';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793174571';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -188,7 +188,7 @@ export class Game {
     const mode = this.admin.cheaters || 'normal';
     if (this.practice || this.aimMode || mode === 'off') return;
     const bots = this.actors.filter(a => a.bot && a.brain).sort(() => Math.random() - 0.5);
-    const chance = mode === 'always' ? 1 : 0.12, maxN = mode === 'always' ? 1 : 2; let n = 0;
+    const chance = mode === 'always' ? 1 : 0.04, maxN = 1; let n = 0;
     const names = CHEAT_NAMES.slice().sort(() => Math.random() - 0.5);
     for (const b of bots) {
       if (n >= maxN || Math.random() >= chance) continue;

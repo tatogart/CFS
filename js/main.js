@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793173618';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793173618';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793173618';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793173618';
-import { AgentModel } from './models.js?v=1793173618';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793173618';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793173618';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793173618';
-import { styleOf } from './decor.js?v=1793173618';
-import { Game } from './game.js?v=1793173618';
+import { MAPS, CELL } from './maps.js?v=1793174571';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793174571';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793174571';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793174571';
+import { AgentModel } from './models.js?v=1793174571';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793174571';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793174571';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793174571';
+import { styleOf } from './decor.js?v=1793174571';
+import { Game } from './game.js?v=1793174571';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -515,9 +515,11 @@ function openProfile() {
     <div class="pLvl"><b>Уровень ${lv}</b><div class="eBar"><i style="width:${(xp % XP_PER_LVL) / XP_PER_LVL * 100}%"></i></div><small>${xp % XP_PER_LVL} / ${XP_PER_LVL} XP</small></div>
     <div class="pRanks">${rk('comp')}${rk('wing')}</div>
     <div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div><div><b>${st.opened}</b>кейсов</div><div><b>${st.bans || 0}</b>читеров забанено</div></div>
+    <h3 class="pDropH">История матчей <small>последние ${Math.min(30, (save.history || []).length)} · нажмите на матч</small></h3><div class="hList" id="pHist">${historyHtml()}</div>
     <h3 class="pDropH">Миссии недели <small>обновятся через ${weekLeft()}</small></h3><div class="misList">${missionsHtml()}</div>
     <h3 class="pDropH">Еженедельный дроп <small>${wk.taken.length < 2 ? `выберите ${2 - wk.taken.length} из 4` : 'получено · новый через ' + weekLeft()}</small></h3>
     <div class="grid items small pDrop" id="dropOffers"></div>`;
+  bindHistory($('pHist'));
   const box = $('dropOffers');
   wk.offers.forEach((o, i) => {
     let c;
@@ -558,7 +560,10 @@ function renderHome() {
   const st = save.stats, lm = save.lastMatch, rc = rankData('comp'), rw = rankData('wing');
   const ms = missions().list;
   $('lastBox').innerHTML = `<h4>Миссии недели · ${ms.filter(m => m.done).length}/${ms.length}</h4><div class="misList small">${missionsHtml()}</div><h4 style="margin-top:10px">Звания</h4><div class="ranksH"><div><img src="${rankURL(rankOf(rc), 140)}" alt=""><small>Соревновательный</small><b>${rankOf(rc) < 0 ? 'Без звания' : RANKS[rankOf(rc)]}</b></div><div><img src="${rankURL(rankOf(rw), 140)}" alt=""><small>Напарники</small><b>${rankOf(rw) < 0 ? 'Без звания' : RANKS[rankOf(rw)]}</b></div></div><h4 style="margin-top:10px">Ваша статистика</h4><div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div></div>` +
-    (lm ? `<h4 style="margin-top:10px">Последний матч</h4><div style="font-size:14px">${esc(lm.map)} · <b style="color:${lm.won ? '#6fd36a' : '#ff6a5a'}">${lm.score}</b> · ${lm.k}/${lm.d}</div>` : '');
+    ((save.history || []).length ? `<h4 style="margin-top:10px">История матчей</h4><div class="hList mini">${historyHtml(3)}</div><button class="hMore" id="hMore">Вся история →</button>` : '') +
+    (lm && !(save.history || []).length ? `<h4 style="margin-top:10px">Последний матч</h4><div style="font-size:14px">${esc(lm.map)} · <b style="color:${lm.won ? '#6fd36a' : '#ff6a5a'}">${lm.score}</b> · ${lm.k}/${lm.d}</div>` : '');
+  const hm = $('hMore'); if (hm) hm.onclick = () => { play('tick'); openProfile(); setTimeout(() => { const h = $('pHist'); if (h) h.scrollIntoView({ block: 'start' }); }, 50); };
+  bindHistory($('lastBox'));
 }
 $('sideSw').onclick = e => { const b = e.target.closest('button'); if (!b) return; M.side = save.menuSide = b.dataset.side; persist(); setMenuAgent(save.agent[M.side]); renderHome(); play('tick'); };
 $('homePlay').onclick = () => { initAudio(); showTab('play'); };
@@ -598,7 +603,7 @@ function renderAdmin() {
   const tog = (key, label) => btn(r, (A[key] ? '✔ ' : '') + label, () => { A[key] = !A[key]; if (game) game.admin[key] = A[key]; }, A[key]);
   tog('god', 'Бессмертие'); tog('ammo', 'Бесконечные патроны'); tog('money', '$16 000 всегда'); tog('oneshot', 'Убийство с одного выстрела'); tog('radar', 'Враги на радаре'); tog('speed', 'Быстрый бег');
   tog('wall', 'ВХ: видно сквозь стены'); tog('norecoil', 'Без отдачи'); tog('nades', 'Бесконечные гранаты'); tog('fastBomb', 'Мгновенная закладка/разминирование'); tog('freeze', 'Заморозить ботов'); tog('peace', 'Боты не стреляют');
-  r = group(`Читеры среди ботов: ${{ off: 'выключены', normal: 'обычно (12%)', always: 'всегда' }[A.cheaters || 'normal']}`);
+  r = group(`Читеры среди ботов: ${{ off: 'выключены', normal: 'обычно (4%)', always: 'всегда' }[A.cheaters || 'normal']}`);
   for (const [v, n] of [['off', 'Выкл'], ['normal', 'Обычно'], ['always', 'В каждом матче']]) btn(r, n, () => { A.cheaters = v; }, (A.cheaters || 'normal') === v);
   r = group(`Скорость игры: ×${A.timeScale || 1}`);
   for (const v of [0.25, 0.5, 1, 1.5, 2]) btn(r, '×' + v, () => { A.timeScale = v === 1 ? 0 : v; if (game) game.admin.timeScale = A.timeScale; }, (A.timeScale || 1) === v);
@@ -702,6 +707,40 @@ function renderSettings() {
   $('statsBox').innerHTML = `<div>Убийств<b>${st.kills}</b></div><div>Смертей<b>${st.deaths}</b></div><div>K/D<b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b></div><div>Матчей<b>${st.matches}</b></div><div>Побед<b>${st.wins}</b></div><div>Кейсов открыто<b>${st.opened}</b></div>`;
 }
 
+// ---------- история матчей ----------
+function recordMatch(g, res, extra = {}) {
+  const p = g.player, rounds = Math.max(1, g.round - (g.state === 'end' || g.over ? 0 : 1));
+  const row = a => ({ n: a.name, t: a.team, k: a.kills, as: a.assists || 0, d: a.deaths, m: a.mvps || 0, hs: a.kills ? Math.round((a.hs || 0) / a.kills * 100) : 0, adr: Math.round((a.dmgTotal || 0) / rounds), me: a === p ? 1 : 0, ch: a.cheat ? 1 : 0 });
+  const h = save.history || (save.history = []);
+  h.unshift({ at: Date.now(), mode: g.mode, map: g.o.map.name, mapId: g.o.map.id, diff: g.diff.name, res, side: p.team, score: g.dm && !g.ar ? null : [g.score[p.team], g.score[p.team === 'T' ? 'CT' : 'T']], ...extra, players: g.actors.filter(a => !a.target).map(row) });
+  if (h.length > 30) h.length = 30;
+  persist();
+}
+const RES_TXT = { win: ['ПОБЕДА', 'win'], lose: ['ПОРАЖЕНИЕ', 'lose'], draw: ['НИЧЬЯ', 'draw'], cancel: ['ОТМЕНЁН · CFAC', 'cancel'] };
+function historyHtml(limit = 30) {
+  const h = (save.history || []).slice(0, limit);
+  if (!h.length) return '<div class="empty">Сыграйте матч — он появится здесь.</div>';
+  return h.map((m, i) => {
+    const me = m.players.find(x => x.me) || {}, md = (MODES.find(x => x[0] === m.mode) || [])[1] || m.mode;
+    const [rt, rc] = m.res === 'place' ? [`МЕСТО ${m.place}`, m.place === 1 ? 'win' : m.place <= 3 ? 'draw' : 'lose'] : RES_TXT[m.res] || ['—', 'draw'];
+    const d = new Date(m.at), when = `${d.toLocaleDateString('ru', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
+    return `<div class="hRow ${rc}" data-i="${i}"><div class="hRes">${rt}</div><div class="hMap"><b>${esc(m.map)}</b><small>${esc(md)} · ${esc(m.diff || '')} · ${when}</small></div>
+      <div class="hScore">${m.score ? `${m.score[0]} : ${m.score[1]}` : ''}</div><div class="hKd"><b>${me.k ?? 0}/${me.as ?? 0}/${me.d ?? 0}</b><small>ADR ${me.adr ?? 0} · ГОЛ ${me.hs ?? 0}%</small></div>
+      ${m.rankDelta != null ? `<div class="hElo ${m.rankDelta >= 0 ? 'up' : 'down'}">${m.rankDelta >= 0 ? '+' : ''}${m.rankDelta}</div>` : '<div class="hElo"></div>'}</div>
+      <div class="hDet hidden" id="hd${i}"></div>`;
+  }).join('');
+}
+function bindHistory(root) {
+  root.querySelectorAll('.hRow').forEach(r => r.onclick = () => {
+    const i = +r.dataset.i, m = save.history[i], det = root.querySelector('#hd' + i);
+    if (!det.classList.contains('hidden')) { det.classList.add('hidden'); return; }
+    const team = t => m.players.filter(x => x.t === t).sort((a, b) => b.k - a.k).map(x => `<tr class="${x.me ? 'me' : ''}"><td class="${x.t === 'T' ? 't' : 'ct'}">${x.ch ? '<span class="banned">CFAC</span> ' : ''}${esc(x.n)}</td><td>${x.k}</td><td>${x.as}</td><td>${x.d}</td><td>${x.m ? '★' + x.m : ''}</td><td>${x.hs}%</td><td>${x.adr}</td></tr>`).join('');
+    const head = '<tr><th>Игрок</th><th>У</th><th>П</th><th>С</th><th>★</th><th>ГОЛ</th><th>ADR</th></tr>';
+    det.innerHTML = `<table>${head}${m.mode === 'dm' ? team('T') + team('CT') : `<tr><th colspan="7" class="ct">Спецназ</th></tr>${team('CT')}<tr><th colspan="7" class="t">Террористы</th></tr>${team('T')}`}</table>${m.cheater ? `<div class="hBan">Матч отменён: игрок <b>${esc(m.cheater)}</b> заблокирован CFAC</div>` : ''}`;
+    det.classList.remove('hidden'); play('tick');
+  });
+}
+
 // ---------- чат игрока ----------
 function closeChat() { $('chatIn').classList.add('hidden'); $('chatTxt').blur(); if (game) { controls.enabled = true; controls.suppressPause = false; if (!touch) controls.lock(); } }
 function sendChat(text) {
@@ -778,6 +817,7 @@ const hud = {
   },
   vacBan(who, g) {
     const comp = 150, xp = 200;
+    recordMatch(g, 'cancel', { cheater: who.name });
     save.coins += comp; save.xp = (save.xp || 0) + xp; save.stats.bans = (save.stats.bans || 0) + 1; persist();
     hud.chat(null, `[CFAC] Игрок ${who.name} навсегда заблокирован. Матч отменён.`);
     controls.unlock(); controls.enabled = false;
@@ -1072,6 +1112,7 @@ function endMatch(g) {
   const starsGot = armoryXP(xpGain);
   const xpFrom = save.xp || 0; save.xp = xpFrom + xpGain;
   save.lastMatch = { map: g.o.map.name, score: dm ? `#${place}` : `${my}:${th}`, won, k: p.kills, d: p.deaths };
+  recordMatch(g, dm ? 'place' : draw ? 'draw' : won ? 'win' : 'lose', { place, rankDelta: rank ? rank.delta : null });
   save.coins += reward; save.stats.matches++; if (won) save.stats.wins++; save.stats.kills += p.kills; save.stats.deaths += p.deaths; persist();
   // кто стоит на сцене: своя команда (или топ-5 в бою насмерть), лучший — в центре
   const pool = (dm ? order : order.filter(a => a.team === p.team)).slice(0, 5);

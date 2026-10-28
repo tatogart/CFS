@@ -553,3 +553,23 @@ body.tedit .tb.teSel { outline: 2px solid #ffd860; box-shadow: 0 0 14px #ffd860;
 .vacR { color: #ffd860; margin: 10px 0 14px; font-size: 18px; }
 .playBig.inline#vacOk { position: static; }
 @media (max-height: 460px) { .vacT { font-size: 32px; } .vacLogo svg { width: 60px; height: 60px; } }
+/* история матчей */
+.hList { display: flex; flex-direction: column; gap: 4px; }
+.hRow { display: grid; grid-template-columns: 96px 1fr 60px 92px 44px; gap: 8px; align-items: center; padding: 6px 8px; background: rgba(255,255,255,.04); border-left: 4px solid #6a7686; border-radius: 3px; cursor: pointer; }
+.hRow:hover { background: rgba(255,255,255,.08); }
+.hRow.win { border-left-color: #4cd07a; } .hRow.lose { border-left-color: #e05555; } .hRow.draw { border-left-color: #c8a040; } .hRow.cancel { border-left-color: #ff4a3a; background: rgba(255,74,58,.08); }
+.hRes { font-family: "Barlow Condensed", system-ui, sans-serif; font-weight: 800; font-size: 15px; letter-spacing: 1px; }
+.hRow.win .hRes { color: #4cd07a; } .hRow.lose .hRes { color: #e05555; } .hRow.cancel .hRes { color: #ff6a5a; font-size: 13px; }
+.hMap b { display: block; font-size: 14px; } .hMap small, .hKd small { display: block; color: #8a96a6; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hScore { font-weight: 800; font-size: 16px; text-align: center; } .hKd b { font-size: 14px; }
+.hElo { font-weight: 800; text-align: right; } .hElo.up { color: #4cd07a; } .hElo.down { color: #e05555; }
+.hDet { padding: 6px 8px 10px; background: rgba(0,0,0,.25); border-radius: 3px; font-size: 12px; }
+.hDet.hidden { display: none; }
+.hDet table { width: 100%; border-collapse: collapse; } .hDet td, .hDet th { padding: 3px 5px; text-align: right; } .hDet td:first-child, .hDet th:first-child { text-align: left; }
+.hDet tr.me { background: rgba(255,216,96,.1); } .hDet .t { color: var(--t); } .hDet .ct { color: var(--ct); }
+.hDet .banned { background: #c0392b; color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 2px; }
+.hBan { margin-top: 6px; color: #ff6a5a; }
+.hList.mini .hRow { grid-template-columns: 70px 1fr 44px; } .hList.mini .hKd, .hList.mini .hElo { display: none; } .hList.mini .hRes { font-size: 12px; }
+.hMore { margin-top: 6px; background: transparent; border: 1px solid rgba(255,255,255,.2); border-radius: 4px; padding: 5px 10px; font-size: 13px; color: #c4cfdb; width: 100%; }
+@media (max-width: 560px) { .hRow { grid-template-columns: 80px 1fr 50px; } .hRow .hKd, .hRow .hElo { display: none; } }
+#lastBox { max-height: calc(100vh - 330px); overflow-y: auto; scrollbar-width: thin; }

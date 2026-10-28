@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=1793172504">
+<link rel="stylesheet" href="css/style.css?v=1793173618">
 </head>
 <body>
 <canvas id="view"></canvas>
@@ -139,6 +139,8 @@
   <div id="chat"></div>
   <div id="dmgRep" class="hidden"></div>
   <div id="inspInfo" style="opacity:0"></div>
+  <div id="chatIn" class="hidden"><div class="chRow"><span id="chatMode">ВСЕМ:</span><input id="chatTxt" maxlength="120" autocomplete="off" placeholder="Сообщение… Enter — отправить, Esc — закрыть"><button id="chatSend">➤</button></div>
+    <div id="chatQuick"><button>gg</button><button>gl hf</button><button>читер!</button><button>репорт</button><button>ez</button><button>помогите</button><button>nice</button><button>привет</button></div></div>
   <div id="center"></div>
   <div id="banner" class="hidden"></div>
   <div id="vignette"></div>
@@ -171,6 +173,7 @@
     <button class="tb mini spr" data-act="spray">🎨</button>
     <button class="tb mini hand" data-act="hand">✋</button>
     <button class="tb mini drop" data-act="drop">⇣</button>
+    <button class="tb mini chatb" data-act="chatAll">💬</button>
   </div>
 </div>
 
@@ -201,6 +204,7 @@
   <button class="playBig inline" id="eOk"><span>ПРОДОЛЖИТЬ</span></button>
 </div>
 
+<div id="vac" class="hidden"></div>
 <div id="rotate" class="hidden"><div>⟳</div>Поверните телефон горизонтально</div>
 <div id="ytBox" class="hidden"></div>
 <div id="loading" class="hidden">Загрузка карты…</div>
@@ -229,6 +233,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=1793172504"></script>
+<script type="module" src="js/main.js?v=1793173618"></script>
 </body>
 </html>

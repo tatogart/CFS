@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793172504';
-import { WEAPONS } from './data.js?v=1793172504';
+import { CELL } from './maps.js?v=1793173618';
+import { WEAPONS } from './data.js?v=1793173618';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -147,8 +147,9 @@ export class Bot {
   // ---------- восприятие ----------
   canSee(e) {
     const g = this.g, a = this.a;
-    if (a.blind > 0.6) return false;
+    if (a.blind > 0.6 && !a.cheat) return false;
     const eye = g.eyePos(a, this._e);
+    if (a.cheat) return e.pos.distanceTo(a.pos) < 90 && g.world.los(eye, g.eyePos(e, this._tv || (this._tv = eye.clone())));   // аимбот: обзор 360°
     const dx = e.pos.x - eye.x, dz = e.pos.z - eye.z, d = Math.hypot(dx, dz);
     if (d > 75 * this.d.spot) return false;
     const yawTo = Math.atan2(-dx, -dz);
@@ -324,6 +325,12 @@ export class Bot {
     this.thinkT -= dt;
     if (this.thinkT <= 0) {
       this.thinkT = 0.12 + Math.random() * 0.06; this.think();
+      // ВХ: читер знает, где враги, и идёт прямо на ближайшего
+      if (a.cheat && a.cheat.wall && !this.target && g.time > (this.huntT || 0)) {
+        this.huntT = g.time + 1.5;
+        let best = null, bd = 1e9; for (const e of g.actors) if (e.alive && g.isEnemy(a, e)) { const d = e.pos.distanceTo(a.pos); if (d < bd) { bd = d; best = e; } }
+        if (best) this.setGoal(best.pos.clone());
+      }
       // без основного оружия — подобрать лежащее рядом
       if (!a.weapons[1] && !this.target && g.ground && g.ground.length && g.time > (this.lootT || 0)) {
         this.lootT = g.time + 2;

@@ -530,3 +530,26 @@ body.tedit .tb.teSel { outline: 2px solid #ffd860; box-shadow: 0 0 14px #ffd860;
 #admin { z-index: 46; }
 .alab { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #9fb0c2; }
 #caseScreen > * { flex-shrink: 0; }
+
+/* чат игрока и бан CFAC */
+#chat i { font-style: normal; color: #9fb0c2; font-size: 11px; }
+#chat .sys { color: #ff6a5a; font-weight: 700; }
+#chatIn { position: absolute; left: calc(10px + var(--safe-l)); bottom: calc(80px + var(--safe-b)); width: min(460px, 70vw); z-index: 20; pointer-events: auto; }
+#chatIn.hidden { display: none; }
+.chRow { display: flex; gap: 6px; align-items: center; background: rgba(8,11,16,.88); border: 1px solid rgba(255,255,255,.15); border-radius: 4px; padding: 4px 6px; }
+#chatMode { font-size: 12px; font-weight: 800; color: #ffd860; white-space: nowrap; }
+#chatTxt { flex: 1; background: transparent; border: 0; color: #fff; font: inherit; font-size: 14px; outline: none; min-width: 0; }
+#chatSend { background: #2f8a3a; border: 0; border-radius: 3px; width: 32px; height: 28px; }
+#chatQuick { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+#chatQuick button { background: rgba(8,11,16,.8); border: 1px solid rgba(255,255,255,.15); border-radius: 12px; padding: 3px 9px; font-size: 12px; }
+.tb.chatb { right: calc(440px + var(--safe-r)); font-size: 14px; }
+#vac { position: fixed; inset: 0; z-index: 48; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(60,8,8,.85), rgba(4,4,6,.95)); }
+#vac.hidden { display: none; }
+.vacBox { text-align: center; max-width: min(520px, 92vw); padding: 20px; font-family: "Barlow Condensed", system-ui, sans-serif; animation: accIn .4s ease-out; }
+.vacLogo svg { width: 90px; height: 90px; filter: drop-shadow(0 0 18px rgba(255,74,58,.6)); }
+.vacT { font-size: 44px; font-weight: 800; letter-spacing: 4px; color: #ff4a3a; }
+.vacP { color: #c4cfdb; font-size: 16px; margin: 6px 0; font-family: system-ui, sans-serif; }
+.vacN { font-size: 30px; font-weight: 800; color: #fff; background: rgba(255,74,58,.15); border: 1px solid rgba(255,74,58,.4); border-radius: 4px; padding: 4px 14px; display: inline-block; margin: 4px 0; }
+.vacR { color: #ffd860; margin: 10px 0 14px; font-size: 18px; }
+.playBig.inline#vacOk { position: static; }
+@media (max-height: 460px) { .vacT { font-size: 32px; } .vacLogo svg { width: 60px; height: 60px; } }

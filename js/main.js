@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793172504';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793172504';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793172504';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793172504';
-import { AgentModel } from './models.js?v=1793172504';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793172504';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793172504';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793172504';
-import { styleOf } from './decor.js?v=1793172504';
-import { Game } from './game.js?v=1793172504';
+import { MAPS, CELL } from './maps.js?v=1793173618';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793173618';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793173618';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793173618';
+import { AgentModel } from './models.js?v=1793173618';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793173618';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793173618';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793173618';
+import { styleOf } from './decor.js?v=1793173618';
+import { Game } from './game.js?v=1793173618';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -514,7 +514,7 @@ function openProfile() {
   body.innerHTML = `<div class="pTop">${avatarHtml(72)}<div class="pId"><input id="nickIn" maxlength="16" value="${esc(nick())}" placeholder="Ник" autocomplete="off"><div class="avPick">${AV_COLORS.map((c, i) => `<button data-av="${i}" class="${(save.avatar || 0) === i ? 'on' : ''}" style="background:${c}"></button>`).join('')}</div></div></div>
     <div class="pLvl"><b>Уровень ${lv}</b><div class="eBar"><i style="width:${(xp % XP_PER_LVL) / XP_PER_LVL * 100}%"></i></div><small>${xp % XP_PER_LVL} / ${XP_PER_LVL} XP</small></div>
     <div class="pRanks">${rk('comp')}${rk('wing')}</div>
-    <div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div><div><b>${st.opened}</b>кейсов</div></div>
+    <div class="hstats"><div><b>${st.kills}</b>убийств</div><div><b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b>K/D</div><div><b>${st.wins}/${st.matches}</b>побед</div><div><b>${st.opened}</b>кейсов</div><div><b>${st.bans || 0}</b>читеров забанено</div></div>
     <h3 class="pDropH">Миссии недели <small>обновятся через ${weekLeft()}</small></h3><div class="misList">${missionsHtml()}</div>
     <h3 class="pDropH">Еженедельный дроп <small>${wk.taken.length < 2 ? `выберите ${2 - wk.taken.length} из 4` : 'получено · новый через ' + weekLeft()}</small></h3>
     <div class="grid items small pDrop" id="dropOffers"></div>`;
@@ -598,6 +598,8 @@ function renderAdmin() {
   const tog = (key, label) => btn(r, (A[key] ? '✔ ' : '') + label, () => { A[key] = !A[key]; if (game) game.admin[key] = A[key]; }, A[key]);
   tog('god', 'Бессмертие'); tog('ammo', 'Бесконечные патроны'); tog('money', '$16 000 всегда'); tog('oneshot', 'Убийство с одного выстрела'); tog('radar', 'Враги на радаре'); tog('speed', 'Быстрый бег');
   tog('wall', 'ВХ: видно сквозь стены'); tog('norecoil', 'Без отдачи'); tog('nades', 'Бесконечные гранаты'); tog('fastBomb', 'Мгновенная закладка/разминирование'); tog('freeze', 'Заморозить ботов'); tog('peace', 'Боты не стреляют');
+  r = group(`Читеры среди ботов: ${{ off: 'выключены', normal: 'обычно (12%)', always: 'всегда' }[A.cheaters || 'normal']}`);
+  for (const [v, n] of [['off', 'Выкл'], ['normal', 'Обычно'], ['always', 'В каждом матче']]) btn(r, n, () => { A.cheaters = v; }, (A.cheaters || 'normal') === v);
   r = group(`Скорость игры: ×${A.timeScale || 1}`);
   for (const v of [0.25, 0.5, 1, 1.5, 2]) btn(r, '×' + v, () => { A.timeScale = v === 1 ? 0 : v; if (game) game.admin.timeScale = A.timeScale; }, (A.timeScale || 1) === v);
   if (game && !END) {
@@ -700,6 +702,29 @@ function renderSettings() {
   $('statsBox').innerHTML = `<div>Убийств<b>${st.kills}</b></div><div>Смертей<b>${st.deaths}</b></div><div>K/D<b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b></div><div>Матчей<b>${st.matches}</b></div><div>Побед<b>${st.wins}</b></div><div>Кейсов открыто<b>${st.opened}</b></div>`;
 }
 
+// ---------- чат игрока ----------
+function closeChat() { $('chatIn').classList.add('hidden'); $('chatTxt').blur(); if (game) { controls.enabled = true; controls.suppressPause = false; if (!touch) controls.lock(); } }
+function sendChat(text) {
+  text = (text || '').trim().slice(0, 120); const all = $('chatIn').dataset.all === '1'; closeChat();
+  if (!text || !game) return;
+  const g = game, p = g.player; g.say(p, text, all);
+  // боты отвечают
+  const low = text.toLowerCase(), pick = a => a[Math.floor(Math.random() * a.length)];
+  const pool = g.actors.filter(a => a.bot && !a.cheat && (all || a.team === p.team));
+  const cheater = g.actors.find(a => a.cheat);
+  let reply = null, who = null;
+  if (/чит|cheat|вх|wh|аим|aim|бан|репорт/.test(low)) { who = pick(pool); reply = pick(['+', 'да, точно читер', 'репорт его', 'уже кинул репорт', 'CFAC разберётся']); if (cheater && Math.random() < 0.6) setTimeout(() => g.say(cheater, pick(['нет у меня читов', 'просто скилл', 'сам ты читер', 'докажи'])), 1800); }
+  else if (/^(gg|гг|gl|hf|glhf)/.test(low)) { who = pick(pool); reply = pick(['gg', 'gl hf', 'gg wp']); }
+  else if (/(^| )(ez|изи)/.test(low)) { who = pick(pool.filter(a => a.team !== p.team)) || pick(pool); reply = pick(['сам изи', 'ну-ну', 'посмотрим', 'рано радуешься']); }
+  else if (/привет|ку|hi|hello|здаров/.test(low)) { who = pick(pool); reply = pick(['ку', 'привет', 'здарова']); }
+  else if (/помог|help|сзади|где/.test(low)) { who = pick(pool.filter(a => a.team === p.team)); reply = pick(['иду', 'щас', 'держись', 'где ты?']); }
+  else if (Math.random() < 0.35) { who = pick(pool); reply = pick(['?', 'ок', 'понял', '+', 'лол']); }
+  if (who && reply) setTimeout(() => { if (game === g && !g.over) g.say(who, reply, all || who.team !== p.team); }, 900 + Math.random() * 1500);
+}
+$('chatTxt').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); sendChat(e.target.value); } if (e.key === 'Escape') { e.preventDefault(); closeChat(); } });
+$('chatSend').onclick = () => sendChat($('chatTxt').value);
+$('chatQuick').onclick = e => { const b = e.target.closest('button'); if (b) sendChat(b.textContent); };
+
 // ---------- раскладка сенсорных кнопок ----------
 const tbKey = b => [...b.classList].find(c => c !== 'tb' && c !== 'mini' && c !== 'on' && c !== 'lit');
 function applyTouchLayout(root = $('touch')) {
@@ -746,10 +771,33 @@ const CT_ICON = '<svg viewBox="0 0 64 64"><path d="M32 4 56 12v18c0 15-10 25-24 
 const T_ICON = '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="#7a5418" stroke="#ffd27a" stroke-width="3"/><path d="M32 12l5 13h14l-11 8 4 14-12-8-12 8 4-14-11-8h14z" fill="#ffd27a"/></svg>';
 const hud = {
   centerT: 0,
-  chat(a, text) {
-    const box = $('chat'), d = el('div', '', `<b class="${a.team === 'T' ? 't' : 'ct'}">${a.alive ? '' : '*УБИТ* '}${esc(a.name)}</b>: ${esc(text)}`);
+  chat(a, text, all) {
+    const box = $('chat'), d = el('div', a ? '' : 'sys', a ? `${all ? '<i>(ВСЕ)</i> ' : ''}<b class="${a.team === 'T' ? 't' : 'ct'}">${a.alive ? '' : '*УБИТ* '}${esc(a.name)}</b>: ${esc(text)}` : esc(text));
     box.appendChild(d); while (box.children.length > 5) box.firstChild.remove();
     setTimeout(() => d.classList.add('fade'), 7000); setTimeout(() => d.remove(), 8000);
+  },
+  vacBan(who, g) {
+    const comp = 150, xp = 200;
+    save.coins += comp; save.xp = (save.xp || 0) + xp; save.stats.bans = (save.stats.bans || 0) + 1; persist();
+    hud.chat(null, `[CFAC] Игрок ${who.name} навсегда заблокирован. Матч отменён.`);
+    controls.unlock(); controls.enabled = false;
+    const box = $('vac');
+    box.innerHTML = `<div class="vacBox"><div class="vacLogo"><svg viewBox="0 0 64 64"><path d="M32 3 57 12v19c0 16-11 26-25 31C18 57 7 47 7 31V12z" fill="#2a0d0d" stroke="#ff4a3a" stroke-width="3"/><text x="32" y="40" font-size="17" font-weight="900" text-anchor="middle" fill="#ff4a3a" font-family="Arial">CFAC</text></svg></div>
+      <div class="vacT">МАТЧ ОТМЕНЁН</div>
+      <div class="vacP">Система <b>CFS Anti-Cheat (CFAC)</b> обнаружила стороннее ПО у игрока</div>
+      <div class="vacN">${esc(who.name)}</div>
+      <div class="vacP">Аккаунт заблокирован навсегда. Результаты матча не засчитываются в звание.</div>
+      <div class="vacR">Компенсация: ◈ ${comp} · +${xp} XP</div>
+      <button class="playBig inline" id="vacOk"><span>В МЕНЮ</span></button></div>`;
+    box.classList.remove('hidden'); play('lose');
+    $('vacOk').onclick = () => { box.classList.add('hidden'); quitGame(); };
+  },
+  openChat(all) {
+    if (!game) return;
+    const box = $('chatIn'), inp = $('chatTxt');
+    box.classList.remove('hidden'); box.dataset.all = all ? '1' : ''; $('chatMode').textContent = all ? 'ВСЕМ:' : 'КОМАНДЕ:';
+    controls.enabled = false; controls.reset(); controls.suppressPause = true; controls.unlock();
+    inp.value = ''; setTimeout(() => inp.focus(), 30);
   },
   damageReport(log, killer, def) {
     const rows = Object.values(log); const box = $('dmgRep');
@@ -798,7 +846,7 @@ const hud = {
     const it = cur.skin && statTrak(slot); if (it) { hud._stDirty = true; clearTimeout(hud._stT); hud._stT = setTimeout(persist, 1500); }
   },
   matchOver(g) { endMatch(g); },
-  menuOpen() { return !$('buy').classList.contains('hidden') || !$('pause').classList.contains('hidden') ; },
+  menuOpen() { return !$('buy').classList.contains('hidden') || !$('pause').classList.contains('hidden') || !$('chatIn').classList.contains('hidden') || !$('vac').classList.contains('hidden'); },
   pause() { openPause(); },
   openBuy() { openBuy(); },
 };

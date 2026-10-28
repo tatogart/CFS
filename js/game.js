@@ -1,16 +1,18 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793172504';
-import { World } from './world.js?v=1793172504';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793172504';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793172504';
-import { play, soundFor } from './sfx.js?v=1793172504';
-import { Bot, planRound } from './bots.js?v=1793172504';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793172504';
+import { CELL } from './maps.js?v=1793173618';
+import { World } from './world.js?v=1793173618';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793173618';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793173618';
+import { play, soundFor } from './sfx.js?v=1793173618';
+import { Bot, planRound } from './bots.js?v=1793173618';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793173618';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
 const ROUND_TIME = 115, FREEZE = 6, BOMB_TIME = 40, END_TIME = 5, PLANT_TIME = 3.2;
+const CHEAT_NAMES = ['CHEAT112', 'aimware.net', 'skeet.cc | Колян', 'NEVERLOSE.CC', 'ez-frags.tk', 'xX_WH_Xx', 'onetap.su', 'interium.ooo', 'Fatality.win', 'cheat228', 'MidnightCheat', 'ПРОДАМ ЧИТ', 'spinbot_2009', 'legit_player'];
+const CHEAT_SPAM = ['BUY AIMWARE.NET', 'skeet.cc owns me and all', 'ez', '1', 'Купи чит — cheat112 точка ру', 'HvH кто?', 'вы все боты', 'я просто хорошо играю', 'не репорть плиз', 'нет у меня читов, это игровая мышка', 'neverlose.cc > all', 'изи катка', 'сервер лагает, не я'];
 const BOT_NAMES = ['Кирпич', 'Тень', 'Шрам', 'Волк', 'Сокол', 'Гром', 'Лис', 'Боцман', 'Призрак', 'Рыжий', 'Седой', 'Бархан', 'Ястреб', 'Кобра', 'Мангуст'];
 const ZONES = [['head', 1.66, 0.15, 4], ['chest', 1.33, 0.26, 1], ['stomach', 1.05, 0.24, 1.25], ['legs', 0.68, 0.2, 0.75], ['legs', 0.32, 0.17, 0.75]];
 
@@ -166,6 +168,7 @@ export class Game {
     const nSide = noBots ? 0 : Math.max(0, n - humans[side]), nEnemy = noBots ? 0 : Math.max(0, n - humans[enemy]);
     for (let i = 0; i < nSide; i++) { const ag = teamAgents(side)[i % 5]; const b = mkActor(names.pop(), side, true, ag.id); this._botSkins(b); }
     for (let i = 0; i < nEnemy; i++) { const ag = teamAgents(enemy)[(i + 2) % 5]; const b = mkActor(names.pop(), enemy, true, ag.id); this._botSkins(b); }
+    this._makeCheaters();
     // тренировка аима: мишени-боты, которые не стреляют
     if (this.aimMode) for (let i = 0; i < 8; i++) { const ag = teamAgents(enemy)[i % 5]; const b = mkActor('Мишень ' + (i + 1), enemy, true, ag.id); b.target = true; }
     this._finishActors(side);
@@ -179,6 +182,56 @@ export class Game {
       if (!m) { m = o.material.clone(); m.fog = false; if (m.emissive) { m.emissive.copy(m.color).multiplyScalar(0.22); } m.userData.readable = true; cache.set(o.material.uuid, m); }
       o.material = m;
     });
+  }
+  // ---------- читеры среди ботов ----------
+  _makeCheaters() {
+    const mode = this.admin.cheaters || 'normal';
+    if (this.practice || this.aimMode || mode === 'off') return;
+    const bots = this.actors.filter(a => a.bot && a.brain).sort(() => Math.random() - 0.5);
+    const chance = mode === 'always' ? 1 : 0.12, maxN = mode === 'always' ? 1 : 2; let n = 0;
+    const names = CHEAT_NAMES.slice().sort(() => Math.random() - 0.5);
+    for (const b of bots) {
+      if (n >= maxN || Math.random() >= chance) continue;
+      n++;
+      b.name = names.pop();
+      b.cheat = { spin: Math.random() < 0.65, bhop: true, wall: Math.random() < 0.85, spamT: 8 + Math.random() * 10 };
+      b.brain.d = { ...b.brain.d, react: 0.03, aim: 0.0015, turn: 60, fire: 1, head: 0.95, burst: 40, comp: 1, spot: 3, strafe: 1 };
+    }
+    if (n) {
+      // CFAC (CFS Anti-Cheat) ловит читера через 2–3 раунда (или через 1,5–2,5 минуты в бою насмерть)
+      const c = this.actors.find(a => a.cheat);
+      this.cheatBan = { who: c, round: 3 + Math.floor(Math.random() * 2), t: 90 + Math.random() * 60 };
+    }
+  }
+  // сообщение в чат (all — общий чат, иначе только своей команде)
+  say(a, text, all = true) { if (!this.ui.chat) return; if (!all && a.team !== this.player.team) return; this.ui.chat(a, text, all); }
+  _cheatChat(dt) {
+    for (const c of this.actors) {
+      if (!c.cheat) continue;
+      c.cheat.spamT -= dt;
+      if (c.cheat.spamT <= 0) { c.cheat.spamT = 14 + Math.random() * 14; this.say(c, CHEAT_SPAM[Math.floor(Math.random() * CHEAT_SPAM.length)]); }
+    }
+  }
+  _cheatReact(killer, victim) {
+    if (Math.random() > 0.55 || this.time < (this._crT || 0)) return;
+    this._crT = this.time + 3;
+    const r = a => a[Math.floor(Math.random() * a.length)];
+    const others = this.actors.filter(x => x.bot && !x.cheat && (x.alive || Math.random() < 0.5));
+    const enemies = others.filter(x => x.team !== killer.team), mates = others.filter(x => x.team === killer.team);
+    setTimeout(() => {
+      if (this.over) return;
+      if (enemies.length && Math.random() < 0.75) this.say(r(enemies), r(['фу читак', 'репорт', 'это что за аим через стену?', 'ВХ у него 100%', 'опять читер...', 'он крутится!', 'как он так прыгает', 'репорт всей командой', `${killer.name}, выключи читы`, 'смотрите его демку']));
+      else if (mates.length) this.say(r(mates), Math.random() < 0.45 ? r(['го ещё, тащи', 'красава, лол', 'ну хоть выиграем', 'норм аим']) : r(['ты что, читер? позор', 'выключи, нас забанят', 'я не с ним', 'кикните его']), Math.random() < 0.5);
+    }, 600 + Math.random() * 1200);
+  }
+  _cheatBanCheck() {
+    const B = this.cheatBan; if (!B || this.over) return false;
+    if (this.dm ? this.time >= B.t : this.round >= B.round) {
+      this.over = true; this.cheatBanned = B.who;
+      if (this.ui.vacBan) this.ui.vacBan(B.who, this);
+      return true;
+    }
+    return false;
   }
   _finishActors(side) {
     for (const a of this.actors) { a.model.root.visible = a !== this.player; this._readable(a); }
@@ -219,6 +272,7 @@ export class Game {
   // ---------- раунды ----------
   startRound(first) {
     this.round++;
+    if (!first && this._cheatBanCheck()) return;
     const half = this.o.winTo - 1;
     if (!first && !this.practice && this.round === half + 1) this._swapSides();
     this.state = this.practice ? 'live' : 'freeze'; this.stateT = this.practice ? 1e9 : FREEZE;
@@ -474,6 +528,7 @@ export class Game {
     spread += def.move * mv;
     if (!a.onGround) spread += def.move * 1.6 + 0.04;
     if (a.crouchK > 0.5) spread *= 0.75;
+    if (a.cheat) spread *= 0.05;   // нет разброса даже в прыжке
     if (def.scope && !a.scope) spread += def.noscope || 0;
     if (def.pellets) spread = Math.max(spread, 0.045);
     spread += def.recoil * 0.25 * Math.min(a.recoilIdx, 10) * (def.type === 'pistol' ? 0.6 : 0.15);
@@ -613,6 +668,7 @@ export class Game {
       if (a === this.player && this.aimMode) { this.aimStats.kills++; if (hs) this.aimStats.hs++; }
     }
     if (v === this.player && this.ui.damageReport && !this.aimMode) this.ui.damageReport(this.dmgLog, a, def);
+    if (a && a.cheat && a !== v) this._cheatReact(a, v);
     if (!this.dm || this.ar) { if (v.team === this.player.team && v !== this.player) this.radio(null, 'down', { v, a, def }); else if (a === this.player && this.isEnemy(a, v) && Math.random() < 0.25) this.radio(null, 'nice'); }
     // оружие выпадает из рук убитого (лучшее из имеющегося)
     if (!this.dm && !this.aimMode && !v.target) { const sl = v.weapons[1] ? 1 : v.weapons[2] ? 2 : 0; if (sl) this.dropWeapon(v, sl, false); }
@@ -1146,6 +1202,8 @@ export class Game {
     if (c.edge('aim')) this.act(p, 'aim');
     if (c.edge('inspect') && !p.scope && p.reloadT <= 0) { this.inspectT = 3.2; this.inspectVar = Math.random() < 0.22 ? 1 : 0; if (this.inspectVar && this.ui.center) this.centerMsg('✦ Секретный осмотр', 1, '#ffd860'); }
     if (c.edge('useP') && p.alive && !this.ar) { const it = this.lookWeapon(p); const B = this.bomb; const busy = (p.hasBomb && this.plantSite(p.pos.x, p.pos.z)) || (B && B.planted && !B.done && p.pos.distanceTo(B.pos) < 1.6); if (it && !busy) this.pickUp(p, it, true); }
+    if (c.edge('chatAll') && this.ui.openChat) this.ui.openChat(true);
+    if (c.edge('chatTeam') && this.ui.openChat) this.ui.openChat(false);
     if (c.edge('hand')) { this.settings.hand = this.settings.hand === 'left' ? 'right' : 'left'; this.vm.scale.x = this.settings.hand === 'left' ? -1 : 1; this.centerMsg(this.settings.hand === 'left' ? 'Оружие в левой руке' : 'Оружие в правой руке', 1); if (this.ui.onHand) this.ui.onHand(this.settings.hand); }
     if (p.in.fire || p.reloadT > 0) this.inspectT = 0;
     if (c.edge('spray')) this.act(p, 'spray', this.o.graffiti);
@@ -1216,12 +1274,17 @@ export class Game {
     if (a === this.player && this.admin.speed) max *= 1.6;
     const f = this.inFire(a.pos); if (f) { a.fireDmgT = (a.fireDmgT || 0) + dt; if (a.fireDmgT > 0.25) { a.fireDmgT = 0; this.damage(a, f.owner, 10, 'legs', 1.0, { pen: 1, kill: 300, icon: 'molotov' }, null); } }
     if (!a.alive) return;
+    // читер прыгает без остановки и разгоняется в воздухе
+    const bh = a.cheat && a.cheat.bhop;
+    if (bh && a.onGround && (a.in.mx || a.in.mz) && a.plantT <= 0 && a.defuseT <= 0) a.in.jump = true;
+    if (bh && !a.onGround) max *= 1.45;
     const wx = a.in.mx * max, wz = a.in.mz * max;
-    const acc = a.onGround ? 48 : 8;
+    const acc = a.onGround ? 48 : bh ? 30 : 8;
     let dx = wx - a.vel.x, dz = wz - a.vel.z; const dl = Math.hypot(dx, dz), stepA = acc * dt;
     if (dl > stepA) { dx *= stepA / dl; dz *= stepA / dl; }
     a.vel.x += dx; a.vel.z += dz;
-    if (a.in.jump && a.onGround && a.crouchK < 0.9) { a.vel.y = JUMP_V; a.onGround = false; }
+    // без банихопа: сразу после приземления прыгнуть нельзя
+    if (a.in.jump && a.onGround && a.crouchK < 0.9 && (bh || this.time - (a.landT || -9) > 0.38)) { a.vel.y = JUMP_V; a.onGround = false; }
     a.vel.y -= GRAV * dt;
     let nx = a.pos.x + a.vel.x * dt, nz = a.pos.z + a.vel.z * dt;
     if (this._blocked(nx, a.pos.z, a.pos.y)) { nx = a.pos.x; a.vel.x = 0; }
@@ -1229,7 +1292,10 @@ export class Game {
     a.pos.x = nx; a.pos.z = nz;
     let ny = a.pos.y + a.vel.y * dt;
     const g = this._ground(a.pos.x, a.pos.z, a.pos.y);
-    if (ny <= g) { if (!a.onGround && a.vel.y < -11) this.damage(a, a, (-a.vel.y - 11) * 9, 'legs', 1, { pen: 1, icon: 'fall' }, null); ny = g; a.vel.y = 0; a.onGround = true; }
+    if (ny <= g) {
+      if (!a.onGround) { if (a.vel.y < -11) this.damage(a, a, (-a.vel.y - 11) * 9, 'legs', 1, { pen: 1, icon: 'fall' }, null); a.landT = this.time; if (!bh && a.vel.y < -2) { a.vel.x *= 0.55; a.vel.z *= 0.55; } }
+      ny = g; a.vel.y = 0; a.onGround = true;
+    }
     else if (ny > g + 0.05) a.onGround = false;
     // ступенька вверх при беге не нужна: ящики 1м — только прыжком
     a.pos.y = ny;
@@ -1299,6 +1365,7 @@ export class Game {
         this.startRound(false);
       }
     }
+    if (this.cheatBan && !this.over) { this._cheatChat(dt); if (this.dm && this._cheatBanCheck()) return; }
     if (this.dm && !this.over) {
       this.dmTime -= dt;
       const lead = this.actors.reduce((m, a) => a.kills > m.kills ? a : m, this.actors[0]);
@@ -1371,7 +1438,7 @@ export class Game {
     // модели
     for (const a of this.actors) {
       if (a === this.player && a.alive) continue;
-      const m = a.model; m.root.position.copy(a.pos); m.root.rotation.y = a.yaw;
+      const m = a.model; m.root.position.copy(a.pos); m.root.rotation.y = a.cheat && a.cheat.spin && a.alive ? this.time * 28 + a.id : a.yaw;
       m.update({ dt, speed: a.alive ? this.hspeed(a) : 0, crouch: a.crouchK > 0.5, pitch: a.pitch, airborne: !a.onGround, firing: this.time - a.lastFired < 0.08 });
       if (a.tag) { a.tag.visible = a.alive && a.model.root.visible; a.tag.position.set(a.pos.x, a.pos.y + 2.15 - a.crouchK * 0.4, a.pos.z); }
     }

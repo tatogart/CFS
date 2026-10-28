@@ -1,7 +1,7 @@
 // Управление: клавиатура/мышь и сенсорный экран
 // действия и клавиши по умолчанию (можно переназначить в настройках)
-export const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', crouch: 'ControlLeft', walk: 'ShiftLeft', use: 'KeyE', reload: 'KeyR', buy: 'KeyB', drop: 'KeyG', inspect: 'KeyF', spray: 'KeyT', hand: 'KeyH', last: 'KeyQ', score: 'Tab', slot1: 'Digit1', slot2: 'Digit2', slot3: 'Digit3', slot4: 'Digit4', slot5: 'Digit5' };
-export const BIND_NAMES = { forward: 'Вперёд', back: 'Назад', left: 'Влево', right: 'Вправо', jump: 'Прыжок', crouch: 'Присесть', walk: 'Тихий шаг', use: 'Использовать / подобрать', reload: 'Перезарядка', buy: 'Закупка', drop: 'Выбросить оружие', inspect: 'Осмотр оружия', spray: 'Граффити', hand: 'Сменить руку', last: 'Прошлое оружие', score: 'Таблица счёта', slot1: 'Основное оружие', slot2: 'Пистолет', slot3: 'Нож', slot4: 'Гранаты', slot5: 'Бомба' };
+export const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', crouch: 'ControlLeft', walk: 'ShiftLeft', use: 'KeyE', reload: 'KeyR', buy: 'KeyB', drop: 'KeyG', inspect: 'KeyF', spray: 'KeyT', hand: 'KeyH', last: 'KeyQ', score: 'Tab', slot1: 'Digit1', slot2: 'Digit2', slot3: 'Digit3', slot4: 'Digit4', slot5: 'Digit5', chatAll: 'KeyY', chatTeam: 'KeyU' };
+export const BIND_NAMES = { forward: 'Вперёд', back: 'Назад', left: 'Влево', right: 'Вправо', jump: 'Прыжок', crouch: 'Присесть', walk: 'Тихий шаг', use: 'Использовать / подобрать', reload: 'Перезарядка', buy: 'Закупка', drop: 'Выбросить оружие', inspect: 'Осмотр оружия', spray: 'Граффити', hand: 'Сменить руку', last: 'Прошлое оружие', score: 'Таблица счёта', slot1: 'Основное оружие', slot2: 'Пистолет', slot3: 'Нож', slot4: 'Гранаты', slot5: 'Бомба', chatAll: 'Чат всем', chatTeam: 'Чат команде' };
 export const isTouch = () => matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 
 export class Controls {
@@ -37,7 +37,7 @@ export class Controls {
   }
   _bind() {
     // клавиша → событие-нажатие
-    const EDGE = { reload: 'reload', slot1: 'slot1', slot2: 'slot2', slot3: 'slot3', slot4: 'slot4', slot5: 'slot5', last: 'last', buy: 'buy', drop: 'drop', inspect: 'inspect', spray: 'spray', hand: 'hand', use: 'useP', jump: 'jumpP' };
+    const EDGE = { reload: 'reload', slot1: 'slot1', slot2: 'slot2', slot3: 'slot3', slot4: 'slot4', slot5: 'slot5', last: 'last', buy: 'buy', drop: 'drop', inspect: 'inspect', spray: 'spray', hand: 'hand', use: 'useP', jump: 'jumpP', chatAll: 'chatAll', chatTeam: 'chatTeam' };
     addEventListener('keydown', e => {
       if (!this.enabled) return;
       if (e.code === 'Tab' || e.code === this.binds.jump) e.preventDefault();

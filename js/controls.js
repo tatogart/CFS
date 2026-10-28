@@ -1,4 +1,7 @@
 // Управление: клавиатура/мышь и сенсорный экран
+// действия и клавиши по умолчанию (можно переназначить в настройках)
+export const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', crouch: 'ControlLeft', walk: 'ShiftLeft', use: 'KeyE', reload: 'KeyR', buy: 'KeyB', drop: 'KeyG', inspect: 'KeyF', spray: 'KeyT', hand: 'KeyH', last: 'KeyQ', score: 'Tab', slot1: 'Digit1', slot2: 'Digit2', slot3: 'Digit3', slot4: 'Digit4', slot5: 'Digit5' };
+export const BIND_NAMES = { forward: 'Вперёд', back: 'Назад', left: 'Влево', right: 'Вправо', jump: 'Прыжок', crouch: 'Присесть', walk: 'Тихий шаг', use: 'Использовать / подобрать', reload: 'Перезарядка', buy: 'Закупка', drop: 'Выбросить оружие', inspect: 'Осмотр оружия', spray: 'Граффити', hand: 'Сменить руку', last: 'Прошлое оружие', score: 'Таблица счёта', slot1: 'Основное оружие', slot2: 'Пистолет', slot3: 'Нож', slot4: 'Гранаты', slot5: 'Бомба' };
 export const isTouch = () => matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 
 export class Controls {
@@ -10,6 +13,7 @@ export class Controls {
     this.touch = isTouch();
     this.crouchToggle = false;
     this.enabled = false;
+    this.binds = { ...DEFAULT_BINDS };
     this._bind();
   }
   edge(name) { if (this.edges.has(name)) { this.edges.delete(name); return true; } return false; }
@@ -22,21 +26,22 @@ export class Controls {
 
   _updMove() {
     if (this.joyActive) return;
-    const k = this.keys;
-    this.s.mx = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
-    this.s.my = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
-    this.s.walk = k.has('ShiftLeft') || k.has('ShiftRight');
-    this.s.crouch = k.has('ControlLeft') || k.has('KeyC') || this.crouchToggle;
-    this.s.jump = k.has('Space');
-    this.s.use = k.has('KeyE');
-    this.s.score = k.has('Tab');
+    const k = this.keys, b = this.binds;
+    this.s.mx = (k.has(b.right) ? 1 : 0) - (k.has(b.left) ? 1 : 0);
+    this.s.my = (k.has(b.forward) ? 1 : 0) - (k.has(b.back) ? 1 : 0);
+    this.s.walk = k.has(b.walk) || (b.walk === 'ShiftLeft' && k.has('ShiftRight'));
+    this.s.crouch = k.has(b.crouch) || (b.crouch === 'ControlLeft' && k.has('KeyC')) || this.crouchToggle;
+    this.s.jump = k.has(b.jump);
+    this.s.use = k.has(b.use);
+    this.s.score = k.has(b.score);
   }
   _bind() {
-    const map = { KeyR: 'reload', Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', KeyQ: 'last', KeyB: 'buy', Escape: 'pause', KeyG: 'drop', KeyF: 'inspect', KeyT: 'spray', KeyH: 'hand', KeyE: 'useP', Space: 'jumpP' };
+    // клавиша → событие-нажатие
+    const EDGE = { reload: 'reload', slot1: 'slot1', slot2: 'slot2', slot3: 'slot3', slot4: 'slot4', slot5: 'slot5', last: 'last', buy: 'buy', drop: 'drop', inspect: 'inspect', spray: 'spray', hand: 'hand', use: 'useP', jump: 'jumpP' };
     addEventListener('keydown', e => {
       if (!this.enabled) return;
-      if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
-      if (!e.repeat && map[e.code]) this.press(map[e.code]);
+      if (e.code === 'Tab' || e.code === this.binds.jump) e.preventDefault();
+      if (!e.repeat) { if (e.code === 'Escape') this.press('pause'); for (const a in EDGE) if (this.binds[a] === e.code) this.press(EDGE[a]); }
       this.keys.add(e.code); this._updMove();
     });
     addEventListener('keyup', e => { this.keys.delete(e.code); this._updMove(); });

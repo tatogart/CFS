@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793168359';
-import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793168359';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793168359';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793168359';
-import { AgentModel } from './models.js?v=1793168359';
-import { Controls, isTouch } from './controls.js?v=1793168359';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793168359';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793168359';
-import { styleOf } from './decor.js?v=1793168359';
-import { Game } from './game.js?v=1793168359';
+import { MAPS, CELL } from './maps.js?v=1793168469';
+import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793168469';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793168469';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793168469';
+import { AgentModel } from './models.js?v=1793168469';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793168469';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793168469';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793168469';
+import { styleOf } from './decor.js?v=1793168469';
+import { Game } from './game.js?v=1793168469';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -36,6 +36,7 @@ function applyQuality() {
 }
 applyQuality();
 const controls = new Controls(canvas, $('touch'));
+controls.binds = { ...DEFAULT_BINDS, ...(save.binds || {}) };
 let game = null;
 
 // ---------- меню ----------
@@ -556,6 +557,28 @@ function renderSettings() {
     const l = el('label', '', `<span>${lb}</span><input type="checkbox" ${s[k] ? 'checked' : ''}>`); l.querySelector('input').onchange = e => { s[k] = e.target.checked; persist(); upd(); }; box.appendChild(l);
   }
   upd();
+  // ---- управление ----
+  box.appendChild(el('h3', '', 'Управление'));
+  if (!touch) {
+    const kb = el('div', 'binds'); box.appendChild(kb);
+    const keyName = c => !c ? '—' : c.replace(/^Key/, '').replace(/^Digit/, '').replace('Space', 'Пробел').replace('ControlLeft', 'L-Ctrl').replace('ControlRight', 'R-Ctrl').replace('ShiftLeft', 'L-Shift').replace('ShiftRight', 'R-Shift').replace('AltLeft', 'L-Alt').replace('Tab', 'Tab').replace('Arrow', '↑ ').replace('Backquote', '`');
+    const draw = () => {
+      kb.innerHTML = '';
+      for (const a in BIND_NAMES) {
+        const r = el('div', 'bind', `<span>${BIND_NAMES[a]}</span><button>${keyName(controls.binds[a])}</button>`);
+        r.querySelector('button').onclick = ev => {
+          const btn = ev.currentTarget; btn.textContent = 'Нажмите клавишу…'; btn.classList.add('wait');
+          const h = e => { e.preventDefault(); removeEventListener('keydown', h, true); if (e.code !== 'Escape') { for (const k in controls.binds) if (controls.binds[k] === e.code && k !== a) controls.binds[k] = ''; controls.binds[a] = e.code; save.binds = { ...controls.binds }; persist(); } draw(); };
+          addEventListener('keydown', h, true);
+        };
+        kb.appendChild(r);
+      }
+      const rs = el('button', 'big', 'Клавиши по умолчанию'); rs.onclick = () => { controls.binds = { ...DEFAULT_BINDS }; save.binds = null; persist(); draw(); }; kb.appendChild(rs);
+    };
+    draw();
+  }
+  const te = el('button', 'big go', '📱 Настроить кнопки на экране'); te.onclick = openTouchEditor; box.appendChild(te);
+  range('touchAlpha', 'Прозрачность кнопок', 0.2, 1, 0.05, v => Math.round(v * 100) + '%');
   box.appendChild(el('h3', '', 'Прочее'));
   check('invertY', 'Инверсия по вертикали');
   check('fps', 'Показывать FPS');
@@ -564,6 +587,47 @@ function renderSettings() {
   const st = save.stats;
   $('statsBox').innerHTML = `<div>Убийств<b>${st.kills}</b></div><div>Смертей<b>${st.deaths}</b></div><div>K/D<b>${(st.kills / Math.max(1, st.deaths)).toFixed(2)}</b></div><div>Матчей<b>${st.matches}</b></div><div>Побед<b>${st.wins}</b></div><div>Кейсов открыто<b>${st.opened}</b></div>`;
 }
+
+// ---------- раскладка сенсорных кнопок ----------
+const tbKey = b => [...b.classList].find(c => c !== 'tb' && c !== 'mini' && c !== 'on' && c !== 'lit');
+function applyTouchLayout(root = $('touch')) {
+  const L = save.settings.touchLayout || {}, a = save.settings.touchAlpha == null ? 1 : save.settings.touchAlpha;
+  root.querySelectorAll('.tb').forEach(b => {
+    const k = tbKey(b), v = L[k];
+    b.style.opacity = a;
+    if (v) { b.style.left = v.x * 100 + '%'; b.style.top = v.y * 100 + '%'; b.style.right = 'auto'; b.style.bottom = 'auto'; b.style.transform = `translate(-50%, -50%) scale(${v.s || 1})`; }
+    else { b.style.left = b.style.top = b.style.right = b.style.bottom = b.style.transform = ''; }
+  });
+}
+function openTouchEditor() {
+  const hudEl = $('hud'), tch = $('touch'), wasH = hudEl.classList.contains('hidden'), wasT = tch.classList.contains('hidden');
+  hudEl.classList.remove('hidden'); tch.classList.remove('hidden'); $('menu').classList.add('hidden');
+  document.body.classList.add('tedit');
+  applyTouchLayout();
+  const L = save.settings.touchLayout = { ...(save.settings.touchLayout || {}) };
+  // зафиксировать текущие позиции всех кнопок
+  tch.querySelectorAll('.tb').forEach(b => { const k = tbKey(b); if (!L[k]) { const r = b.getBoundingClientRect(); L[k] = { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight, s: 1 }; } });
+  applyTouchLayout();
+  let sel = null, drag = null;
+  const bar = el('div', 'teBar', `<b>Перетащите кнопки</b><label>Размер <input type="range" min="0.6" max="1.8" step="0.05" value="1" id="teSize"></label><button id="teReset">Сброс</button><button class="go" id="teDone">Готово</button>`);
+  document.body.appendChild(bar);
+  const size = bar.querySelector('#teSize');
+  const pick = b => { tch.querySelectorAll('.tb').forEach(x => x.classList.remove('teSel')); sel = b; b.classList.add('teSel'); size.value = L[tbKey(b)].s || 1; };
+  const down = e => { const b = e.target.closest('.tb'); if (!b) return; e.preventDefault(); e.stopPropagation(); pick(b); drag = { b, id: e.pointerId }; };
+  const move = e => { if (!drag || e.pointerId !== drag.id) return; const k = tbKey(drag.b); L[k].x = Math.max(0.02, Math.min(0.98, e.clientX / innerWidth)); L[k].y = Math.max(0.03, Math.min(0.97, e.clientY / innerHeight)); applyTouchLayout(); };
+  const up = () => { drag = null; };
+  tch.addEventListener('pointerdown', down, true); addEventListener('pointermove', move); addEventListener('pointerup', up);
+  size.oninput = () => { if (!sel) return; L[tbKey(sel)].s = +size.value; applyTouchLayout(); };
+  bar.querySelector('#teReset').onclick = () => { save.settings.touchLayout = null; persist(); close(); openTouchEditor(); };
+  const close = () => {
+    tch.removeEventListener('pointerdown', down, true); removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+    bar.remove(); document.body.classList.remove('tedit'); tch.querySelectorAll('.tb').forEach(x => x.classList.remove('teSel'));
+    if (wasH) hudEl.classList.add('hidden'); if (wasT) tch.classList.add('hidden'); $('menu').classList.remove('hidden');
+    applyTouchLayout();
+  };
+  bar.querySelector('#teDone').onclick = () => { persist(); close(); };
+}
+applyTouchLayout();
 
 // ---------- HUD ----------
 const CT_ICON = '<svg viewBox="0 0 64 64"><path d="M32 4 56 12v18c0 15-10 25-24 30C18 55 8 45 8 30V12z" fill="#2f5d9a" stroke="#9cc4ff" stroke-width="3"/><path d="M20 30l8 8 16-16" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1102,7 +1166,7 @@ function finishLoad() {
   if (!game || game !== lg) return;
   startAmbience(styleOf(game.o.map));
   $('load').classList.add('hidden'); $('hud').classList.remove('hidden');
-  $('touch').classList.toggle('hidden', !touch);
+  $('touch').classList.toggle('hidden', !touch); applyTouchLayout();
   $('fps').classList.toggle('hidden', !save.settings.fps);
   $('feed').innerHTML = ''; $('chat').innerHTML = ''; $('dmgRep').classList.add('hidden');
   controls.reset(); controls.enabled = true; controls.touchSens = save.settings.touchSens;

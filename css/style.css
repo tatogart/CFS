@@ -491,3 +491,15 @@ body.touch #chat { bottom: calc(150px + var(--safe-b)); left: calc(180px + var(-
 .eMis { font-size: 13px; color: #7cf08a; margin-top: 3px; }
 .tb.hand { right: calc(344px + var(--safe-r)); font-size: 14px; }
 .tb.drop { right: calc(392px + var(--safe-r)); font-size: 14px; }
+
+/* настройка управления */
+.binds { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 14px; margin-bottom: 10px; }
+.bind { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.bind button { min-width: 96px; padding: 5px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,.2); background: #1b2330; font-weight: 700; }
+.bind button.wait { background: #c8902a; color: #000; }
+body.tedit #hud > *:not(#touch) { display: none !important; }
+body.tedit #hud { background: repeating-linear-gradient(45deg, #121820, #121820 20px, #161d27 20px, #161d27 40px); }
+body.tedit .tb { outline: 1px dashed rgba(255,255,255,.4); }
+body.tedit .tb.teSel { outline: 2px solid #ffd860; box-shadow: 0 0 14px #ffd860; }
+.teBar { position: fixed; z-index: 60; left: 50%; top: 56px; transform: translateX(-50%); display: flex; gap: 12px; align-items: center; background: rgba(8,11,16,.92); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,.15); font-size: 14px; }
+.teBar button { padding: 6px 12px; border-radius: 4px; border: 0; background: #2a323d; } .teBar button.go { background: #2f8a3a; }

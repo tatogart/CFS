@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793196291';
-import { World } from './world.js?v=1793196291';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793196291';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793196291';
-import { play, soundFor } from './sfx.js?v=1793196291';
-import { Bot, planRound } from './bots.js?v=1793196291';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793196291';
+import { CELL } from './maps.js?v=1793196962';
+import { World } from './world.js?v=1793196962';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793196962';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793196962';
+import { play, soundFor } from './sfx.js?v=1793196962';
+import { Bot, planRound } from './bots.js?v=1793196962';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793196962';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -14,6 +14,7 @@ const ROUND_TIME = 115, FREEZE = 6, BOMB_TIME = 40, END_TIME = 5, PLANT_TIME = 3
 // правила раундов по режимам (как в CS2)
 const RULES = {
   comp: { winTo: 13, half: 12, max: 24, ot: true, otHalf: 3, otMoney: 10000, roundLen: 115, freeze: 15, buy: 20, start: 800 },
+  premier: { winTo: 13, half: 12, max: 24, ot: true, otHalf: 3, otMoney: 10000, roundLen: 115, freeze: 15, buy: 20, start: 800 },
   wing: { winTo: 9, half: 8, max: 16, ot: false, roundLen: 90, freeze: 10, buy: 20, start: 800 },
   casual: { winTo: 8, half: 7, max: 15, ot: false, roundLen: 135, freeze: 6, buy: 45, start: 1000, freeArmor: true },
 };

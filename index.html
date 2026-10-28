@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=1793196291">
+<link rel="stylesheet" href="css/style.css?v=1793196962">
 </head>
 <body>
 <canvas id="view"></canvas>
@@ -47,7 +47,8 @@
       <h2>Режим</h2>
       <div class="pills" id="modes"></div>
       <p class="hint" id="modeDesc"></p>
-      <h2>Карта</h2>
+      <div id="premBox" class="hidden"></div>
+      <h2 id="mapsH">Карта</h2>
       <div class="maps" id="maps"></div>
       <h2>Боты</h2>
       <div class="pills" id="diffs"></div>
@@ -209,6 +210,7 @@
 
 <div id="vac" class="hidden"></div>
 <div id="teamSel" class="hidden"></div>
+<div id="veto" class="hidden"></div>
 <div id="rotate" class="hidden"><div>⟳</div>Поверните телефон горизонтально</div>
 <div id="ytBox" class="hidden"></div>
 <div id="loading" class="hidden">Загрузка карты…</div>
@@ -237,6 +239,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=1793196291"></script>
+<script type="module" src="js/main.js?v=1793196962"></script>
 </body>
 </html>

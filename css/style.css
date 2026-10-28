@@ -680,3 +680,34 @@ select, input[type=text], input[type=number], input:not([type]) { border-radius:
 .tb { backdrop-filter: blur(6px); background: rgba(16,22,32,.42); border-color: rgba(255,255,255,.28); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 #banner, #center { text-shadow: 0 4px 18px rgba(0,0,0,.6); }
 .bitem { border-radius: 10px !important; transition: transform .12s, box-shadow .12s; } .bitem:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,.4); }
+
+/* ===== Premier ===== */
+.prBadge { --pc: #b0c3d9; position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 2px 12px 2px 16px; transform: skewX(-14deg); background: linear-gradient(90deg, color-mix(in srgb, var(--pc) 55%, #0a0d12), color-mix(in srgb, var(--pc) 22%, #0a0d12)); border: 1px solid color-mix(in srgb, var(--pc) 70%, transparent); border-radius: 3px; box-shadow: 0 0 12px color-mix(in srgb, var(--pc) 35%, transparent); font-family: "Barlow Condensed", system-ui, sans-serif; vertical-align: middle; }
+.prBadge b { transform: skewX(14deg); font-size: 15px; font-weight: 800; color: #fff; letter-spacing: 1px; font-style: italic; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.prBadge i { position: absolute; left: 4px; top: 3px; bottom: 3px; width: 6px; background: repeating-linear-gradient(90deg, var(--pc) 0 2px, transparent 2px 4px); }
+.prBadge.big { padding: 6px 22px 6px 26px; } .prBadge.big b { font-size: 30px; } .prBadge.big i { width: 10px; left: 6px; top: 6px; bottom: 6px; }
+.prBadge.none { --pc: #6a7686; } .prBadge.none b { color: #9fb0c2; }
+#premBox { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; margin: 6px 0 10px; }
+.prCard { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--pc) 25%, rgba(16,22,32,.9)), rgba(12,16,24,.92)); border: 1px solid color-mix(in srgb, var(--pc) 40%, transparent); }
+.prCard small { display: block; letter-spacing: 3px; color: #c4cfdb; font-size: 12px; margin-bottom: 6px; } .prCard span { display: block; color: #9fb0c2; font-size: 13px; margin-top: 6px; }
+.prPool div { display: flex; gap: 4px; flex-wrap: wrap; } .prPool img { width: 46px; height: 46px; border-radius: 6px; object-fit: cover; }
+.prLead { padding: 10px 12px; border-radius: 14px; background: var(--glass, rgba(16,22,32,.7)); border: 1px solid rgba(255,255,255,.08); }
+.prLead h3 { margin: 0 0 6px; font-size: 14px; }
+.prRow { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 8px; padding: 3px 0; font-size: 14px; } .prRow i { font-style: normal; color: #9fb0c2; text-align: right; } .prRow.me { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.1); color: #ffd860; font-weight: 700; }
+.pPrem { display: flex; align-items: center; gap: 12px; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: rgba(0,0,0,.25); } .pPrem small { letter-spacing: 2px; color: #9fb0c2; font-size: 11px; } .pPrem span { color: #9fb0c2; font-size: 13px; }
+.tpTxt small .prBadge { padding: 0 8px 0 12px; } .tpTxt small .prBadge b { font-size: 12px; } .tpTxt small .prBadge i { width: 4px; left: 3px; top: 2px; bottom: 2px; }
+.ePrem .prBadge { margin: 6px 0; } .ePrem .eRn em { font-style: normal; font-size: 22px; } .ePrem .eRn em.up { color: #7cf08a; } .ePrem .eRn em.down { color: #ff6a5a; }
+/* вето */
+#veto { position: fixed; inset: 0; z-index: 46; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: radial-gradient(ellipse at center, rgba(14,20,30,.85), rgba(4,6,10,.96)); backdrop-filter: blur(8px); padding: 12px; font-family: "Barlow Condensed", system-ui, sans-serif; }
+#veto.hidden { display: none; }
+.vtTitle { font-size: 34px; font-weight: 800; letter-spacing: 5px; } .vtSub { font-size: 18px; color: #c4cfdb; min-height: 24px; text-align: center; }
+.vtSub .me { color: #5aa0ff; } .vtSub .en { color: #ff6a5a; } .vtSub .pick { color: #ffd860; }
+.vtMaps { display: grid; grid-template-columns: repeat(7, minmax(80px, 140px)); gap: 8px; max-width: 100%; }
+.vtMap { position: relative; padding: 0; border: 2px solid rgba(255,255,255,.12); border-radius: 10px; overflow: hidden; background: #0e131a; font-family: inherit; }
+.vtMap img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; } .vtMap b { display: block; padding: 4px; font-size: 16px; letter-spacing: 1px; }
+.vtMap:not(:disabled):hover { border-color: #ff6a5a; transform: translateY(-3px); }
+.vtMap.ban { opacity: .45; filter: grayscale(.9); } .vtMap.ban span { position: absolute; left: 0; right: 0; top: 40%; background: rgba(160,30,30,.85); font-size: 11px; letter-spacing: 1px; padding: 3px 0; }
+.vtMap.ban.me span { background: rgba(40,80,160,.9); }
+.vtOrder { display: flex; gap: 6px; } .vtOrder i { font-style: normal; font-size: 12px; letter-spacing: 1px; padding: 3px 8px; border-radius: 4px; background: rgba(255,255,255,.06); color: #6a7686; }
+.vtOrder i.me { color: #5aa0ff; } .vtOrder i.en { color: #ff6a5a; } .vtOrder i.done { opacity: .4; } .vtOrder i.cur { background: rgba(255,255,255,.18); color: #fff; } .vtOrder i.pick.cur { background: #c8a020; color: #000; }
+@media (max-width: 700px), (max-height: 460px) { .vtMaps { grid-template-columns: repeat(7, minmax(60px, 1fr)); } .vtMap b { font-size: 12px; } .vtTitle { font-size: 24px; } #premBox { grid-template-columns: 1fr; } }

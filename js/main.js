@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793203122';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793203122';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793203122';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793203122';
-import { AgentModel } from './models.js?v=1793203122';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793203122';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793203122';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793203122';
-import { styleOf } from './decor.js?v=1793203122';
-import { Game } from './game.js?v=1793203122';
+import { MAPS, CELL } from './maps.js?v=1793203411';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793203411';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793203411';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793203411';
+import { AgentModel } from './models.js?v=1793203411';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793203411';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793203411';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793203411';
+import { styleOf } from './decor.js?v=1793203411';
+import { Game } from './game.js?v=1793203411';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -274,8 +274,14 @@ function updYt() {
   $('ytClose').onclick = () => { box.innerHTML = ''; box.dataset.id = 'closed'; box.classList.add('hidden'); };
   stopMusic(0.5);
 }
+let kitsGen = 0;
 async function renderKits() {
-  const box = $('kitList'); if (!box) return; box.innerHTML = '';
+  const box = $('kitList'); if (!box) return;
+  // треки грузятся асинхронно: если за это время позвали ещё раз, старый вызов ничего не рисует (иначе карточки дублируются)
+  const gen = ++kitsGen, slots = [['menu', 'Меню (по кругу)'], ['start', 'Начало раунда'], ['mvp', 'MVP раунда']];
+  const recs = await Promise.all(slots.map(([s]) => loadTrack(s)));
+  if (gen !== kitsGen) return;
+  box.innerHTML = '';
   const cur = save.musicKit || 'cfs';
   const secs = [[true, '🔊 Бассовые', '808, вобл и рис-бас — качает'], [false, '🎹 Мелодичные', 'без тяжёлого баса — спокойнее']];
   const ordered = secs.flatMap(([bassy, h, sub]) => [{ head: h, sub }, ...KITS.filter(k => !!k.bassy === bassy)]);
@@ -288,8 +294,6 @@ async function renderKits() {
   }
   // свой кит: треки игрока
   box.appendChild(el('div', 'kitSec', '<b>★ Свой кит</b><small>свои треки или YouTube</small>'));
-  const slots = [['menu', 'Меню (по кругу)'], ['start', 'Начало раунда'], ['mvp', 'MVP раунда']];
-  const recs = await Promise.all(slots.map(([s]) => loadTrack(s)));
   const c = el('div', 'kit custom' + (cur === 'custom' ? ' on' : ''), `<div class="kArt" style="--kc:#3cf06a"><span>★</span></div>
     <input class="kTitle" maxlength="24" value="${esc(save.customKitName || 'Мой кит')}" title="Название кита">
     <div class="kAuth">Свои треки (mp3, m4a, ogg) — хранятся только на этом устройстве</div>

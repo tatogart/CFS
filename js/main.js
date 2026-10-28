@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793199126';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793199126';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793199126';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793199126';
-import { AgentModel } from './models.js?v=1793199126';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793199126';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793199126';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793199126';
-import { styleOf } from './decor.js?v=1793199126';
-import { Game } from './game.js?v=1793199126';
+import { MAPS, CELL } from './maps.js?v=1793199243';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793199243';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793199243';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793199243';
+import { AgentModel } from './models.js?v=1793199243';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793199243';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793199243';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793199243';
+import { styleOf } from './decor.js?v=1793199243';
+import { Game } from './game.js?v=1793199243';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -494,7 +494,7 @@ addEventListener('freeze', () => onHide(true));
 // ---------- профиль ----------
 const AV_COLORS = ['#e8a640', '#5aa0ff', '#4cd07a', '#e05555', '#b06cff', '#3fd0d0', '#ff7ac0', '#9aa6b6'];
 const XP_PER_LVL = 1000;
-const nick = () => (save.nick || 'Игрок');
+function nick() { return save.nick || 'Игрок'; }
 function avatarHtml(size = 40) {
   const c = AV_COLORS[save.avatar || 0];
   return `<span class="avatar" style="--av:${c};width:${size}px;height:${size}px;font-size:${Math.round(size * 0.5)}px">${esc(nick().trim()[0] || '?').toUpperCase()}</span>`;

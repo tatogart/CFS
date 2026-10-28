@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793168991';
-import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793168991';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793168991';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793168991';
-import { AgentModel } from './models.js?v=1793168991';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793168991';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793168991';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793168991';
-import { styleOf } from './decor.js?v=1793168991';
-import { Game } from './game.js?v=1793168991';
+import { MAPS, CELL } from './maps.js?v=1793169372';
+import { ARMORY, AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793169372';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793169372';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793169372';
+import { AgentModel } from './models.js?v=1793169372';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793169372';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793169372';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793169372';
+import { styleOf } from './decor.js?v=1793169372';
+import { Game } from './game.js?v=1793169372';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -595,10 +595,44 @@ function renderAdmin() {
   const sel = el('select'); for (const sk of SKINS) { const o = el('option', '', `${weaponName(sk.weapon)} | ${sk.name}`); o.value = sk.id; sel.appendChild(o); }
   r.appendChild(sel); btn(r, 'Выдать', () => addItem(sel.value));
   r = group('Читы в матче');
-  const tog = (key, label) => btn(r, (A[key] ? '✔ ' : '') + label, () => { A[key] = !A[key]; }, A[key]);
+  const tog = (key, label) => btn(r, (A[key] ? '✔ ' : '') + label, () => { A[key] = !A[key]; if (game) game.admin[key] = A[key]; }, A[key]);
   tog('god', 'Бессмертие'); tog('ammo', 'Бесконечные патроны'); tog('money', '$16 000 всегда'); tog('oneshot', 'Убийство с одного выстрела'); tog('radar', 'Враги на радаре'); tog('speed', 'Быстрый бег');
+  tog('wall', 'ВХ: видно сквозь стены'); tog('norecoil', 'Без отдачи'); tog('nades', 'Бесконечные гранаты'); tog('fastBomb', 'Мгновенная закладка/разминирование'); tog('freeze', 'Заморозить ботов'); tog('peace', 'Боты не стреляют');
+  r = group(`Скорость игры: ×${A.timeScale || 1}`);
+  for (const v of [0.25, 0.5, 1, 1.5, 2]) btn(r, '×' + v, () => { A.timeScale = v === 1 ? 0 : v; if (game) game.admin.timeScale = A.timeScale; }, (A.timeScale || 1) === v);
+  if (game && !END) {
+    r = group('Действия в текущем матче');
+    const act = (label, k, v) => btn(r, label, () => { game.adminAction(k, v); if (k === 'winMatch') $('admin').classList.add('hidden'); });
+    act('Убить всех врагов', 'killEnemies'); act('Убить всех', 'killAll'); act('Выиграть раунд', 'winRound'); act('Выиграть матч', 'winMatch');
+    act('Вылечить + броня', 'heal'); act('$16 000', 'money'); act('Все гранаты', 'nades'); act('Возродиться', 'respawn');
+    const ws = el('select'); for (const id of Object.keys(WEAPONS)) if (id !== 'knife') { const o = el('option', '', WEAPONS[id].name); o.value = id; ws.appendChild(o); }
+    r.appendChild(ws); btn(r, 'Выдать оружие', () => game.adminAction('give', ws.value));
+  }
+  r = group(`Прогресс: уровень ${Math.floor((save.xp || 0) / XP_PER_LVL) + 1} · ${save.xp || 0} XP`);
+  btn(r, '+1 000 XP', () => save.xp = (save.xp || 0) + 1000); btn(r, '+10 000 XP', () => save.xp = (save.xp || 0) + 10000); btn(r, 'Сбросить опыт', () => save.xp = 0);
+  for (const m of ['comp', 'wing']) {
+    const rd = rankData(m), rs = el('select'); rs.appendChild(Object.assign(el('option', '', 'Без звания'), { value: -1 })); RANKS.forEach((n, i) => { const o = el('option', '', n); o.value = i; rs.appendChild(o); }); rs.value = rankOf(rd);
+    r.appendChild(el('span', 'alab', m === 'comp' ? 'Соревн.:' : 'Напарники:')); r.appendChild(rs);
+    rs.onchange = () => { const i = +rs.value; if (i < 0) { rd.wins = 0; rd.elo = 600; } else { rd.wins = Math.max(2, rd.wins); rd.elo = 250 + i * 125 + 60; } persist(); renderAdmin(); };
+  }
+  const P = pass();
+  r = group(`Armory Pass: ${P.active ? 'активен' : 'не куплен'} · ★ ${P.stars} · заработано ${P.earned}/${ARMORY.stars}`);
+  btn(r, 'Активировать бесплатно', () => { P.active = true; if (P.earned >= ARMORY.stars) P.earned = 0; }); btn(r, '+10 ★', () => P.stars += 10); btn(r, '+40 ★', () => P.stars += 40); btn(r, 'Сбросить пасс', () => save.pass = null);
+  r = group('Миссии и дроп недели');
+  btn(r, 'Выполнить все миссии', () => { for (const m of missions().list) { m.prog = m.n; m.done = true; } });
+  btn(r, 'Новые миссии', () => { const pool = MISSIONS.slice(), list = []; while (list.length < 3) { const m = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; list.push({ id: m.id, n: m.n[Math.floor(Math.random() * m.n.length)], prog: 0, done: false }); } save.missions = { week: weekId(), list }; });
+  btn(r, 'Новый дроп недели', () => { save.weekly = null; weekly(); });
+  r = group('Выдача с параметрами');
+  const sel2 = el('select'); for (const sk of SKINS) { const o = el('option', '', `${weaponName(sk.weapon)} | ${sk.name}`); o.value = sk.id; sel2.appendChild(o); }
+  const wsel = el('select'); [['0.0001', 'Прямо с завода 0.0001'], ['0.1', 'Немного поношенное'], ['0.25', 'После полевых'], ['0.4', 'Поношенное'], ['0.99', 'Закалённое в боях 0.99']].forEach(([v, n]) => { const o = el('option', '', n); o.value = v; wsel.appendChild(o); });
+  const stc = el('label', 'alab', '<input type="checkbox"> StatTrak™');
+  r.appendChild(sel2); r.appendChild(wsel); r.appendChild(stc);
+  btn(r, 'Выдать', () => { const it = addItem(sel2.value, stc.querySelector('input').checked); it.wear = +wsel.value; });
+  r = group('Тест экранов');
+  btn(r, 'Окно «Матч найден»', () => { $('admin').classList.add('hidden'); save.last.mode = 'comp'; if (save.last.diff === 'none') save.last.diff = 'medium'; MM = { t: 0, find: 0, mode: 'comp', ranked: true, total: 10, phase: 'search' }; showAccept(); const tk = () => { if (!MM || MM.phase !== 'accept') return; MM.t += 0.1; $('accBar').style.width = Math.max(0, (20 - (MM.t - MM.acceptT)) / 20 * 100) + '%'; if (MM.accepted && MM.bots < MM.total - 1 && MM.t >= MM.nextBot) { MM.bots++; MM.nextBot = MM.t + 0.3; renderAccSlots(); } if (MM.accepted && MM.bots >= MM.total - 1) { setTimeout(() => { $('accept').classList.add('hidden'); MM = null; }, 800); return; } if (MM.t - MM.acceptT > 20) { $('accept').classList.add('hidden'); MM = null; return; } setTimeout(tk, 100); }; tk(); });
   r = group('Прочее');
   tog2(r, 'freeCases', 'Кейсы бесплатно');
+  tog2(r, 'fastLoad', 'Быстрая загрузка матча');
   btn(r, 'Сбросить статистику', () => { save.stats = { kills: 0, deaths: 0, wins: 0, matches: 0, opened: 0 }; save.lastMatch = null; });
   btn(r, 'Выйти из админки', () => { adminOk = false; $('admin').classList.add('hidden'); });
   function tog2(row, key, label) { btn(row, (A[key] ? '✔ ' : '') + label, () => { A[key] = !A[key]; }, A[key]); }
@@ -953,10 +987,11 @@ function renderBuy() {
 }
 
 // ---------- пауза / выход ----------
-function openPause() { $('pause').classList.remove('hidden'); $('pSens').value = touch ? save.settings.touchSens : save.settings.sens; controls.unlock(); }
+function openPause() { $('pAdmin').classList.toggle('hidden', !adminOk); $('pause').classList.remove('hidden'); $('pSens').value = touch ? save.settings.touchSens : save.settings.sens; controls.unlock(); }
 $('pSens').oninput = e => { if (touch) { save.settings.touchSens = +e.target.value; controls.touchSens = +e.target.value; } else save.settings.sens = +e.target.value; persist(); };
 $('resume').onclick = () => { $('pause').classList.add('hidden'); if (!touch) controls.lock(); };
 $('quit').onclick = () => { $('pause').classList.add('hidden'); quitGame(); };
+$('pAdmin').onclick = () => { if (adminOk) openAdmin(); };
 // ---------- конец матча: сцена как в CS2 ----------
 const XP_LVL = XP_PER_LVL;
 function endMatch(g) {
@@ -1220,7 +1255,7 @@ function beginLoad() {
     const roster = t => g.actors.filter(a => a.team === t).map(a => `<div class="ldP${a === g.player ? ' me' : ''}"><span class="avatar" style="--av:${a === g.player ? AV_COLORS[save.avatar || 0] : t === 'T' ? '#a8823f' : '#41689c'};width:22px;height:22px;font-size:12px">${esc(a.name[0] || '?')}</span>${esc(a.name)}</div>`).join('');
     $('ldRoster').innerHTML = mode === 'dm' ? `<div class="ldCol"><h5>Участники</h5>${g.actors.map(a => `<div class="ldP${a === g.player ? ' me' : ''}">${esc(a.name)}</div>`).join('')}</div>`
       : `<div class="ldCol t"><h5>Террористы</h5>${roster('T')}</div><div class="ldCol ct"><h5>Спецназ</h5>${roster('CT')}</div>`;
-    LOADING = { g, t: 0, t0: 0, dur: window.__fast ? 0.05 : 6.5 + Math.random() * 2, cx, cz, R: Math.max(cx, cz) * 1.1, tipT: 0 };
+    LOADING = { g, t: 0, t0: 0, dur: window.__fast ? 0.05 : save.admin && save.admin.fastLoad ? 1 : 6.5 + Math.random() * 2, cx, cz, R: Math.max(cx, cz) * 1.1, tipT: 0 };
     renderer.compile && renderer.compile(g.scene, g.camera);
   }, 60);
 }

@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793168991';
-import { World } from './world.js?v=1793168991';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793168991';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793168991';
-import { play, soundFor } from './sfx.js?v=1793168991';
-import { Bot, planRound } from './bots.js?v=1793168991';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793168991';
+import { CELL } from './maps.js?v=1793169372';
+import { World } from './world.js?v=1793169372';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793169372';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793169372';
+import { play, soundFor } from './sfx.js?v=1793169372';
+import { Bot, planRound } from './bots.js?v=1793169372';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793169372';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -452,6 +452,7 @@ export class Game {
   hspeed(a) { return Math.hypot(a.vel.x, a.vel.z); }
 
   tryFire(a) {
+    if (a.bot && this.admin.peace) return;
     const inst = a.cur; if (!inst || a.fireCd > 0 || a.switchT > 0) return;
     if (inst.c4) return;
     if (inst.nade) { this.throwNade(a, inst.id); return; }
@@ -485,8 +486,9 @@ export class Game {
     }
     // отдача
     const ri = a.recoilIdx;
+    if (a === this.player && this.admin.norecoil) { a.recoilIdx = 0; } else
     a.punch.p += def.recoil * (ri < 3 ? 0.7 : ri < 9 ? 1.1 : 0.4);
-    a.punch.y += def.recoil * (ri < 6 ? (Math.random() - 0.5) * 0.4 : Math.sin(ri * 0.55) * 0.9);
+    if (!(a === this.player && this.admin.norecoil)) a.punch.y += def.recoil * (ri < 6 ? (Math.random() - 0.5) * 0.4 : Math.sin(ri * 0.55) * 0.9);
     a.punch.p = Math.min(a.punch.p, 0.22);
     a.recoilIdx += 1;
     if (def.scope && a.scope) { a.prevScope = a.scope; a.scope = 0; a.rescope = def.rate * 0.95; }
@@ -625,7 +627,7 @@ export class Game {
   // ---------- гранаты ----------
   throwNade(a, type, vel) {
     const i = a.nades.indexOf(type); if (i < 0) return;
-    a.nades.splice(i, 1);
+    if (!(a === this.player && this.admin.nades)) a.nades.splice(i, 1);
     const o = this.eyePos(a);
     if (!vel) {
       const d = this.aimDir(a, new THREE.Vector3(), 0.08);
@@ -953,6 +955,20 @@ export class Game {
     }
   }
 
+  // ---------- действия админки прямо в матче ----------
+  adminAction(kind, v) {
+    const p = this.player;
+    if (kind === 'killEnemies') for (const e of this.actors) if (e.alive && this.isEnemy(p, e)) this.kill(e, p, WEAPONS.ak47, true, null);
+    if (kind === 'killAll') for (const e of this.actors) if (e.alive && e !== p) this.kill(e, p, WEAPONS.ak47, true, null);
+    if (kind === 'winRound' && !this.dm && !this.practice) this.endRound(p.team, 'elim');
+    if (kind === 'winMatch') { if (this.ar) this.arWinner = p; else if (this.dm) p.kills = Math.max(p.kills, this.dmLimit); else this.score[p.team] = this.o.winTo; this.over = true; this.ui.matchOver(this); }
+    if (kind === 'give' && WEAPONS[v]) { const sl = WEAPONS[v].slot; this.give(p, v); this.selectSlot(p, sl); }
+    if (kind === 'nades') p.nades = ['he', 'flash', 'smoke', 'molotov'];
+    if (kind === 'heal') { p.hp = 100; p.armor = 100; p.helmet = true; }
+    if (kind === 'money') p.money = 16000;
+    if (kind === 'respawn' && !p.alive) { if (this.dm) this.dmRespawn(p); else { p.alive = true; p.hp = 100; p.model.revive(); p.model.root.visible = false; this.vm.visible = true; this.spect = null; } }
+  }
+
   // ---------- радио: реплики ботов-союзников в чате команды ----------
   radio(who, kind, x = {}) {
     if (!this.ui.chat || this.practice || (this.dm && !this.ar)) return;
@@ -1255,18 +1271,22 @@ export class Game {
     const T = a.team === 'T';
     if (T && a.hasBomb && a.in.use && a.onGround && this.plantSite(a.pos.x, a.pos.z) && (this.state === 'live')) {
       if (a.cur && !a.cur.c4) this.selectSlot(a, 5, true);
-      a.plantT += dt; if (a.plantT >= PLANT_TIME) { a.plantT = 0; this.plant(a); }
+      a.plantT += dt; if (a.plantT >= (this.admin.fastBomb && a === this.player ? 0.4 : PLANT_TIME)) { a.plantT = 0; this.plant(a); }
     } else a.plantT = 0;
     const B = this.bomb;
     if (!T && B && B.planted && !B.done && a.in.use && a.pos.distanceTo(B.pos) < 1.6) {
       if (a.defuseT === 0) { const [d, pan] = this.listen(a.pos); play('defuse', d, pan); }
       a.defuseT += dt;
-      if (a.defuseT >= (a.kit ? 5 : 10)) { this.defuser = a; B.done = true; a.defuseT = 0; a.money += 300; this.endRound('CT', 'defuse'); }
+      if (a.defuseT >= (this.admin.fastBomb && a === this.player ? 0.4 : a.kit ? 5 : 10)) { this.defuser = a; B.done = true; a.defuseT = 0; a.money += 300; this.endRound('CT', 'defuse'); }
     } else a.defuseT = 0;
   }
 
   // ---------- главный цикл ----------
   update(dt) {
+    if (this.admin.timeScale) dt *= this.admin.timeScale;
+    // вх: агенты видны сквозь стены
+    const wh = !!this.admin.wall;
+    if (this._wh !== wh && this._rmCache) { this._wh = wh; for (const m of this._rmCache.values()) { m.depthTest = !wh; m.needsUpdate = true; } for (const a of this.actors) a.model.root.renderOrder = wh ? 5 : 0; }
     this.time += dt;
     // состояние раунда
     if (!this.practice && !this.dm) {
@@ -1303,7 +1323,7 @@ export class Game {
     }
     if (this.aimMode) this._aimTargets(dt);
     const frozen = this.state === 'freeze';
-    for (const a of this.actors) if (a.brain && a.alive) a.brain.update(dt, frozen);
+    for (const a of this.actors) if (a.brain && a.alive) a.brain.update(dt, frozen || this.admin.freeze);
     for (const a of this.actors) {
       if (frozen) { a.in.mx = a.in.mz = 0; a.in.jump = false; }
       this._move(a, dt);

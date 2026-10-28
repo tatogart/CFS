@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793168991';
-import { WEAPONS } from './data.js?v=1793168991';
+import { CELL } from './maps.js?v=1793169372';
+import { WEAPONS } from './data.js?v=1793169372';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -327,7 +327,7 @@ export class Bot {
       // без основного оружия — подобрать лежащее рядом
       if (!a.weapons[1] && !this.target && g.ground && g.ground.length && g.time > (this.lootT || 0)) {
         this.lootT = g.time + 2;
-        let best = null, bd = 12; for (const it of g.ground) { const d = it.pos.distanceTo(a.pos); if (d < bd && it.rest && g.world.los(g.eyePos(a), it.pos.clone().setY(it.pos.y + 0.3))) { bd = d; best = it; } }
+        let best = null, bd = 12; for (const it of g.ground) { const wd = WEAPONS[it.inst.id]; if (!wd || wd.slot !== 1) continue; const d = it.pos.distanceTo(a.pos); if (d < bd && it.rest && g.world.los(g.eyePos(a), it.pos.clone().setY(it.pos.y + 0.3))) { bd = d; best = it; } }
         if (best) this.setGoal(best.pos.clone());
       }
     }

@@ -527,3 +527,5 @@ body.tedit .tb.teSel { outline: 2px solid #ffd860; box-shadow: 0 0 14px #ffd860;
 .armCase img { width: 160px; } .armCase b { display: block; font-size: 17px; } .armCase span { display: block; color: #9fb0c2; font-size: 13px; margin: 2px 0 8px; }
 .eStar { color: #ffd860 !important; }
 @media (max-width: 1100px) { .cs2 .tabs button { padding: 10px 10px; font-size: 16px; letter-spacing: 1px; } }
+#admin { z-index: 46; }
+.alab { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #9fb0c2; }

@@ -1,15 +1,15 @@
 // Интерфейс: меню, кейсы, инвентарь, агенты, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { MAPS, CELL } from './maps.js?v=1793168469';
-import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793168469';
-import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793168469';
-import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793168469';
-import { AgentModel } from './models.js?v=1793168469';
-import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793168469';
-import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793168469';
-import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793168469';
-import { styleOf } from './decor.js?v=1793168469';
-import { Game } from './game.js?v=1793168469';
+import { MAPS, CELL } from './maps.js?v=1793168645';
+import { AR_LADDER, WEAPONS, NADES, GEAR, BUY_GROUPS, CASES, RARITY, RARITY_ORDER, AGENTS, DIFFICULTIES, SKINS, GRAFFITI, KNIVES, skinById, weaponName, agentById } from './data.js?v=1793168645';
+import { load, persist, S, addItem, sellItem, equipItem, isEquipped, loadout, rollCase, wearOf, statTrak } from './store.js?v=1793168645';
+import { weaponIconURL, caseIconURL, mapThumbURL, graffitiURL, RANKS, rankURL } from './art.js?v=1793168645';
+import { AgentModel } from './models.js?v=1793168645';
+import { Controls, isTouch, DEFAULT_BINDS, BIND_NAMES } from './controls.js?v=1793168645';
+import { initAudio, play, setVolume, startAmbience, stopAmbience } from './sfx.js?v=1793168645';
+import { KITS, playMusic, stopMusic, setKit, setMusicVolume, saveTrack, loadTrack, deleteTrack, musicMode, onMusicEnd, setHidden } from './music.js?v=1793168645';
+import { styleOf } from './decor.js?v=1793168645';
+import { Game } from './game.js?v=1793168645';
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -255,8 +255,45 @@ function renderGraffiti() {
     box.appendChild(b);
   }
 }
+// ---------- лоадаут как в CS2: в закупке только выбранное оружие ----------
+const LO_CATS = [['pistols', 'Пистолеты', t => t === 'pistol'], ['mid', 'Средний класс', t => t === 'smg' || t === 'shotgun' || t === 'mg'], ['rifles', 'Винтовки', t => t === 'rifle' || t === 'sniper']];
+const loPool = (team, cat) => { const f = LO_CATS.find(c => c[0] === cat)[2]; return Object.keys(WEAPONS).filter(id => f(WEAPONS[id].type) && (!WEAPONS[id].team || WEAPONS[id].team === team)); };
+function wLoadout(team) {
+  save.wlo = save.wlo || {};
+  const cur = save.wlo[team] || {}, out = {};
+  for (const [cat] of LO_CATS) {
+    const pool = loPool(team, cat), n = Math.min(5, pool.length);
+    const DEF = { T: { pistols: ['glock', 'p250', 'tec9', 'deagle'], mid: ['mac10', 'mp7', 'ump45', 'p90', 'nova'], rifles: ['galil', 'ak47', 'sg553', 'ssg08', 'awp'] }, CT: { pistols: ['usp', 'p250', 'fiveseven', 'deagle'], mid: ['mp9', 'mp7', 'ump45', 'p90', 'xm1014'], rifles: ['famas', 'm4a4', 'aug', 'ssg08', 'awp'] } };
+    let list = (cur[cat] || DEF[team][cat]).filter(id => pool.includes(id));
+    for (const id of pool) { if (list.length >= n) break; if (!list.includes(id)) list.push(id); }
+    out[cat] = list.slice(0, n);
+  }
+  save.wlo[team] = out; return out;
+}
+const inLoadout = (team, id) => { if (!WEAPONS[id] || WEAPONS[id].type === 'knife') return true; const lo = wLoadout(team); return LO_CATS.some(([c]) => lo[c].includes(id)); };
+let wloSide = 'T';
+function renderWLoadout() {
+  const box = $('wloBox'); if (!box) return;
+  const lo = wLoadout(wloSide), lo2 = loadout();
+  box.innerHTML = `<div class="pills wloSide"><button data-s="T" class="${wloSide === 'T' ? 'on' : ''}">Террористы</button><button data-s="CT" class="${wloSide === 'CT' ? 'on' : ''}">Спецназ</button></div>`;
+  box.querySelectorAll('.wloSide button').forEach(b => b.onclick = () => { wloSide = b.dataset.s; renderWLoadout(); play('tick'); });
+  for (const [cat, name] of LO_CATS) {
+    const row = el('div', 'wloRow', `<h5>${name}</h5>`), slots = el('div', 'wloSlots');
+    lo[cat].forEach((id, i) => {
+      const b = el('button', 'wloSlot', `${cat === 'pistols' && i === 0 ? '<i>стартовый</i>' : ''}<img src="${weaponIconURL(id, lo2[id] || null, 192, 72)}" alt=""><span>${esc(WEAPONS[id].name)}</span>`);
+      b.onclick = () => {
+        const pool = loPool(wloSide, cat);
+        const pk = el('div', 'wloPick'); pk.innerHTML = pool.map(x => `<button data-id="${x}" class="${x === id ? 'on' : lo[cat].includes(x) ? 'have' : ''}"><img src="${weaponIconURL(x, lo2[x] || null, 192, 72)}" alt=""><span>${esc(WEAPONS[x].name)}</span></button>`).join('');
+        pk.onclick = e => { const t = e.target.closest('button'); if (!t) return; const j = lo[cat].indexOf(t.dataset.id); if (j >= 0) lo[cat][j] = lo[cat][i]; lo[cat][i] = t.dataset.id; save.wlo[wloSide] = lo; persist(); play('buy'); renderWLoadout(); };
+        box.querySelectorAll('.wloPick').forEach(x => x.remove()); row.appendChild(pk);
+      };
+      slots.appendChild(b);
+    });
+    row.appendChild(slots); box.appendChild(row);
+  }
+}
 function renderInv() {
-  renderGraffiti(); renderKits();
+  renderGraffiti(); renderKits(); renderWLoadout();
   const box = $('invList'); box.innerHTML = '';
   const sort = $('invSort').value;
   const list = save.inv.slice();
@@ -860,6 +897,7 @@ function renderBuy() {
     const sec = el('div', 'bgroup', `<h4>${esc(grp.name)}</h4>`), grid = el('div', 'bgrid');
     for (const id of grp.items) {
       if (!g.canTeam(p, id)) continue;
+      if (!g.dm && !inLoadout(p.team, id)) continue;
       const price = g.priceOf(p, id);
       const name = WEAPONS[id] ? WEAPONS[id].name : NADES[id] ? (id === 'molotov' && p.team === 'CT' ? NADES[id].ctName : NADES[id].name) : GEAR[id].name;
       const own = (WEAPONS[id] && p.weapons[WEAPONS[id].slot] && p.weapons[WEAPONS[id].slot].id === id) || (id === 'kit' && p.kit) || (id === 'vesthelm' && p.helmet) || (id === 'vest' && p.armor >= 100);
@@ -1133,7 +1171,7 @@ function beginLoad() {
   // даём оверлею отрисоваться, потом строим карту
   setTimeout(() => {
     try {
-      game = new Game(renderer, { nick: nick(), map, diff, side, size, winTo, mode, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
+      game = new Game(renderer, { startPistol: { T: wLoadout('T').pistols[0], CT: wLoadout('CT').pistols[0] }, nick: nick(), map, diff, side, size, winTo, mode, settings: save.settings, quality: quality(), controls, loadout: loadout(), agents: save.agent, graffiti: save.graffiti || 'cfs', admin: { ...(save.admin || {}) } }, hud);
     } catch (e) { L.classList.add('hidden'); $('menu').classList.remove('hidden'); alert('Ошибка запуска: ' + e.message); console.error(e); return; }
     const g = game, cx = g.world.w * CELL / 2, cz = g.world.h * CELL / 2;
     const roster = t => g.actors.filter(a => a.team === t).map(a => `<div class="ldP${a === g.player ? ' me' : ''}"><span class="avatar" style="--av:${a === g.player ? AV_COLORS[save.avatar || 0] : t === 'T' ? '#a8823f' : '#41689c'};width:22px;height:22px;font-size:12px">${esc(a.name[0] || '?')}</span>${esc(a.name)}</div>`).join('');

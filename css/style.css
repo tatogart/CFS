@@ -503,3 +503,15 @@ body.tedit .tb { outline: 1px dashed rgba(255,255,255,.4); }
 body.tedit .tb.teSel { outline: 2px solid #ffd860; box-shadow: 0 0 14px #ffd860; }
 .teBar { position: fixed; z-index: 60; left: 50%; top: 56px; transform: translateX(-50%); display: flex; gap: 12px; align-items: center; background: rgba(8,11,16,.92); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,.15); font-size: 14px; }
 .teBar button { padding: 6px 12px; border-radius: 4px; border: 0; background: #2a323d; } .teBar button.go { background: #2f8a3a; }
+
+/* лоадаут */
+.wlo { margin-bottom: 12px; }
+.wloSide { margin-bottom: 8px; }
+.wloRow h5 { margin: 8px 0 4px; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #9fb0c2; }
+.wloSlots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.wloSlot, .wloPick button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; background: #161d27; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; font-size: 12px; }
+.wloSlot img, .wloPick img { width: 100%; max-width: 110px; height: auto; }
+.wloSlot i { position: absolute; top: 2px; left: 4px; font-size: 9px; font-style: normal; color: #ffd860; text-transform: uppercase; }
+.wloPick { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; margin-top: 6px; padding: 8px; background: rgba(0,0,0,.35); border-radius: 6px; }
+.wloPick button.on { border-color: #ffd860; }
+.wloPick button.have { opacity: .55; }

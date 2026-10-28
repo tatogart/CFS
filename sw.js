@@ -1,6 +1,6 @@
 // Сервис-воркер: игра сохраняется на устройстве и запускается без интернета.
-const VERSION = '1793169827';
-const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "vendor/three.module.min.js", "css/style.css?v=1793169827", "js/art.js?v=1793169827", "js/bots.js?v=1793169827", "js/controls.js?v=1793169827", "js/data.js?v=1793169827", "js/decor.js?v=1793169827", "js/game.js?v=1793169827", "js/main.js?v=1793169827", "js/maps.js?v=1793169827", "js/models.js?v=1793169827", "js/music.js?v=1793169827", "js/sfx.js?v=1793169827", "js/store.js?v=1793169827", "js/world.js?v=1793169827"];
+const VERSION = '1793171228';
+const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "vendor/three.module.min.js", "css/style.css?v=1793171228", "js/art.js?v=1793171228", "js/bots.js?v=1793171228", "js/controls.js?v=1793171228", "js/data.js?v=1793171228", "js/decor.js?v=1793171228", "js/game.js?v=1793171228", "js/main.js?v=1793171228", "js/maps.js?v=1793171228", "js/models.js?v=1793171228", "js/music.js?v=1793171228", "js/sfx.js?v=1793171228", "js/store.js?v=1793171228", "js/world.js?v=1793171228"];
 const CACHE = 'cfs-' + VERSION;
 
 self.addEventListener('install', e => {

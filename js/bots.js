@@ -1,7 +1,7 @@
 // ИИ ботов: закупка, тактика раунда, раскидка гранат, стрельба
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793169827';
-import { WEAPONS } from './data.js?v=1793169827';
+import { CELL } from './maps.js?v=1793171228';
+import { WEAPONS } from './data.js?v=1793171228';
 
 const G = 15;
 const v3 = () => new THREE.Vector3();
@@ -357,6 +357,8 @@ export class Bot {
       if (a.cur && (a.cur.nade || a.cur.c4)) this.selectPrimary();
       // стрельба
       let shoot = this.react <= 0 && ey < tol * 1.6 && ep < tol * 1.6 && Math.random() < this.d.fire + 0.2;
+      // не стрелять в стену: враг только что ушёл за угол
+      if (shoot) { this._losT = (this._losT || 0) - dt; if (this._losT <= 0) { this._losT = 0.1; this._los = g.world.los(eye, g.eyePos(T, this._tv || (this._tv = eye.clone()))); } if (!this._los) shoot = false; }
       if (def && def.type === 'knife' && dist > 2) shoot = false;
       if (shoot && def) {
         if (def.scope && !a.scope) a.scope = 1;

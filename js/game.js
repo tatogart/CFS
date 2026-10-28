@@ -1,12 +1,12 @@
 // Ядро матча: актёры, физика, оружие, гранаты, бомба, раунды, HUD
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793168241';
-import { World } from './world.js?v=1793168241';
-import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793168241';
-import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793168241';
-import { play, soundFor } from './sfx.js?v=1793168241';
-import { Bot, planRound } from './bots.js?v=1793168241';
-import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793168241';
+import { CELL } from './maps.js?v=1793168359';
+import { World } from './world.js?v=1793168359';
+import { WEAPONS, NADES, GEAR, agentById, AGENTS, SKINS, KNIVES, GRAFFITI, AR_LADDER } from './data.js?v=1793168359';
+import { AgentModel, buildWeapon, buildViewArms, mat } from './models.js?v=1793168359';
+import { play, soundFor } from './sfx.js?v=1793168359';
+import { Bot, planRound } from './bots.js?v=1793168359';
+import { weaponIconURL, mapThumbURL, drawGraffiti } from './art.js?v=1793168359';
 
 export const GRAV = 15;
 const EYE = 1.62, EYE_C = 1.15, RADIUS = 0.32, STEP = 0.45, JUMP_V = 5.9;
@@ -170,8 +170,18 @@ export class Game {
     if (this.aimMode) for (let i = 0; i < 8; i++) { const ag = teamAgents(enemy)[i % 5]; const b = mkActor('Мишень ' + (i + 1), enemy, true, ag.id); b.target = true; }
     this._finishActors(side);
   }
+  // агенты не тонут в тумане и не превращаются в тёмные силуэты вдали
+  _readable(a) {
+    const cache = this._rmCache || (this._rmCache = new Map());
+    a.model.root.traverse(o => {
+      if (!o.isMesh || !o.material || o.material.userData.readable) return;
+      let m = cache.get(o.material.uuid);
+      if (!m) { m = o.material.clone(); m.fog = false; if (m.emissive) { m.emissive.copy(m.color).multiplyScalar(0.22); } m.userData.readable = true; cache.set(o.material.uuid, m); }
+      o.material = m;
+    });
+  }
   _finishActors(side) {
-    for (const a of this.actors) a.model.root.visible = a !== this.player;
+    for (const a of this.actors) { a.model.root.visible = a !== this.player; this._readable(a); }
     this._retag();
     this._buildViewmodel();
   }
@@ -253,7 +263,7 @@ export class Game {
   }
   _swapSides() {
     for (const a of this.actors) { a.team = a.team === 'T' ? 'CT' : 'T'; a.money = 800; a.kills = a.kills; const ag = a.bot ? AGENTS.filter(x => x.team === a.team)[a.id % 5] : a.remote ? (agentById[a.agents && a.agents[a.team]] || AGENTS.find(x => x.team === a.team)) : agentById[this.o.agents[a.team]];
-      this.scene.remove(a.model.root); a.agent = ag; a.model = new AgentModel(ag, 'knife'); if (a.skins.gloves) a.model.setGloves(a.skins.gloves); this.scene.add(a.model.root); this.resetLoadout(a, true); }
+      this.scene.remove(a.model.root); a.agent = ag; a.model = new AgentModel(ag, 'knife'); if (a.skins.gloves) a.model.setGloves(a.skins.gloves); this._readable(a); this.scene.add(a.model.root); this.resetLoadout(a, true); }
     this.score = { T: this.score.CT, CT: this.score.T }; this.lossStreak = { T: 0, CT: 0 };
     this.playerSide = this.player.team;
     this._retag();

@@ -2,8 +2,8 @@
 // Окна, двери, ставни, карнизы, фонари, навесы, кондиционеры, трубы, провода с бельём,
 // деревья, крыши с баками и антеннами, город и горы на горизонте, пятна на полу.
 import * as THREE from '../vendor/three.module.min.js';
-import { CELL } from './maps.js?v=1793168241';
-import { rng, shade } from './art.js?v=1793168241';
+import { CELL } from './maps.js?v=1793168359';
+import { rng, shade } from './art.js?v=1793168359';
 
 // стиль оформления по карте
 const STYLE_BY_MAP = { dust2: 'dust', mirage: 'dust', inferno: 'inferno', nuke: 'industrial', overpass: 'park', ancient: 'jungle', anubis: 'egypt', vertigo: 'construction', train: 'industrial', aim: 'indoor', shortdust: 'dust', lake: 'lake', canals: 'inferno', baggage: 'indoor', shoots: 'dust', poolday: 'lake' };

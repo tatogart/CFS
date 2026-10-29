@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>CFS Strike</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="css/style.css?v=1793209863">
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<!-- ===== Меню ===== -->
+<div id="menu" class="screen cs2">
+  <header class="topbar">
+    <div class="tleft"><div class="logo" id="logo">CFS<span>STRIKE</span></div><button class="tPlay" data-tab="play" id="topPlay"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg><span>ИГРАТЬ</span></button></div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="home" class="on"><svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8v10h-6v-6H9v6H3z"/></svg><span>Главная</span></button>
+      <button data-tab="inv"><svg viewBox="0 0 24 24"><path d="M8 6V4a4 4 0 0 1 8 0v2h3a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1zm2 0h4V4a2 2 0 0 0-4 0zm-2 6v2h8v-2z"/></svg><span>Инвентарь</span></button>
+      <button data-tab="cases"><svg viewBox="0 0 24 24"><path d="M3 8h18v12H3zM8 8V5h8v3h-2V7h-4v1zm2 4v3h4v-3z"/></svg><span>Магазин</span></button>
+      <button data-tab="agents"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-5 3.6-8 8-8s8 3 8 8z"/></svg><span>Агенты</span></button>
+      <button data-tab="armory" class="armTab"><svg viewBox="0 0 24 24"><path d="m12 2 2.9 6.6 7.1.6-5.4 4.7 1.6 7.1L12 17.3 5.8 21l1.6-7.1L2 9.2l7.1-.6z"/></svg><span>Armory</span></button>
+    </nav>
+    <div class="tright"><div class="coins" id="coins">0</div><button class="topProf" id="topProf" aria-label="Профиль"></button><button class="icon" data-tab="settings" aria-label="Настройки"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.3 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L9 21h4l.3-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button></div>
+  </header>
+  <main class="pages">
+    <section id="tab-home" class="page on">
+      <div class="stage" id="stage"></div>
+      <div class="agentTag"><small id="homeSide"></small><b id="homeAgent"></b>
+        <div class="sideSw" id="sideSw"><button data-side="T">T</button><button data-side="CT">CT</button></div>
+        <button class="profChip" id="profChip" aria-label="Профиль"></button></div>
+      <aside class="homeSide">
+        <div class="hcard" id="promo"></div>
+        <div class="hcard" id="lastBox"></div>
+      </aside>
+      <button class="playBig" id="homePlay"><span>ИГРАТЬ</span><small id="homePlayInfo"></small></button>
+    </section>
+    <section id="tab-play" class="page panelPage">
+      <h2>Режим</h2>
+      <div class="pills" id="modes"></div>
+      <p class="hint" id="modeDesc"></p>
+      <div id="premBox" class="hidden"></div>
+      <h2 id="mapsH">Карта</h2>
+      <div class="maps" id="maps"></div>
+      <h2>Боты</h2>
+      <div class="pills" id="diffs"></div>
+      <p class="hint" id="diffDesc"></p>
+      <div class="row">
+        <div id="rowSide"><h3>Сторона</h3><div class="pills" id="sides"></div></div>
+        <div id="rowSize"><h3>Команды</h3><div class="pills" id="sizes"></div></div>
+        <div id="rowLen"><h3>Матч</h3><div class="pills" id="lengths"></div></div>
+      </div>
+      <button class="playBig inline" id="start"><span>В БОЙ</span></button>
+      <p class="hint">ПК: WASD, мышь, R — перезарядка, E — заложить/разминировать, B — закупка, 1-5 — оружие, Tab — счёт, Shift — шаг, Ctrl — присесть.</p>
+    </section>
+    <section id="tab-cases" class="page panelPage">
+      <div class="grid cases" id="caseList"></div>
+    </section>
+    <section id="tab-inv" class="page panelPage">
+      <h3>Граффити · на ПК клавиша «T», на телефоне 🎨</h3><div class="graf" id="grafList"></div>
+      <h3>Лоадаут · что будет в закупке</h3><div class="wlo" id="wloBox"></div>
+      <h3>Music kit</h3><div class="kits" id="kitList"></div>
+      <div class="invtop"><span id="invCount"></span><select id="invSort"><option value="new">Сначала новые</option><option value="rar">По редкости</option><option value="w">По оружию</option></select></div>
+      <div class="grid items" id="invList"></div>
+    </section>
+    <section id="tab-armory" class="page panelPage"><div id="armoryBox"></div></section>
+    <section id="tab-agents" class="page">
+      <div class="stage" id="stage2"></div>
+      <div class="agentPanel">
+        <h3>Террористы</h3><div class="agentList" id="agentsT"></div>
+        <h3>Спецназ</h3><div class="agentList" id="agentsCT"></div>
+      </div>
+    </section>
+    <section id="tab-settings" class="page panelPage">
+      <div class="set" id="settingsBox"></div>
+      <div class="stats" id="statsBox"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== Админка ===== -->
+<div id="adminPass" class="modal hidden">
+  <div class="panel small">
+    <h2>Вход в админку</h2>
+    <input id="passIn" type="password" inputmode="numeric" autocomplete="off" placeholder="Пароль">
+    <p class="hint" id="passErr"></p>
+    <button class="big go" id="passOk">Войти</button>
+    <button class="big" id="passCancel">Отмена</button>
+  </div>
+</div>
+<div id="admin" class="modal hidden">
+  <div class="panel">
+    <header class="ahead"><b>⚙ Админ-панель</b><button class="x" id="adminClose">✕</button></header>
+    <div id="adminBody"></div>
+  </div>
+</div>
+
+<!-- ===== Профиль ===== -->
+<div id="profile" class="modal hidden">
+  <div class="panel profPanel">
+    <header class="ahead"><b>Профиль</b><button class="x" id="profClose">✕</button></header>
+    <div id="profBody"></div>
+  </div>
+</div>
+
+<!-- ===== Кейс ===== -->
+<div id="caseScreen" class="screen hidden">
+  <header class="topbar"><button class="back" id="caseBack">‹ Назад</button><div class="title" id="caseTitle"></div><div class="coins" id="coins2"></div></header>
+  <div class="roller"><div class="strip" id="strip"></div><div class="needle"></div></div>
+  <div class="caseActions"><img id="caseImg" alt=""><button class="big go" id="openBtn">Открыть</button></div>
+  <h3 class="center">Содержимое кейса</h3>
+  <div class="grid items small" id="caseItems"></div>
+</div>
+<div id="drop" class="modal hidden">
+  <div class="dropCard" id="dropCard">
+    <div class="rar" id="dropRar"></div>
+    <img id="dropImg" alt="">
+    <div class="dname" id="dropName"></div>
+    <div class="btns"><button class="big go" id="dropKeep">Забрать</button><button class="big" id="dropSell"></button></div>
+  </div>
+</div>
+
+<!-- ===== HUD ===== -->
+<div id="hud" class="hidden">
+  <div id="cross"><i></i><i></i><i></i><i></i><b></b></div>
+  <div id="scope" class="hidden"></div>
+  <div id="flashOv"></div><div id="smokeOv"></div><div id="hurtOv"></div>
+  <canvas id="mini" width="170" height="170"></canvas>
+  <div id="topScore"><span class="t" id="scT">0</span><span id="timer">1:55</span><span class="ct" id="scCT">0</span><div id="alive"></div></div>
+  <div id="feed"></div>
+  <div id="chat"></div>
+  <div id="dmgRep" class="hidden"></div>
+  <div id="inspInfo" style="opacity:0"></div>
+  <div id="chatIn" class="hidden"><div class="chRow"><span id="chatMode">ВСЕМ:</span><input id="chatTxt" maxlength="120" autocomplete="off" placeholder="Сообщение… Enter — отправить, Esc — закрыть"><button id="chatSend">➤</button></div>
+    <div id="chatQuick"><button>gg</button><button>gl hf</button><button>читер!</button><button>репорт</button><button>ez</button><button>помогите</button><button>nice</button><button>привет</button></div></div>
+  <div id="center"></div>
+  <div id="banner" class="hidden"></div>
+  <div id="vignette"></div>
+  <div id="hint"></div>
+  <div id="prog" class="hidden"><div id="progBar"></div><span id="progTxt"></span></div>
+  <div id="hp"><span class="ic">✚</span><b id="hpV">100</b><span class="ic sh">⛉</span><b id="arV">0</b></div>
+  <div id="money">$800</div>
+  <div id="ammo"><b id="mag">12</b><span id="res">/24</span><img id="wIcon" alt=""></div>
+  <div id="slots"></div>
+  <div id="hitm"></div>
+  <div id="spect" class="hidden"></div>
+  <div id="fps" class="hidden"></div>
+  <div id="board" class="hidden"></div>
+  <!-- сенсорное управление -->
+  <div id="touch" class="hidden">
+    <div id="joy"><div id="knob"></div></div>
+    <button class="tb fire" data-act="fire">✸</button>
+    <button class="tb fireL" data-act="fire">✸</button>
+    <button class="tb aim" data-act="aim">◎</button>
+    <button class="tb jump" data-act="jump">⤒</button>
+    <button class="tb crouch" data-act="crouch">⤓</button>
+    <button class="tb reload" data-act="reload">⟳</button>
+    <button class="tb use" data-act="use">E</button>
+    <button class="tb nade" data-act="nade">◍</button>
+    <button class="tb swap" data-act="swap">⇄</button>
+    <button class="tb mini buy" data-act="buy">$</button>
+    <button class="tb mini score" data-act="score">☰</button>
+    <button class="tb mini pause" data-act="pause">❚❚</button>
+    <button class="tb mini insp" data-act="inspect">🔍</button>
+    <button class="tb mini spr" data-act="spray">🎨</button>
+    <button class="tb mini hand" data-act="hand">✋</button>
+    <button class="tb mini drop" data-act="drop">⇣</button>
+    <button class="tb mini chatb" data-act="chatAll">💬</button>
+  </div>
+</div>
+
+<!-- ===== Закупка ===== -->
+<div id="buy" class="modal hidden">
+  <div class="panel buyPanel">
+    <header><b>Закупка</b><span id="buyMoney"></span><button class="x" id="buyClose">✕</button></header>
+    <div id="buyBody"></div>
+  </div>
+</div>
+
+<!-- ===== Пауза ===== -->
+<div id="pause" class="hidden">
+  <header class="pTop">
+    <div class="tleft"><button class="tPlay" id="resume"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg><span>ПРОДОЛЖИТЬ</span></button></div>
+    <nav class="tabs pTabs" id="pTabs">
+      <button data-pt="match" class="on"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4zm0 6h16v4H4zm0 6h16v4H4z"/></svg><span>Матч</span></button>
+      <button data-pt="settings"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.3 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L9 21h4l.3-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg><span>Настройки</span></button>
+      <button data-pt="vote"><svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M4 4h16v16H4z" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>Голосование</span></button>
+      <button data-pt="admin" id="pAdmin" class="hidden"><svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg><span>Админка</span></button>
+    </nav>
+    <div class="tright"><span class="pInfo" id="pInfo"></span><button class="pQuit" id="quit">ОТКЛЮЧИТЬСЯ</button></div>
+  </header>
+  <div class="pBody" id="pBody"></div>
+</div>
+
+<!-- ===== Конец матча ===== -->
+<div id="endScr" class="hidden">
+  <div id="eCancel" class="hidden"></div>
+  <div id="eTitle"></div>
+  <div id="eCards"></div>
+  <div id="eRew"></div>
+  <button class="playBig inline" id="eOk"><span>ПРОДОЛЖИТЬ</span></button>
+</div>
+
+<div id="vac" class="hidden"></div>
+<div id="teamSel" class="hidden"></div>
+<div id="veto" class="hidden"></div>
+<div id="rotate" class="hidden"><div>⟳</div>Поверните телефон горизонтально</div>
+<div id="ytBox" class="hidden"></div>
+<div id="loading" class="hidden">Загрузка карты…</div>
+<!-- поиск матча -->
+<div id="mmBar" class="hidden"><span class="mmDot"></span><b>ПОИСК МАТЧА</b><span id="mmTime">0:00</span><button id="mmCancel" aria-label="Отмена">✕</button></div>
+<div id="accept" class="hidden">
+  <div class="accBox">
+    <div class="accTitle" id="accTitle">ВАШ МАТЧ ГОТОВ!</div>
+    <div class="accMode" id="accMode"></div>
+    <button class="accBtn" id="accBtn"><span>ПРИНЯТЬ</span></button>
+    <div class="accSlots" id="accSlots"></div>
+    <div class="accCount" id="accCount"></div>
+    <div class="accTimer"><i id="accBar"></i></div>
+  </div>
+</div>
+<!-- загрузка матча -->
+<div id="load" class="hidden">
+  <div id="ldBg"></div>
+  <div class="ldShade"></div>
+  <div class="ldHead"><div class="ldMode" id="ldMode"></div><h1 id="ldMap"></h1><div class="ldDesc" id="ldDesc"></div></div>
+  <div class="ldRoster" id="ldRoster"></div>
+  <div class="ldFoot">
+    <div class="ldTip"><b>СОВЕТ</b><span id="ldTip"></span></div>
+    <div class="ldRow"><span id="ldStage"></span><span id="ldPct"></span></div>
+    <div class="ldProg"><i id="ldBar"></i></div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js?v=1793209863"></script>
+</body>
+</html>
